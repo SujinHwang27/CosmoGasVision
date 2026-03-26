@@ -10,6 +10,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import mlflow
 from src.data.loader import SherwoodLoader
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def generate_ray_visualizations():
     print("--- Support Researcher: Generating NeRF Ray Visualizations ---")

@@ -9,6 +9,9 @@ import torch.optim as optim
 from src.data.loader import SherwoodLoader
 from src.models.nerf import IGMNeRF, volume_render_dummy
 import mlflow
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def run_stage1_2a():
     """Execute Stage 1 and Stage 2a of the NeRF Tomography Plan."""
