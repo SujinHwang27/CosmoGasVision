@@ -1,0 +1,47 @@
+# General Exclusions
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Hidden project folders (DVC/Environment)
+# We ignore ALL folders starting with a dot in Git
+# except for the ones needed for repo operation
+.*/
+!.gitignore
+!.github/
+
+# Specific files to ignore
+.env
+
+# Large Project Folders (DVC Tracked)
+Sherwood/
+SherwoodIGM_gal/
+experiments/
+
+# MLflow
+mlruns/
+mlflow.db
+
+# DVC internals
+.dvc/tmp/
+.dvc/cache/
+/.agents
+/.docs

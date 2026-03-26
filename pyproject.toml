@@ -1,0 +1,39 @@
+[project]
+name = "igm-tomography"
+version = "0.1.0"
+description = "3D Gas Density Reconstruction from Lyman-alpha Spectra using Implicit Neural Representations"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+    "h5py>=3.8.0",
+    "fpdf>=1.7.2",
+    "pandoc>=2.4",
+    "pypandoc>=1.16.2",
+    "weasyprint>=66.0",
+    "torch>=2.8.0",
+    "mlflow>=3.1.4",
+    "dvc[s3]>=3.0",
+    "tqdm>=4.67.3",
+    "rich>=14.3.3",
+    "fsspec>=2024.3.1",
+    "dvc-s3",
+    "pathspec",
+    "scmrepo>=3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = []
