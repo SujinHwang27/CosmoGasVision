@@ -85,7 +85,7 @@ if __name__ == "__main__":
     
     if use_mlflow:
         mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
-        mlflow.set_experiment("IGM-Tomography-Stage1")
+        mlflow.set_experiment("Cosmo-Gas-3DGS-Stage1")
         run_name = f"Seeds_P{args.physics}_z{args.redshift:.3f}"
         context_manager = mlflow.start_run(run_name=run_name)
     else:

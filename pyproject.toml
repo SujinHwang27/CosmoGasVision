@@ -1,5 +1,5 @@
 [project]
-name = "igm-tomography"
+name = "cosmo-gas-vision"
 version = "0.1.0"
 description = "3D Gas Density Reconstruction from Lyman-alpha Spectra using Implicit Neural Representations"
 readme = "README.md"
