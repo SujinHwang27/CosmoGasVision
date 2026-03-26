@@ -73,8 +73,8 @@ if __name__ == "__main__":
     print("ARGS PARSED!")
 
     try:
-        # Force local sqlite backend to avoid remote tracking server timeouts
-        os.environ["MLFLOW_TRACKING_URI"] = "sqlite:///mlflow.db"
+        from dotenv import load_dotenv
+        load_dotenv()
         import mlflow
         MLFLOW_AVAILABLE = True
     except ImportError:
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     use_mlflow = MLFLOW_AVAILABLE
     
     if use_mlflow:
-        mlflow.set_tracking_uri("sqlite:///mlflow.db")
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db"))
         mlflow.set_experiment("IGM-Tomography-Stage1")
         run_name = f"Seeds_P{args.physics}_z{args.redshift:.3f}"
         context_manager = mlflow.start_run(run_name=run_name)

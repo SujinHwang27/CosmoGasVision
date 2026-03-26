@@ -22,6 +22,8 @@ dependencies = [
     "dvc-s3",
     "pathspec",
     "scmrepo>=3.0",
+    "python-dotenv>=1.2.1",
+    "boto3>=1.41.5",
 ]
 
 [project.optional-dependencies]
