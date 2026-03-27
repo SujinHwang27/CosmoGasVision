@@ -1,6 +1,6 @@
 outs:
-- md5: 2aabae199e4e1903956d93e8fffe41b1.dir
-  size: 157490
-  nfiles: 17
+- md5: 9e9303f445070dba4be92c22b76b9595.dir
+  size: 2361633
+  nfiles: 18
   hash: md5
   path: paper_cvpr
