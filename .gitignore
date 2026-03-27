@@ -45,3 +45,6 @@ mlflow.db
 .dvc/cache/
 /.agents
 /.docs
+/.overleaf_mcp
+/docs
+/paper_cvpr
