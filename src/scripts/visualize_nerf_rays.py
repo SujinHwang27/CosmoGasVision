@@ -99,17 +99,25 @@ def generate_ray_visualizations():
     stats_csv = os.path.join(out_dir, "ray_field_statistics.csv")
     stats_df.to_csv(stats_csv)
 
-    # MLflow Logging targeting specific NeRF branch
+    # MLflow Logging targeting specific NeRF branch following Governance Rules
     mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://44.201.176.18:5000")
     try:
         mlflow.set_tracking_uri(mlflow_uri)
-        mlflow.set_experiment("exp/nerf")
-        print(f"Connected to MLflow at {mlflow_uri}")
+        mlflow.set_experiment("CosmoGasVision/NeRF")
+        print(f"Connected to MLflow at {mlflow_uri} [Experiment: CosmoGasVision/NeRF]")
     except Exception as e:
         print(f"MLflow connection issue: {e}")
 
     try:
-        with mlflow.start_run(run_name="stage2a_ray_visualization"):
+        with mlflow.start_run(run_name="Stage2a-RayTraceVisualization"):
+            # Metadata Tagging
+            mlflow.set_tags({
+                "model_type": "nerf",
+                "stage": "2a",
+                "physics_id": "1",
+                "redshift": "0.3",
+            })
+            
             # Record base metrics
             mlflow.log_metric("max_density_ray", float(df['Density'].max()))
             mlflow.log_metric("max_tau_ray", float(df['Tau_GroundTruth'].max()))
