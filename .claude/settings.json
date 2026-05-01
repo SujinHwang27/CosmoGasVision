@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv run:*)",
+      "Bash(uv add:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv pip:*)",
+      "Bash(uv lock:*)",
+      "Bash(dvc status:*)",
+      "Bash(dvc list:*)",
+      "Bash(dvc remote:*)",
+      "Bash(dvc push:*)",
+      "Bash(dvc pull:*)",
+      "Bash(dvc add:*)",
+      "Bash(dvc diff:*)",
+      "Bash(mlflow ui:*)",
+      "Bash(python -u:*)",
+      "Bash(python -m:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git ls-files:*)",
+      "Bash(ruff:*)",
+      "Bash(black:*)"
+    ],
+    "deny": [
+      "Write(Sherwood/**)",
+      "Edit(Sherwood/**)",
+      "Write(SherwoodIGM_gal/*.dat)",
+      "Edit(SherwoodIGM_gal/*.dat)",
+      "Write(SherwoodIGM_gal/*.h5)",
+      "Edit(SherwoodIGM_gal/*.h5)",
+      "Write(SherwoodIGM_gal/*.hdf5)",
+      "Edit(SherwoodIGM_gal/*.hdf5)",
+      "Write(SherwoodIGM_gal/*.tar.gz)",
+      "Edit(SherwoodIGM_gal/*.tar.gz)"
+    ]
+  }
+}

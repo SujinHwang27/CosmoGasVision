@@ -27,6 +27,9 @@ wheels/
 .*/
 !.gitignore
 !.github/
+!.claude/
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Specific files to ignore
 .env
@@ -43,7 +46,6 @@ mlflow.db
 # DVC internals
 .dvc/tmp/
 .dvc/cache/
-/.agents
 /.docs
 /.overleaf_mcp
 /docs
