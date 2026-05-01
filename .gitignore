@@ -34,7 +34,8 @@ wheels/
 # Specific files to ignore
 .env
 
-# Large Project Folders (DVC Tracked)
+# Large simulation volumes — NOT DVC-tracked (too large to host on the team
+# remote; load directly from the upstream Sherwood S3 bucket when needed).
 Sherwood/
 SherwoodIGM_gal/
 

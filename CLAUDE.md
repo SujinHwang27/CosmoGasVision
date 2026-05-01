@@ -8,7 +8,7 @@ CosmoGasVision: 3D IGM gas density reconstruction from Lyman-alpha sightlines (S
 - Package manager: **uv** (`uv add`, `uv run`, `uv sync`). Don't use `pip install` directly — it desyncs `uv.lock`.
 - Quote version specifiers: `uv add "fsspec>=2024.1.0"` (otherwise the shell creates junk redirect files).
 - `python -u` for unbuffered output; set `PYTHONPATH=.` from the repo root so `src.` imports resolve.
-- Sim binaries (`Sherwood/`, `SherwoodIGM_gal/`) are kept locally read-only — don't modify in place.
+- Sim binaries (`Sherwood/`, `SherwoodIGM_gal/`) are kept locally read-only — don't modify in place. **Not DVC-tracked** (too large for the team remote): pull directly from upstream `s3://sherwood-raw/` when bootstrapping a machine.
 
 ## Source layout
 - `src/data/` — loaders, validation, all sim-data I/O.

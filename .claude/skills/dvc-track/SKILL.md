@@ -16,6 +16,8 @@ Track an artifact under DVC if **either** condition holds:
 
 Do **not** DVC-track: source code, configs (`.yaml`, `.toml`), markdown, small CSVs (<1 MB), MLflow's own `mlruns/` (already gitignored).
 
+**Project-specific exception** — the upstream simulation volumes `Sherwood/` and `SherwoodIGM_gal/` are deliberately **not** DVC-tracked despite their size. They are sourced from the upstream `s3://sherwood-raw/` bucket and loaded directly per machine. Don't `dvc add` them.
+
 ## Procedure
 
 ```bash
