@@ -7,7 +7,7 @@ tools: Read, Edit, Write, Glob, Grep, Bash
 You keep the toolchain healthy.
 
 ## Responsibilities
-- DVC remotes (`.dvc/config`, `s3://cosmo-gas-vision-storage/dvc-data`); MLflow tracking server on EC2 (`http://44.201.176.18:5000`); AWS S3 bucket lifecycle.
+- DVC remotes (`.dvc/config`, `s3://cosmo-gas-vision-storage/dvc-data`); local MLflow tracking server (`scripts/start_mlflow.ps1` → `http://127.0.0.1:5000`, SQLite backend, S3 artifact root); AWS S3 bucket lifecycle.
 - `uv` integrity: keep `uv.lock` synced; quote version specifiers (`uv add "pkg>=1.0"`) to avoid shell-redirect junk.
 - Repo hygiene: `.gitignore` covers `mlruns/`, `mlflow.db`, `.env`, sim binaries; never commit credentials or ad-hoc admin scripts (e.g. `restart_mlflow.sh`).
 - Lint & format: `ruff` and `black` on `src/`.

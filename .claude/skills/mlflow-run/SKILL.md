@@ -36,7 +36,7 @@ load_dotenv()  # Inject AWS_* for S3 artifact upload (fixes boto3 INTERNAL_ERROR
 
 try:
     import mlflow
-    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://44.201.176.18:5000"))
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000"))
     mlflow.set_experiment(f"CosmoGasVision/{TRACK}")
     run_ctx = mlflow.start_run(run_name=f"Stage{STAGE}-{DESCRIPTION}")
 except Exception as e:
@@ -62,5 +62,5 @@ After the run completes, capture the `run_id` and append it to the LEDGER's **Se
 
 - Run name without a stage prefix → blocks chronological filtering.
 - Skipping any of the four mandatory tags → orphans the run from LEDGER queries.
-- Hard-coding the tracking URI → use `MLFLOW_TRACKING_URI` env so dev/prod switch cleanly.
+- Hard-coding the tracking URI → use `MLFLOW_TRACKING_URI` env so dev/prod switch cleanly. The server is launched locally via `scripts/start_mlflow.ps1`; the URI default is `http://127.0.0.1:5000`.
 - Letting an unreachable server crash the script → always wrap in the try/except + `nullcontext` fallback above; CLAUDE.md flags this as a silent-exit cause.

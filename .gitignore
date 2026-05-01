@@ -37,7 +37,10 @@ wheels/
 # Large Project Folders (DVC Tracked)
 Sherwood/
 SherwoodIGM_gal/
-experiments/
+
+# Experiments: track source (LEDGER.md, pipeline.py, configs); DVC-track artifacts
+experiments/**/artifacts/
+experiments/**/__pycache__/
 
 # MLflow
 mlruns/

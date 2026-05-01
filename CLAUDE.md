@@ -48,5 +48,6 @@ If the same command fails 3 times with no progress, **stop and surface the issue
 - Silent script exit (code 0, no output) → usually `import mlflow` hang. Test imports sequentially with `print` diagnostics; run with `python -u`; verify `MLFLOW_TRACKING_URI` is reachable; ensure script falls back to `nullcontext` when MLflow is unavailable.
 
 ## Remote services
-- MLflow tracking URI: `http://44.201.176.18:5000` (override with `MLFLOW_TRACKING_URI` env var; loaded from `.env`).
+- MLflow tracking URI: `http://127.0.0.1:5000` — **served locally by this machine**. Launch with `pwsh scripts/start_mlflow.ps1`. Backend: SQLite (`mlflow.db`, gitignored). Artifacts: `s3://cosmo-gas-vision-storage/mlflow-artifacts`. Override with `MLFLOW_TRACKING_URI` env var; loaded from `.env`.
 - DVC remote: `s3://cosmo-gas-vision-storage/dvc-data`.
+- The previous EC2 tracker (`44.201.176.18:5000`) is decommissioned. Run IDs from before this migration are still recorded in each track's LEDGER §6 but their UI links no longer resolve.
