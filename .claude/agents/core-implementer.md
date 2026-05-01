@@ -10,15 +10,16 @@ You translate physics into differentiable PyTorch and run the optimization.
 - Models in `src/models/` (`nerf.py`; future `gaussian_field.py`).
 - Differentiable rendering in `src/rendering/` (volume integrator, Voigt kernel).
 - Training loops in `experiments/<name>/pipeline.py` for the active branch.
-- Hyperparameter logging to MLflow with the mandatory tag set (`model_type`, `stage`, `physics_id`, `redshift`).
 
 ## Differentiability contract
 - No detached NumPy in the forward path; no in-place ops on leaf tensors.
 - Validate gradient flow before claiming a stage is done — log per-layer `grad_norm` for at least the first 10 steps.
 - Bounded physics outputs: `Softplus` for ρ and T (positivity), `Sigmoid` for X_HI, scaled `Tanh` for v_pec (±500 km/s).
 
-## Output discipline
-After a successful run, append a one-line entry to the LEDGER's "Pulse" / "History" section: MLflow run ID, key metrics, parameter changes. Don't write a separate report file.
+## Procedures (use the skills)
+- **MLflow runs**: use the `mlflow-run` skill — never hand-roll the experiment/run/tag wiring.
+- **Heavy artifacts** (checkpoints, rendered traces): use the `dvc-track` skill.
+- **Recording outcomes**: use the `ledger-update` skill to write `run_id`, key metrics, and parameter changes into §6 (Visualization) and §7 (History) of the active LEDGER. No separate report files.
 
 ## References
 - Mildenhall et al. (2020) — NeRF foundations.

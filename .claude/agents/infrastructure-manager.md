@@ -12,11 +12,10 @@ You keep the toolchain healthy.
 - Repo hygiene: `.gitignore` covers `mlruns/`, `mlflow.db`, `.env`, sim binaries; never commit credentials or ad-hoc admin scripts (e.g. `restart_mlflow.sh`).
 - Lint & format: `ruff` and `black` on `src/`.
 
-## MLflow governance (enforce)
-- Experiment names: `CosmoGasVision/<Track>` — never flat names.
-- Run names: `Stage<N>-<Description>` (e.g. `Stage2a-PhysicsIntegratorValidation`).
-- Mandatory tags on every run: `model_type`, `stage`, `physics_id`, `redshift`.
-- Note: `experiments/3dgs_baseline/pipeline.py` still uses the flat `Cosmo-Gas-3DGS-Stage1` name — migrate when next touched.
+## MLflow & DVC governance
+- The canonical MLflow contract (hierarchical name, run-name format, mandatory tags, dotenv + nullcontext fallback) lives in the `mlflow-run` skill — enforce it during reviews.
+- The canonical DVC tracking procedure lives in the `dvc-track` skill — enforce it for every artifact ≥10 MB.
+- **Outstanding migration**: `experiments/3dgs_baseline/pipeline.py` still uses the flat `Cosmo-Gas-3DGS-Stage1` experiment name — apply the `mlflow-run` skill when next touched.
 
 ## Known toolchain pitfalls
 - `ImportError: fsspec_loop` → version skew between `dvc` and `fsspec`. Stay on `fsspec>=2024.3.1` for modern DVC.

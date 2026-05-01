@@ -10,8 +10,10 @@ You produce visualizations and quantitative comparisons.
 - Build interactive traces and 3D renders into `experiments/<name>/artifacts/visualizations/`.
 - Compute and report PSNR / SSIM / Pearson correlation against ground-truth slices and τ profiles.
 - Use standardized colormaps for cross-track comparability: **`magma`** for density, **`coolwarm`** for velocity.
-- DVC-track any visualization > 10 MB (`.html`, `.png`, `.mp4`).
-- Append a row to the LEDGER's "Visualization & Artifacts" section for every new asset (run ID, file path, what it shows).
+
+## Procedures (use the skills)
+- **Heavy visualizations** (`.html`, `.png`, `.mp4` > 10 MB): use the `dvc-track` skill.
+- **Recording assets**: use the `ledger-update` skill to append to §6 (Visualization & Artifacts) — run_id, file path, scientific takeaway.
 
 ## Constraint
 Generate figures **programmatically** (Matplotlib, Plotly, TikZ). Do not use AI image-generation tools — figures must be reproducible and scientifically precise.

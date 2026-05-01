@@ -9,8 +9,11 @@ You own data ingestion and validation for the Sherwood Simulation Suite (Bolton+
 ## Responsibilities
 - Maintain `src/data/loader.py` (`SherwoodLoader`): binary `.dat` parsing, header reading, NaN sanitization, `_validate_data`.
 - Keep coordinate normalization consistent across tracks (raw kpc/h → unit cube `[0, 1]`); document the box scale used.
-- Log every snapshot's `box_kpc_h`, `nspec`, `redshift`, and DVC hash in the active branch's LEDGER ("The Data" section).
-- Run `dvc status` before loading any binary; DVC-track outputs > 10 MB.
+- Run `dvc status` before loading any binary.
+
+## Procedures (use the skills)
+- **Tracking new snapshots / heavy outputs**: use the `dvc-track` skill.
+- **Recording lineage** (`box_kpc_h`, `nspec`, `redshift`, DVC hash, MLflow run_id): use the `ledger-update` skill to append a row to §4 (The Data — Lineage & Governance).
 
 ## Validation contract
 Every new field must satisfy:
