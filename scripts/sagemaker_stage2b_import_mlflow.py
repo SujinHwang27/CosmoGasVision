@@ -1,10 +1,10 @@
 """Replay MLflow runs from a finished SageMaker training job into the local
 tracker.
 
-Stage 2b cloud trainers write MLflow under ``file:///opt/ml/output/mlflow`` in
+Stage 2b cloud trainers write MLflow under ``file:///opt/ml/model/mlflow`` in
 the container (see ``scripts/sagemaker_stage2b_launch.py``); SageMaker tarballs
-``/opt/ml/output/`` into ``output.tar.gz`` and uploads it to
-``s3://cosmo-gas-vision-storage/stage2b-output/<JOBNAME>/output/output.tar.gz``
+``/opt/ml/model/`` into ``model.tar.gz`` and uploads it to
+``s3://cosmo-gas-vision-storage/stage2b-output/<JOBNAME>/output/model.tar.gz``
 at job exit. This script:
 
   1. Downloads that tarball.
@@ -96,7 +96,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--source_tarball",
         default=None,
-        help="Optional local path to output.tar.gz. Skips the S3 download "
+        help="Optional local path to model.tar.gz. Skips the S3 download "
              "(useful for offline replays / unit tests).",
     )
     parser.add_argument(
@@ -114,7 +114,7 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 def _download_tarball(bucket: str, prefix: str, job_name: str, dest: Path) -> Path:
     if boto3 is None:
         sys.exit("ERROR: boto3 is not installed. `uv add boto3` first.")
-    key = f"{prefix}/{job_name}/output/output.tar.gz"
+    key = f"{prefix}/{job_name}/output/model.tar.gz"
     print(f"[s3] downloading s3://{bucket}/{key} -> {dest}")
     s3 = boto3.client("s3")
     s3.download_file(bucket, key, str(dest))
@@ -204,7 +204,7 @@ def _replay_run(
             )
 
     # Artifacts: the artifact_uri stored in meta.yaml points to the path used
-    # when the source store was first created (e.g. /opt/ml/output/mlflow/...
+    # when the source store was first created (e.g. /opt/ml/model/mlflow/...
     # inside the SageMaker container), which no longer exists locally. Resolve
     # the actual on-disk artifact directory by walking the extracted store
     # layout: <store_root>/<experiment_id>/<run_id>/artifacts/.
@@ -255,7 +255,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(f"[s3] using local tarball {tarball}")
         else:
             tarball = _download_tarball(args.bucket, args.prefix, args.job_name,
-                                        workdir / "output.tar.gz")
+                                        workdir / "model.tar.gz")
 
         # 2. Extract and locate the mlflow file-store.
         extract_dir = workdir / "extracted"

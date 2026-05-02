@@ -59,10 +59,10 @@ SHERWOOD_CONTAINER_PATH = "/opt/ml/input/data/sherwood"
 
 # In-container MLflow store. file:// scheme avoids the 127.0.0.1:5000 retry
 # storm — the local tracker isn't reachable from a SageMaker worker. Output
-# under /opt/ml/output/ is auto-tarballed to S3 at job exit; the post-job
+# under /opt/ml/model/ is auto-tarballed to S3 at job exit; the post-job
 # importer (scripts/sagemaker_stage2b_import_mlflow.py) replays runs into
 # the local tracker.
-SAGEMAKER_MLFLOW_URI = "file:///opt/ml/output/mlflow"
+SAGEMAKER_MLFLOW_URI = "file:///opt/ml/model/mlflow"
 
 # These two are deployment-environment dependent. They MUST be set as env vars
 # (or via the matching CLI flags) before launching.
@@ -272,8 +272,8 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
         "EnableManagedSpotTraining": not args.no_spot,
         "Environment": {
             # In-container MLflow goes to a local file store under
-            # /opt/ml/output/mlflow/. Anything under /opt/ml/output/ is
-            # auto-tarballed by SageMaker into output.tar.gz at job exit, then
+            # /opt/ml/model/mlflow/. Anything under /opt/ml/output/ is
+            # auto-tarballed by SageMaker into model.tar.gz at job exit, then
             # replayed into the host MLflow tracker (args.mlflow_uri) by
             # scripts/sagemaker_stage2b_import_mlflow.py. This avoids the
             # 127.0.0.1:5000 retry storm that hangs the container ~4 min and
@@ -323,8 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     client = boto3.client("sagemaker", region_name=args.region)
     response = client.create_training_job(**payload)
     print(f"\nSubmitted: {response['TrainingJobArn']}")
-    # In-container MLflow writes to file:///opt/ml/output/mlflow which lands in
-    # output.tar.gz at job exit. Replay into the host tracker with:
+    # In-container MLflow writes to file:///opt/ml/model/mlflow which lands in
+    # model.tar.gz at job exit. Replay into the host tracker with:
     print(
         f"==> When job completes: uv run python scripts/sagemaker_stage2b_import_mlflow.py "
         f"{payload['TrainingJobName']} --mlflow_uri {args.mlflow_uri}"
