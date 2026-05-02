@@ -233,16 +233,28 @@ def train(args):
             f"Stage2b-Ablation-P{args.physics}-N{args.n_rays}-S{args.seed}"
         )
 
+    # Device --------------------------------------------------------------
+    # Without explicit device placement the entire training loop runs on CPU
+    # even on a GPU instance — silent ~7-min hang surfaced on the B-2 cloud
+    # smoke (33M MLP points/step on g5.xlarge's 4 vCPU). The renderer in
+    # src/models/nerf.py already follows the input tensor's device, so moving
+    # the model + parameters + dataset tensors here cascades correctly.
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}", flush=True)
+
     # Dataset --------------------------------------------------------------
     coords, vel_axis, tau_gt_profile, box_max = load_dataset(args)
+    coords = coords.to(device)
+    vel_axis = vel_axis.to(device)
+    tau_gt_profile = tau_gt_profile.to(device)
 
     # Available rays after potential truncation
     n_rays_actual = coords.shape[0]
     n_bins = coords.shape[1]
 
     # Model ---------------------------------------------------------------
-    model = IGMNeRF(hidden_dim=256, num_layers=8, L=10)
-    log_tau_amp = torch.nn.Parameter(torch.tensor(0.0))
+    model = IGMNeRF(hidden_dim=256, num_layers=8, L=10).to(device)
+    log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
     sigma_log = 0.5
     tau_amp_prior_weight = 1e-3
 
