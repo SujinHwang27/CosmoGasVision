@@ -39,6 +39,14 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
+# MLflow's set_terminated() prints a "🏃 View run ..." message that crashes on
+# non-UTF-8 stdout encodings (e.g. cp949 on Windows-Korean locales). Reconfigure
+# stdout/stderr to UTF-8 with replace-errors fallback before any MLflow call so
+# the importer doesn't die at the last step of a successful replay.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure") and getattr(_stream, "encoding", "").lower() != "utf-8":
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # boto3 + mlflow are runtime deps; soft-import for clearer error messages.
 try:
     import boto3  # type: ignore
