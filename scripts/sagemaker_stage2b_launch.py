@@ -117,7 +117,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--code_s3_uri",
         type=str,
         default=os.environ.get(CODE_S3_URI_ENV),
-        help=f"S3 URI of source tarball staged at /opt/ml/code/. Defaults to ${CODE_S3_URI_ENV}.",
+        help=f"S3 URI of source tarball staged at /opt/ml/code/. Defaults to ${CODE_S3_URI_ENV}. "
+             "Optional when source is already baked into the image at /opt/ml/code/.",
     )
     parser.add_argument(
         "--region",
@@ -155,8 +156,7 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
         sys.exit(f"ERROR: --role_arn or ${ROLE_ARN_ENV} is required.")
     if not args.image_uri:
         sys.exit(f"ERROR: --image_uri or ${IMAGE_URI_ENV} is required.")
-    if not args.code_s3_uri:
-        sys.exit(f"ERROR: --code_s3_uri or ${CODE_S3_URI_ENV} is required.")
+    # code_s3_uri is optional when the image bakes /opt/ml/code/ at build time.
 
     run_id = _build_run_id(args.physics, args.n_rays, args.seed)
     checkpoint_s3 = f"s3://{S3_BUCKET}/{CHECKPOINT_PREFIX}/{run_id}/"
@@ -172,10 +172,14 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
         "max_steps": str(args.max_steps),
         "checkpoint_interval": str(CHECKPOINT_INTERVAL_STEPS),
         "run_name": run_id,
-        # Entry-point script path inside /opt/ml/code/ (set by code_s3_uri tarball).
+        # Entry-point script path inside /opt/ml/code/.
         "sagemaker_program": "experiments/nerf/pipeline.py",
-        "sagemaker_submit_directory": args.code_s3_uri,
     }
+    if args.code_s3_uri:
+        # SageMaker SDK convention: pull source tarball from S3 to /opt/ml/code/
+        # at job start. Without this, /opt/ml/code/ must already exist in the
+        # training image (the Dockerfile in this repo bakes it).
+        hyperparameters["sagemaker_submit_directory"] = args.code_s3_uri
 
     payload: Dict[str, Any] = {
         "TrainingJobName": run_id,
