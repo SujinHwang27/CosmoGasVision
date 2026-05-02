@@ -344,6 +344,12 @@ def train(args):
         # Training loop ----------------------------------------------------
         for step in range(start_step + 1, args.max_steps + 1):
             optimizer.zero_grad(set_to_none=True)
+            # Pass 1 runs under no_grad, so a single tau_amp tensor is fine
+            # here. Pass 2 must recompute tau_amp inside the chunk loop so
+            # each microbatch's backward owns its own autograd subgraph
+            # rooted at log_tau_amp (otherwise chunk 1's backward would try
+            # to traverse the torch.exp node that chunk 0 already freed —
+            # the latent D-14 bug surfaced by the B-2 cloud smoke).
             tau_amp = torch.exp(log_tau_amp)
 
             # ---- Pass 1: compute the cycle mean of exp(-tau) (no grad). ----
@@ -378,8 +384,15 @@ def train(args):
             # frees the graph immediately, keeping peak memory at one chunk.
             data_loss_chunks = []
             for chunk_i, (s, e) in enumerate(microbatch_slices()):
+                # Recompute tau_amp per chunk so its torch.exp autograd node
+                # is local to this microbatch's backward pass. Without this,
+                # the second chunk's .backward() raises "Trying to backward
+                # through the graph a second time" because chunk 0 already
+                # freed the shared exp node. log_tau_amp.grad still
+                # accumulates correctly (sum over chunks).
+                tau_amp_chunk = torch.exp(log_tau_amp)
                 tau_pred_mb = volume_render_physics(
-                    model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp,
+                    model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
                 )
                 loss_data_mb = mse_loss(tau_pred_mb, tau_gt_profile[s:e])
                 mean_F_mb = torch.exp(-tau_pred_mb).mean()
