@@ -68,8 +68,18 @@ if ! aws ecr describe-repositories --repository-names "${REPOSITORY}" --region "
 fi
 
 # --- Build, tag, push --------------------------------------------------------
+# SageMaker's pull path requires Docker v2 schema (not OCI index with provenance
+# attestations). Modern Docker buildx defaults to OCI multi-manifest, which
+# SageMaker rejects with a misleading "Access denied for repository" error.
+# Force linux/amd64 single-platform + disable provenance + load into local
+# daemon so the subsequent `docker tag`/`docker push` produce a Docker v2 manifest.
 echo "==> Building image ${REPOSITORY}:${TAG} ..."
-docker build -t "${REPOSITORY}:${TAG}" .
+docker buildx build \
+    --platform linux/amd64 \
+    --provenance=false \
+    --sbom=false \
+    --output type=docker \
+    -t "${REPOSITORY}:${TAG}" .
 
 echo "==> Tagging for ECR ..."
 docker tag "${REPOSITORY}:${TAG}" "${ECR_URI}"
