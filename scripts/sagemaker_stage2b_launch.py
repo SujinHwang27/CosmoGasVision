@@ -50,6 +50,20 @@ MAX_WAIT_S = 36000                         # 10 hr, [D-14]
 CHECKPOINT_INTERVAL_STEPS = 10000          # checkpoint sync cadence, [D-14]
 DEFAULT_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
+# Sherwood data mirror in our bucket. Mirrors only the Physics<N>/los*.dat and
+# tauH1*.dat files actually consumed by SherwoodLoader; the upstream
+# s3://sherwood-raw/ prefix is too large to ingest in full.
+# SageMaker auto-syncs this to /opt/ml/input/data/sherwood/ on the worker.
+SHERWOOD_S3_PREFIX = f"s3://{S3_BUCKET}/sherwood/"
+SHERWOOD_CONTAINER_PATH = "/opt/ml/input/data/sherwood"
+
+# In-container MLflow store. file:// scheme avoids the 127.0.0.1:5000 retry
+# storm — the local tracker isn't reachable from a SageMaker worker. Output
+# under /opt/ml/output/ is auto-tarballed to S3 at job exit; the post-job
+# importer (scripts/sagemaker_stage2b_import_mlflow.py) replays runs into
+# the local tracker.
+SAGEMAKER_MLFLOW_URI = "file:///opt/ml/output/mlflow"
+
 # These two are deployment-environment dependent. They MUST be set as env vars
 # (or via the matching CLI flags) before launching.
 #   SAGEMAKER_ROLE_ARN    : IAM role the training job assumes.
@@ -99,7 +113,10 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--mlflow_uri",
         type=str,
         required=True,
-        help="MLflow tracking URI to forward as MLFLOW_TRACKING_URI in the container.",
+        help="MLflow tracking URI for THIS host (not the container). Logged to "
+             "stdout for audit; the container always uses the file:// store at "
+             f"{SAGEMAKER_MLFLOW_URI}, which is replayed back to this URI by "
+             "scripts/sagemaker_stage2b_import_mlflow.py after the job finishes.",
     )
     parser.add_argument(
         "--role_arn",
@@ -207,8 +224,30 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
                 "--run_name", run_id,
                 "--checkpoint_dir", "/opt/ml/checkpoints",
                 "--checkpoint_interval", str(CHECKPOINT_INTERVAL_STEPS),
+                # Sherwood mirror is mounted at /opt/ml/input/data/sherwood/
+                # by the InputDataConfig channel below. SherwoodLoader expects
+                # data_root such that data_root/Physics<N>_<name>/los*.dat
+                # resolves, so we pass the channel mount point directly.
+                "--data_root", SHERWOOD_CONTAINER_PATH,
             ],
         },
+        "InputDataConfig": [
+            {
+                "ChannelName": "sherwood",
+                "DataSource": {
+                    "S3DataSource": {
+                        "S3DataType": "S3Prefix",
+                        "S3Uri": SHERWOOD_S3_PREFIX,
+                        # File mode: full prefix is downloaded to
+                        # /opt/ml/input/data/sherwood/ before container start.
+                        # Stage 2b file sizes (~1.5 GB / Physics) are well
+                        # within EBS budget set in ResourceConfig.
+                        "S3DataDistributionType": "FullyReplicated",
+                    }
+                },
+                "InputMode": "File",
+            },
+        ],
         "HyperParameters": hyperparameters,
         "ResourceConfig": {
             "InstanceType": INSTANCE_TYPE,
@@ -232,14 +271,19 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
         ),
         "EnableManagedSpotTraining": not args.no_spot,
         "Environment": {
-            "MLFLOW_TRACKING_URI": args.mlflow_uri,
+            # In-container MLflow goes to a local file store under
+            # /opt/ml/output/mlflow/. Anything under /opt/ml/output/ is
+            # auto-tarballed by SageMaker into output.tar.gz at job exit, then
+            # replayed into the host MLflow tracker (args.mlflow_uri) by
+            # scripts/sagemaker_stage2b_import_mlflow.py. This avoids the
+            # 127.0.0.1:5000 retry storm that hangs the container ~4 min and
+            # silently records nothing (Run id: None in the B-2 smoke).
+            "MLFLOW_TRACKING_URI": SAGEMAKER_MLFLOW_URI,
             "MLFLOW_EXPERIMENT_NAME": "CosmoGasVision/NeRF",
             "STAGE2B_RUN_NAME": run_id,
             "PYTHONUNBUFFERED": "1",
-            # Cap MLflow's HTTP retry storm. The default retry policy hangs the
-            # container ~4 min waiting for a 127.0.0.1:5000 tracker that isn't
-            # reachable from SageMaker. With these caps it falls through to
-            # nullcontext in ~10 sec, saving billable GPU time per run.
+            # Harmless for file:// scheme but kept as belt-and-suspenders in
+            # case any code path falls through to an HTTP backend.
             "MLFLOW_HTTP_REQUEST_TIMEOUT": "10",
             "MLFLOW_HTTP_REQUEST_MAX_RETRIES": "1",
         },
@@ -279,6 +323,12 @@ def main(argv: list[str] | None = None) -> int:
     client = boto3.client("sagemaker", region_name=args.region)
     response = client.create_training_job(**payload)
     print(f"\nSubmitted: {response['TrainingJobArn']}")
+    # In-container MLflow writes to file:///opt/ml/output/mlflow which lands in
+    # output.tar.gz at job exit. Replay into the host tracker with:
+    print(
+        f"==> When job completes: uv run python scripts/sagemaker_stage2b_import_mlflow.py "
+        f"{payload['TrainingJobName']} --mlflow_uri {args.mlflow_uri}"
+    )
     return 0
 
 
