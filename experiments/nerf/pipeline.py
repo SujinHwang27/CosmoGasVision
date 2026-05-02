@@ -47,23 +47,22 @@ def run_stage1_2a():
             box_max = sightlines['header']['box_kpc_h']
             print(f"Loaded {coords_raw.shape[0]} rays. Normalizing coords to box scale {box_max} kpc/h")
 
-            # Smoke-run scope: 10 sightlines, every 8th velocity bin (256 of 2048).
-            # The full RSD convolution at 2048 bins requires the windowed
-            # implementation flagged in [D-06] (Stage 2b prerequisite); the
-            # naive (n_rays, 2048, 2048) intermediate exceeds memory.
+            # Smoke-run scope: 10 sightlines, full 2048-bin grid. The windowed
+            # Voigt convolution in volume_render_physics keeps the intermediate
+            # tensor O(n_rays * n_src * (2*W+1)) rather than O(n_src * n_obs),
+            # closing [D-06]'s memory gap.
             n_rays = 10
-            stride = 8
-            coords = torch.tensor(coords_raw[:n_rays, ::stride], dtype=torch.float32) / box_max
+            coords = torch.tensor(coords_raw[:n_rays], dtype=torch.float32) / box_max
 
-            # Velocity grid (km/s), strided to match
-            vel_axis = torch.tensor(sightlines['vel_axis'][::stride], dtype=torch.float32)
+            # Velocity grid (km/s) — full-resolution simulation grid
+            vel_axis = torch.tensor(sightlines['vel_axis'], dtype=torch.float32)
 
-            # Ground truth: full tau(v) profile per ray, strided to match
-            tau_gt_profile = torch.tensor(sightlines['tau_h1'][:n_rays, ::stride], dtype=torch.float32)
+            # Ground truth: full tau(v) profile per ray
+            tau_gt_profile = torch.tensor(sightlines['tau_h1'][:n_rays], dtype=torch.float32)
 
             # Sanity check: normalized coords should fill [0, 1]
             print(f"Normalized coord range: [{coords.min().item():.4f}, {coords.max().item():.4f}]")
-            print(f"Smoke scope: {n_rays} rays x {coords.shape[1]} bins (stride={stride}); full-grid Voigt deferred to Stage 2b windowed implementation.")
+            print(f"Smoke scope: {n_rays} rays x {coords.shape[1]} bins (full grid, windowed Voigt).")
 
         except FileNotFoundError as e:
             print("Data files not found, exiting.", e)
@@ -94,12 +93,21 @@ def run_stage1_2a():
 
             # Production-scale architecture (D-09 paper-vs-code parity): 8 layers / L=10.
             model = IGMNeRF(hidden_dim=256, num_layers=8, L=10)
-            # Single learnable amplitude absorbing sigma_0 * ds * mean column.
-            tau_amp = torch.nn.Parameter(torch.tensor(1.0))
-            print(f"Model: {sum(p.numel() for p in model.parameters())} params + 1 tau_amp scalar.")
+
+            # Learnable optical-depth amplitude absorbing sigma_0 * ds * mean column.
+            # Parameterized in log-space so it stays positive under unconstrained Adam,
+            # and anchored to log(tau_amp) ~ N(0, sigma_log) per [D-10] to break the
+            # tau_amp <-> density rescaling degeneracy. Width sigma_log=0.5 corresponds
+            # to a multiplicative uncertainty of factor exp(0.5) ~ 1.65; tight enough
+            # to break the symmetry, loose enough not to dominate the data fit.
+            log_tau_amp = torch.nn.Parameter(torch.tensor(0.0))
+            sigma_log = 0.5
+            tau_amp_prior_weight = 1e-3   # subdominant to data MSE at smoke scale
+
+            print(f"Model: {sum(p.numel() for p in model.parameters())} params + log_tau_amp scalar.")
 
             optimizer = optim.Adam(
-                list(model.parameters()) + [tau_amp],
+                list(model.parameters()) + [log_tau_amp],
                 lr=5e-4,
             )
             mse_loss = torch.nn.MSELoss()
@@ -111,34 +119,45 @@ def run_stage1_2a():
                 "n_rays": coords.shape[0],
                 "n_bins": coords.shape[1],
                 "lr": 5e-4,
-                "loss_form": "tau_v_profile_mse",
+                "loss_form": "tau_v_profile_mse + log_tau_amp_prior",
+                "voigt_window_bins": 64,
+                "log_tau_amp_sigma": sigma_log,
+                "tau_amp_prior_weight": tau_amp_prior_weight,
             })
 
             for step in range(10):
                 optimizer.zero_grad()
 
-                # Forward pass: full tau(v) profile via RSD convolution
+                tau_amp = torch.exp(log_tau_amp)
+
+                # Forward pass: full tau(v) profile via windowed RSD convolution
                 tau_pred = volume_render_physics(
                     model, coords, vel_axis=vel_axis, tau_amp=tau_amp
                 )  # (n_rays, n_bins)
 
-                loss = mse_loss(tau_pred, tau_gt_profile)
+                loss_data = mse_loss(tau_pred, tau_gt_profile)
+                loss_prior = (log_tau_amp ** 2) / (2 * sigma_log ** 2)
+                loss = loss_data + tau_amp_prior_weight * loss_prior
                 loss.backward()
 
                 grad_norm = model.out_layer.weight.grad.norm().item()
                 optimizer.step()
 
                 print(
-                    f"Step {step+1}/10 | Loss: {loss.item():.4f} | "
+                    f"Step {step+1}/10 | Loss: {loss.item():.4f} "
+                    f"(data={loss_data.item():.4f}, prior={loss_prior.item():.4f}) | "
                     f"Grad Norm: {grad_norm:.4f} | tau_amp: {tau_amp.item():.4f}",
                     flush=True,
                 )
 
                 mlflow.log_metric("loss", loss.item(), step=step)
+                mlflow.log_metric("loss_data", loss_data.item(), step=step)
+                mlflow.log_metric("loss_prior", loss_prior.item(), step=step)
                 mlflow.log_metric("grad_norm", grad_norm, step=step)
                 mlflow.log_metric("tau_amp", tau_amp.item(), step=step)
 
             print("Backward pass and gradient flow confirmed. Projection layer verified.")
+            print(f"Run id: {mlflow.active_run().info.run_id}", flush=True)
 
     except Exception as e:
         print(f"Pipeline error after run body: {e}", flush=True)
