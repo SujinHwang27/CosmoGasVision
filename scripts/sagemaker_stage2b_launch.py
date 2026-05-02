@@ -127,6 +127,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="AWS region. Default from AWS_DEFAULT_REGION env var.",
     )
     parser.add_argument(
+        "--no_spot",
+        action="store_true",
+        help="Use on-demand instead of managed spot training. Default is spot "
+             "(70%% cheaper, can be preempted). Use on-demand when spot quota "
+             "is unavailable or for time-sensitive runs.",
+    )
+    parser.add_argument(
         "--launch",
         action="store_true",
         help="Actually call create_training_job. Without this flag the script "
@@ -218,16 +225,23 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
             "S3Uri": checkpoint_s3,
             "LocalPath": "/opt/ml/checkpoints",
         },
-        "StoppingCondition": {
-            "MaxRuntimeInSeconds": MAX_RUNTIME_S,
-            "MaxWaitTimeInSeconds": MAX_WAIT_S,
-        },
-        "EnableManagedSpotTraining": True,
+        "StoppingCondition": (
+            {"MaxRuntimeInSeconds": MAX_RUNTIME_S}
+            if args.no_spot
+            else {"MaxRuntimeInSeconds": MAX_RUNTIME_S, "MaxWaitTimeInSeconds": MAX_WAIT_S}
+        ),
+        "EnableManagedSpotTraining": not args.no_spot,
         "Environment": {
             "MLFLOW_TRACKING_URI": args.mlflow_uri,
             "MLFLOW_EXPERIMENT_NAME": "CosmoGasVision/NeRF",
             "STAGE2B_RUN_NAME": run_id,
             "PYTHONUNBUFFERED": "1",
+            # Cap MLflow's HTTP retry storm. The default retry policy hangs the
+            # container ~4 min waiting for a 127.0.0.1:5000 tracker that isn't
+            # reachable from SageMaker. With these caps it falls through to
+            # nullcontext in ~10 sec, saving billable GPU time per run.
+            "MLFLOW_HTTP_REQUEST_TIMEOUT": "10",
+            "MLFLOW_HTTP_REQUEST_MAX_RETRIES": "1",
         },
         "Tags": [
             {"Key": "model_type", "Value": "nerf"},
