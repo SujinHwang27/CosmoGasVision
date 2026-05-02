@@ -480,6 +480,12 @@ def train(args):
                     mlflow_run_id=active_run_id,
                 )
 
+        if torch.cuda.is_available():
+            peak_vram_gb = torch.cuda.max_memory_allocated() / 1e9
+            print(f"Peak VRAM: {peak_vram_gb:.2f} GB", flush=True)
+            if mlflow_active:
+                mlflow.log_metric("peak_vram_gb", peak_vram_gb)
+
         print("Training finished.", flush=True)
 
 
