@@ -30,6 +30,12 @@ import time
 import uuid
 from typing import Any, Dict
 
+# UTF-8 stdout/stderr — payload includes em-dash etc.; default cp949 on
+# Windows-Korean crashes on print. Same fix as in the importer.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure") and getattr(_stream, "encoding", "").lower() != "utf-8":
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 # boto3 is a soft dependency — the script must import cleanly so reviewers can
 # inspect the payload even on a machine without AWS SDK installed.
 try:
@@ -108,6 +114,22 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=int,
         default=50000,
         help="Total optimizer steps. Default 50000 per [D-14].",
+    )
+    parser.add_argument(
+        "--microbatch",
+        type=int,
+        default=None,
+        help="Per-chunk ray count. None lets pipeline.py use its default 1024. "
+             "[D-23] specifies 4096 for tier 3 (n_rays=1024) and 8192 for tier 4 "
+             "(n_rays=16384) to keep accum_steps small without OOM.",
+    )
+    parser.add_argument(
+        "--warmup_steps",
+        type=int,
+        default=None,
+        help="LR warmup steps. None lets pipeline.py use its default 1000. "
+             "Override to 50 for the [D-23] micro-grid (max_steps=200) and to "
+             "500 for tier 3/4 cost-survey runs (max_steps=12500).",
     )
     parser.add_argument(
         "--mlflow_uri",
@@ -238,7 +260,11 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
                 # data_root such that data_root/Physics<N>_<name>/los*.dat
                 # resolves, so we pass the channel mount point directly.
                 "--data_root", SHERWOOD_CONTAINER_PATH,
-            ],
+            ] + (
+                ["--microbatch", str(args.microbatch)] if args.microbatch is not None else []
+            ) + (
+                ["--warmup_steps", str(args.warmup_steps)] if args.warmup_steps is not None else []
+            ),
         },
         "InputDataConfig": [
             {
