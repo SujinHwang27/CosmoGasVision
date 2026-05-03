@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from src.analysis.flux_power import compute_PF_1d
 from src.analysis.density_power import compute_Pdelta_3d
 from src.analysis.cross_corr import compute_xi_cross
-from src.analysis.flux_pdf import compute_F_PDF, ks_distance
+from src.analysis.flux_pdf import compute_F_PDF, ks_distance_pdf
 from src.data.igm_gal_loader import SherwoodIGMGalLoader
 from src.data.loader import SherwoodLoader
 from src.models.nerf import IGMNeRF
@@ -219,7 +219,7 @@ def _fig_flux_pdf(
     F_bins = np.linspace(0.0, 1.0, 51)
     c, pdf_p = compute_F_PDF(tau_pred, F_bins)
     _, pdf_t = compute_F_PDF(tau_truth, F_bins)
-    ks = ks_distance(pdf_p, pdf_t, F_bins)
+    ks = ks_distance_pdf(pdf_p, pdf_t, F_bins)
     fig, ax = plt.subplots(figsize=(5.4, 4.0))
     ax.plot(c, pdf_t, "k-", lw=2, label="Truth")
     ax.plot(c, pdf_p, "C0--", lw=2, label="Predicted")
