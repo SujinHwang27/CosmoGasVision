@@ -151,6 +151,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "is unavailable or for time-sensitive runs.",
     )
     parser.add_argument(
+        "--stage_tag",
+        type=str,
+        default="2b",
+        help="Value for the MLflow `stage` tag (and SageMaker job tag). Default "
+             "'2b' for production matrix runs; pass '2b-microsweep' for the "
+             "[D-23] 16-cell pre-flight grid so it is filterable from the main "
+             "ablation in MLflow.",
+    )
+    parser.add_argument(
         "--launch",
         action="store_true",
         help="Actually call create_training_job. Without this flag the script "
@@ -289,7 +298,7 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
         },
         "Tags": [
             {"Key": "model_type", "Value": "nerf"},
-            {"Key": "stage", "Value": "2b"},
+            {"Key": "stage", "Value": args.stage_tag},
             {"Key": "physics_id", "Value": str(args.physics)},
             {"Key": "n_rays", "Value": str(args.n_rays)},
             {"Key": "seed", "Value": str(args.seed)},
