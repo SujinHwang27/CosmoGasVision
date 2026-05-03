@@ -9,9 +9,11 @@ Conventions
 - Input is the transmitted flux F = exp(-tau), shape (n_sightlines, n_bins).
 - Velocity-axis FFT: k_|| has units of s/km (angular wavenumber 2*pi*f).
 - Per-sightline mean subtraction before FFT (kills DC contamination).
-- Window-power normalization yields a one-sided PSD in s/km.
-- No window is applied (raw periodogram); apodization is the caller's
-  responsibility — the spec asks for the standard FFT-and-square pipeline.
+- Hann-windowed periodogram with $dv/\\sum w^2$ normalization, matching
+  Walther+ 2018 / Boera+ 2019 pipeline convention. The window suppresses
+  spectral leakage from the periodic-FFT discontinuity at the sightline
+  endpoints; the $\\sum w^2$ denominator compensates for the power lost
+  to apodization so the resulting one-sided PSD has units of s/km.
 - Output binning: log-spaced k bins between ``k_min`` and ``k_max``.
 
 This module is intentionally NumPy-only (no SciPy required) and vectorized
@@ -70,13 +72,20 @@ def compute_p_flux(
     # Per-sightline mean subtraction; standard for the Lyα flux power.
     delta_F = F - F.mean(axis=1, keepdims=True)
 
+    # Hann window apodization to suppress periodic-window leakage.
+    # Walther+ 2018 / Boera+ 2019 convention. Normalization below uses
+    # sum(window**2) (leakage compensation), not n_bins.
+    window = np.hanning(n_bins)
+    delta_F = delta_F * window[None, :]
+
     # Real FFT along the velocity (frequency) axis. Vectorized over rays.
     F_k = np.fft.rfft(delta_F, axis=1)
 
     # PSD normalization for a one-sided periodogram in s/km.
-    # |F_k|^2 * dv / n_bins gives the two-sided PSD; multiply positive
-    # frequencies (excluding DC and Nyquist) by 2 for the one-sided form.
-    psd = (np.abs(F_k) ** 2) * (dv / n_bins)
+    # |F_k|^2 * dv / sum(window**2) gives the two-sided PSD; multiply
+    # positive frequencies (excluding DC and Nyquist) by 2 for the
+    # one-sided form.
+    psd = (np.abs(F_k) ** 2) * (dv / np.sum(window ** 2))
     if n_bins % 2 == 0:
         psd[:, 1:-1] *= 2.0
     else:
@@ -85,8 +94,10 @@ def compute_p_flux(
     # Average over sightlines.
     psd_mean = psd.mean(axis=0)
 
-    # Convert FFT frequency (cycles/(km/s)) -> angular wavenumber k (s/km).
     f = np.fft.rfftfreq(n_bins, d=dv)
+    # Angular wavenumber k_|| = 2*pi*f, units s/km. Matches Walther+ 2018
+    # Fig. 5 / Boera+ 2019 convention. Ordinary-frequency f = k/(2*pi)
+    # would shift inertial-range labels by log10(2*pi) = 0.798.
     k_axis = 2.0 * np.pi * f
 
     # Log-spaced binning over the requested k range.

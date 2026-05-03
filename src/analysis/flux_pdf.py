@@ -60,9 +60,9 @@ def compute_flux_pdf(
 def ks_distance(
     F_pred: np.ndarray,
     F_truth: np.ndarray,
-    F_range: tuple[float, float] = (0.05, 0.99),
+    F_range: tuple[float, float] = (0.05, 0.95),
 ) -> float:
-    """Kolmogorov-Smirnov distance between two flux samples.
+    """Kolmogorov-Smirnov distance between two flux samples — [D-13] gate.
 
     Computes ``max |CDF_pred(F) - CDF_truth(F)|`` over the empirical
     distributions restricted to ``F_range``. Pure NumPy implementation
@@ -74,9 +74,14 @@ def ks_distance(
         Transmitted-flux samples F = exp(-tau). Any shape, will be flattened.
     F_range : (F_min, F_max)
         Restrict to this interval before computing the KS distance. The
-        [D-13] threshold of 0.05 is defined on this restricted CDF to
-        sidestep the saturated-absorber pile-up at F~0 and the
-        continuum-noise tail at F~1.
+        [D-13] threshold of 0.05 is defined on this restricted CDF.
+        Default ``(0.05, 0.95)`` follows Bolton et al. 2008 / Lee et
+        al. 2015 Lyα-forest analysis conventions: the lower cut F > 0.05
+        excludes saturated absorbers (where the flux floor is dominated
+        by detector / continuum-fitting noise rather than IGM physics),
+        and the upper cut F < 0.95 excludes the continuum-fitting and
+        metal-line residual tail near F~1 (where p(F) is dominated by
+        observational systematics, not the IGM signal we are gating on).
 
     Returns
     -------

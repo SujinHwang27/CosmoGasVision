@@ -34,8 +34,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 from src.analysis.flux_power import compute_PF_1d
 from src.analysis.density_power import compute_Pdelta_3d
-from src.analysis.cross_corr import compute_xi_cross
-from src.analysis.flux_pdf import compute_F_PDF, ks_distance_pdf
+from src.analysis.cross_corr import compute_xi_pearson
+from src.analysis.flux_pdf import compute_F_PDF, ks_distance, ks_distance_pdf
 from src.data.igm_gal_loader import SherwoodIGMGalLoader
 from src.data.loader import SherwoodLoader
 from src.models.nerf import IGMNeRF
@@ -191,7 +191,7 @@ def _fig_xi_cross(
     out_dir: Path, rho_pred: np.ndarray, rho_truth: np.ndarray, box_kpc_h: float
 ) -> dict:
     r_bins = np.linspace(0.1, 20.0, 41)  # h^-1 Mpc
-    r, xi = compute_xi_cross(rho_pred, rho_truth, box_kpc_h, r_bins)
+    r, xi = compute_xi_pearson(rho_pred, rho_truth, box_kpc_h, r_bins)
     fig, ax = plt.subplots(figsize=(5.4, 4.0))
     ax.plot(r, xi, "C2-", lw=2, label=r"$\xi_{\hat\rho,\rho}(r)$")
     ax.axhline(0.6, color="k", ls="--", lw=1, label=r"[D-13] threshold $0.6$")
@@ -216,16 +216,27 @@ def _fig_xi_cross(
 def _fig_flux_pdf(
     out_dir: Path, tau_pred: np.ndarray, tau_truth: np.ndarray
 ) -> dict:
+    # Visualization: pre-binned PDF over the full F-range so the figure
+    # shows both the saturated absorber pile-up and the F~1 tail.
     F_bins = np.linspace(0.0, 1.0, 51)
     c, pdf_p = compute_F_PDF(tau_pred, F_bins)
     _, pdf_t = compute_F_PDF(tau_truth, F_bins)
-    ks = ks_distance_pdf(pdf_p, pdf_t, F_bins)
+
+    # [D-13] gate: KS on RAW flux samples over F in [0.05, 0.95]
+    # (Bolton+ 2008 / Lee+ 2015 cuts: drop saturated absorbers and the
+    # continuum-fitting / metal-line residual tail). The binned-PDF
+    # ks_distance_pdf is retained only for the figure annotation.
+    F_pred_samples = np.exp(-np.asarray(tau_pred)).ravel()
+    F_truth_samples = np.exp(-np.asarray(tau_truth)).ravel()
+    ks = ks_distance(F_pred_samples, F_truth_samples, F_range=(0.05, 0.95))
+
     fig, ax = plt.subplots(figsize=(5.4, 4.0))
     ax.plot(c, pdf_t, "k-", lw=2, label="Truth")
     ax.plot(c, pdf_p, "C0--", lw=2, label="Predicted")
+    ax.axvspan(0.05, 0.95, color="grey", alpha=0.10, label="[D-13] KS window")
     ax.set_xlabel("F = exp(-tau)")
     ax.set_ylabel("p(F)")
-    ax.set_title(f"Flux PDF (KS = {ks:.4f})")
+    ax.set_title(f"Flux PDF (KS = {ks:.4f}, F in [0.05, 0.95])")
     ax.legend(fontsize=9)
     fig.tight_layout()
     fig.savefig(out_dir / "flux_pdf.png", dpi=140)

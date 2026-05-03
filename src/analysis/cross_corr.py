@@ -4,7 +4,10 @@ The Stark+ 2015 sparse-tomography reference metric: compute the cross-power
 between predicted and ground-truth overdensity fields in Fourier space,
 inverse-transform to real space, and bin into spherical shells of |r|.
 
-The headline number for [D-13] is xi(r=2 h^-1 Mpc).
+The headline number for [D-13] is xi(r=2 h^-1 Mpc) computed by
+:func:`compute_xi_pearson` (Pearson correlation, bounded in [-1, 1]).
+:func:`compute_xi_covariance` returns the unnormalized covariance form;
+diagnostic only — not a [D-13] gate.
 """
 
 from __future__ import annotations
@@ -12,13 +15,19 @@ from __future__ import annotations
 import numpy as np
 
 
-def compute_xi_cross(
+def compute_xi_pearson(
     rho_pred: np.ndarray,
     rho_truth: np.ndarray,
     box_kpc_h: float,
     r_bins: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Density-density cross-correlation function.
+    """Pearson density-density cross-correlation function — [D-13] gate.
+
+    Both fields are mean-subtracted and rescaled to unit variance before
+    the FFT cross-power is taken, so the returned xi(r) is the Pearson
+    correlation coefficient in real space, bounded in [-1, 1]. The
+    [D-13] gating threshold xi(r = 2 h^-1 Mpc) > 0.6 is defined on this
+    normalized form.
 
     Parameters
     ----------
@@ -34,7 +43,7 @@ def compute_xi_cross(
     r_centers : (n_bins,) ndarray
         Geometric centers of the r bins (h^-1 Mpc).
     xi : (n_bins,) ndarray
-        Mean cross-correlation in each shell. Empty bins -> NaN.
+        Mean Pearson cross-correlation in each shell. Empty bins -> NaN.
     """
     if rho_pred.shape != rho_truth.shape:
         raise ValueError(
@@ -90,25 +99,31 @@ def compute_xi_cross(
     return r_centers, xi
 
 
-def compute_xi_rho(
+# Backward-compat shim: stage2b_report.py and any external callers from
+# the previous cycle still import the old name. Remove once all callers
+# migrate to compute_xi_pearson.
+compute_xi_cross = compute_xi_pearson
+
+
+def compute_xi_covariance(
     rho_pred_3d: np.ndarray,
     rho_truth_3d: np.ndarray,
     box_kpc_h: float,
     r_bins_h_inv_mpc: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Density-density cross-correlation xi(r) on overdensity cubes.
+    """Density-density cross-COVARIANCE xi(r) on overdensity cubes.
 
-    Spec-compliant entrypoint per the [D-13] gating criterion
-    ``xi(r = 2 h^-1 Mpc) > 0.6`` (Stark+ 2015 sparse-tomography).
+    Diagnostic only — NOT a [D-13] gate. The [D-13] gating function is
+    :func:`compute_xi_pearson`, which divides through by the per-field
+    standard deviations so the result is bounded in [-1, 1] and the
+    threshold 0.6 has meaning. This routine returns the unnormalized
+    covariance estimator ``<delta_pred(x) delta_truth(x + r)>`` so that
+    ``xi(r=0) ≈ Var(rho)`` when ``rho_pred == rho_truth`` — useful for
+    sanity-checking the FFT-based pipeline against direct variance.
 
     The Sherwood box is periodic, so the FFT-based estimator is exact:
     multiply ``hat(rho_pred)^* . hat(rho_truth)``, inverse-FFT, then bin
     in radial separation using periodic (signed) distances.
-
-    Unlike the legacy :func:`compute_xi_cross`, this function does NOT
-    rescale to unit variance; it returns the unbiased estimator
-    ``<delta_pred(x) delta_truth(x + r)>`` so that ``xi(r=0) ≈ Var(rho)``
-    when ``rho_pred == rho_truth`` (matching the unit-test expectation).
 
     Parameters
     ----------
@@ -118,14 +133,14 @@ def compute_xi_rho(
         Comoving box length in kpc/h (Sherwood: 60000.0 for the 60 Mpc/h box).
     r_bins_h_inv_mpc : (n_bins+1,) ndarray, optional
         Bin EDGES for |r| in h^-1 Mpc. Default ``np.logspace(-1, 1.5, 25)``
-        spans 0.1 to ~31.6 h^-1 Mpc — covers the [D-13] r=2 probe.
+        spans 0.1 to ~31.6 h^-1 Mpc.
 
     Returns
     -------
     r_h_inv_mpc : (n_bins,) ndarray
         Linear midpoints of the supplied bins (h^-1 Mpc).
     xi_pred_truth : (n_bins,) ndarray
-        Mean xi in each spherical shell. Empty bins -> NaN.
+        Mean covariance in each spherical shell. Empty bins -> NaN.
     """
     if r_bins_h_inv_mpc is None:
         r_bins_h_inv_mpc = np.logspace(-1, 1.5, 25)
@@ -176,3 +191,8 @@ def compute_xi_rho(
     xi[nz] = sum_xi[nz] / cnt[nz]
 
     return r_centers, xi
+
+
+# Backward-compat shim: existing callers still importing under the old
+# name. Remove once tests + stage2b_report.py migrate.
+compute_xi_rho = compute_xi_covariance
