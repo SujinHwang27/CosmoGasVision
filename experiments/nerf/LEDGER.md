@@ -292,15 +292,12 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 
 | Cell | Run name | status | final loss_data | mean_F | tau_amp | peak_vram_gb | sec/step | billable_sec | cost_usd |
 |:---|:---|:---|---:|---:|---:|---:|---:|---:|---:|
-| P1-T2 | `Stage2b-Ablation-P1-N256-S0-1777927887-d607dc` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| P2-T2 | `Stage2b-Ablation-P2-N256-S0-1777927932-e2e58b` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| P3-T2 | `Stage2b-Ablation-P3-N256-S0-1777927958-506193` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
-| P4-T2 | `Stage2b-Ablation-P4-N256-S0-1777927981-ab15e8` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P1-T2 | `Stage2b-Ablation-P1-N256-S0-1777927887-d607dc` | **Stopped 2026-05-04** | — | — | — | — | — | — | — |
+| P2-T2 | `Stage2b-Ablation-P2-N256-S0-1777927932-e2e58b` | **Stopped 2026-05-04** | — | — | — | — | — | — | — |
+| P3-T2 | `Stage2b-Ablation-P3-N256-S0-1777927958-506193` | **Stopped 2026-05-04** | — | — | — | — | — | — | — |
+| P4-T2 | `Stage2b-Ablation-P4-N256-S0-1777927981-ab15e8` | **Stopped 2026-05-04** | — | — | — | — | — | — | — |
 
-ETA ~4 hr at ~$1/hr × 4-parallel ≈ **$16 envelope**. Importer command (run per cell after job completion):
-```
-uv run python scripts/sagemaker_stage2b_import_mlflow.py <run_name> --mlflow_uri http://127.0.0.1:5000
-```
+**Batch 2 terminated by user 2026-05-04 (PI sign-off pending re-dispatch)**. All 4 jobs received `StopTrainingJob` shortly after submission; P2/P3/P4 transitioned to `Stopped`, P1 to `Stopping`. No useful step-rate / VRAM / convergence data was harvested before termination. No importer needed.
 
 #### Tier 3 cost-survey (P1/P2/P3/P4, conditional on remaining budget)
 
