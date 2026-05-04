@@ -53,9 +53,14 @@ LAMBDA_F = 1.0
 
 
 def _build_fixture(device: torch.device):
-    """Return a fresh (model, log_tau_amp, coords, vel_axis, tau_gt) tuple.
+    """Return a fresh (model, log_tau_amp, coords, vel_axis, tau_gt, mask) tuple.
 
     Identical across calls because we re-seed before each construction.
+
+    The synthetic data has no DLAs by construction, so ``mask`` is all-True
+    (every bin included). This preserves the [D-14] gradient-invariance proof
+    — a constant mask is a per-bin scalar that factors out of the per-chunk
+    reduction identity — while exercising the [D-24] code path.
     """
     torch.manual_seed(SEED)
     # Tiny model -- exercise the same code path (Fourier encoding, skip
@@ -67,7 +72,8 @@ def _build_fixture(device: torch.device):
     coords = torch.rand(N_RAYS, N_BINS, 3, generator=gen).to(device)
     vel_axis = torch.linspace(0.0, 6000.0, N_BINS, device=device)
     tau_gt = torch.rand(N_RAYS, N_BINS, generator=gen).to(device)
-    return model, log_tau_amp, coords, vel_axis, tau_gt
+    mask_no_dla = torch.ones(N_RAYS, N_BINS, dtype=torch.bool, device=device)
+    return model, log_tau_amp, coords, vel_axis, tau_gt, mask_no_dla
 
 
 def _step_grads(accum_steps: int, device: torch.device):
@@ -80,12 +86,18 @@ def _step_grads(accum_steps: int, device: torch.device):
 
     Returns the post-backward (pre-step) ``.grad`` of ``log_tau_amp`` and a
     flat clone of every ``model.parameters()`` ``.grad``.
+
+    Mirrors the [D-24] loss form (log1p MSE capped at TAU_MAX, masked) plus
+    the [D-24] masked mean-F reduction. Since the synthetic mask is all-True
+    the masked-mean reduces to the ordinary mean — but the code path that
+    exercises ``(diff_sq * mask).sum() / mask.sum()`` is what we're regression
+    testing, so the test must drive it.
     """
-    model, log_tau_amp, coords, vel_axis, tau_gt = _build_fixture(device)
+    model, log_tau_amp, coords, vel_axis, tau_gt, mask_no_dla = _build_fixture(device)
 
     assert N_RAYS % accum_steps == 0, "Test rigged so chunks tile exactly."
     microbatch = N_RAYS // accum_steps
-    mse_loss = torch.nn.MSELoss()
+    TAU_MAX = 10.0  # [D-24] Bolton+ 2017 forest cap
 
     def slices():
         for i in range(accum_steps):
@@ -102,18 +114,20 @@ def _step_grads(accum_steps: int, device: torch.device):
         if p.grad is not None:
             p.grad = None
 
-    # Pass 1 (no grad): cycle-mean F.
+    # Pass 1 (no grad): cycle-mean F, masked per [D-24].
     with torch.no_grad():
         tau_amp_p1 = torch.exp(log_tau_amp)
         weighted_F_sum = 0.0
-        total_elems = 0
+        total_F_count = 0
         for s, e in slices():
             tau_pred = volume_render_physics(
                 model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_p1,
             )
-            weighted_F_sum += torch.exp(-tau_pred).sum().item()
-            total_elems += tau_pred.numel()
-        mean_F_pred_val = weighted_F_sum / max(1, total_elems)
+            mask_mb = mask_no_dla[s:e]
+            F_pred = torch.exp(-tau_pred)
+            weighted_F_sum += (F_pred * mask_mb).sum().item()
+            total_F_count += int(mask_mb.sum().item())
+        mean_F_pred_val = weighted_F_sum / max(1, total_F_count)
 
     mean_F_grad_coef = 2.0 * LAMBDA_F * (mean_F_pred_val - MEAN_FLUX_OBS)
 
@@ -123,8 +137,16 @@ def _step_grads(accum_steps: int, device: torch.device):
         tau_pred = volume_render_physics(
             model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
         )
-        loss_data = mse_loss(tau_pred, tau_gt[s:e])
-        mean_F_mb = torch.exp(-tau_pred).mean()
+        # [D-24] log1p MSE, capped at TAU_MAX, masked.
+        tau_pred_eff = tau_pred.clamp_max(TAU_MAX)
+        tau_gt_eff = tau_gt[s:e].clamp_max(TAU_MAX)
+        mask_mb = mask_no_dla[s:e]
+        diff = torch.log1p(tau_pred_eff) - torch.log1p(tau_gt_eff)
+        diff_sq = diff * diff
+        loss_data = (diff_sq * mask_mb).sum() / mask_mb.sum().clamp(min=1)
+        # [D-24] masked mean-F surrogate.
+        F_pred = torch.exp(-tau_pred)
+        mean_F_mb = (F_pred * mask_mb).sum() / mask_mb.sum().clamp(min=1)
         loss_mb = loss_data + mean_F_grad_coef * mean_F_mb
         (loss_mb / accum_steps).backward()
 
@@ -213,7 +235,7 @@ def test_pass2_does_not_share_graph_across_chunks():
     the regression-detection logic in this file needs revisiting.
     """
     device = torch.device("cpu")
-    model, log_tau_amp, coords, vel_axis, tau_gt = _build_fixture(device)
+    model, log_tau_amp, coords, vel_axis, tau_gt, _mask = _build_fixture(device)
     mse_loss = torch.nn.MSELoss()
 
     accum_steps = 4
