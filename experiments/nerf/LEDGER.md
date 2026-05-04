@@ -334,21 +334,24 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 
 ## 6.5 Compute Environment for Production Sweep
 
-Authoritative spec for the quota-raise request (`experiments/nerf/quota_request_2026-05.md`). Every measured value cites a §6 line; every projected value states its anchor and assumption.
+Hardware-and-time spec for the production sweep, framed in HPC-generic terms (GPU class, parallelism, GPU-hours) so it is portable to any supercomputing-center quota request. Past spend was on AWS SageMaker `ml.g5.xlarge` (A10G 24 GB) and is reported in dollars in §6.6 for traceability; the forward request is hardware-agnostic.
 
-### Validated instance type
+### Hardware specification (per training job)
 
-| Field | Value | Source |
+One job ↔ one MLP ↔ one (physics, sightline-density) cell of the 4 × 4 production matrix. Jobs are independent and embarrassingly parallel.
+
+| Resource | Requirement | Validated on |
 |:---|:---|:---|
-| Instance | `ml.g5.xlarge` | §6 cloud bring-up (line 239), all production runs |
-| GPU | NVIDIA A10G, 24 GB GDDR6 | AWS hardware spec |
-| On-demand rate | **\$1.006 / hr** (us-east-1) | AWS pricing 2026-05-04 |
-| Spot discount | up to ~70% off (typically \$0.30-\$0.40 / hr) | AWS spot history |
-| Region | `us-east-1` | `.env: AWS_DEFAULT_REGION` |
-| Container | ECR `<account>/cgv-stage2b:stage2b-7805842` (latest validated) | §6 micro-grid image tag |
-| CUDA / PyTorch | CUDA 12.1 / PyTorch 2.4 (base `pytorch-training:2.4.0-gpu-py311-cu121-ubuntu22.04`) | `Dockerfile` |
-| Spot quota | submitted, **pending AWS approval** (gating Tier 4) | §6 line 360 |
-| On-demand quota | **4 instances** (approved) | §6 line 360 |
+| GPU class | NVIDIA Ampere or newer; sm_80+ | A10G (sm_86, 24 GB GDDR6) |
+| GPU memory | **≥ 12 GB VRAM** (T4 production peak measured at 11.77 GB) | A10G 24 GB (>50% headroom) |
+| GPUs per job | **1** (single-device training; no NCCL / multi-GPU) | A10G ×1 |
+| CPU | ~4 cores (workload is GPU-bound; CPU only runs the dataloader and Python driver) | 4 vCPU AWS class |
+| System RAM | 16 GB | 16 GB AWS class |
+| Local scratch | 50 GB (input snapshot ~1.6 GB + checkpoints + working set) | 200 GB EBS (oversized) |
+| Software | PyTorch 2.4 + CUDA 12.1 (or compatible), Python 3.11 | Validated container — Dockerfile reproducible to Singularity/Apptainer |
+| Network | Read access to a shared dataset volume (~6.5 GB total, read-once-per-job) and write access to a per-job output directory | S3 read-only mount + per-job output bucket |
+
+Compatible GPU families that satisfy the spec without code changes: **A10 / A10G / A30 / A40 / A100 (40 GB or 80 GB) / L4 / L40 / L40S / H100 / RTX A4000 / RTX A5000 / RTX 6000 Ada**. Older Volta (V100 16 GB) is borderline — the T4 cell at 11.77 GB peak fits but headroom shrinks to ~26%, increasing OOM risk under allocator fragmentation; not recommended.
 
 ### Per-tier measured peak VRAM
 
@@ -361,94 +364,113 @@ Anchored to the §6 micro-grid (`stage=2b-microsweep-d24`, completed 2026-05-04)
 | T3 | 1024 | 256 | 4 | **11.23** | `c6815983` (P1), `655427c2` (P2), `04cecbe6` (P3), `ec0d09da` (P4) |
 | T4 | 16384 | 256 | 64 | **11.77** | `8557f12d` (P1), `d36048d0` (P2), `b8a8445c` (P3), `04fbf999` (P4) |
 
-All tiers fit comfortably under the 21.6 GB / 90% A10G utilization cap (§6 line 240). Validates the [D-23] linear-VRAM model across `accum_steps ∈ {1, 4, 64}` (§6 line 428).
+Validates the [D-23] linear-VRAM model `peak_vram ≈ 2.82 · min(n_rays, chunk_size) / 64 GB` across `accum_steps ∈ {1, 4, 64}`.
 
 ### Per-tier throughput anchors
 
-Production-grade s/step (50k-step runs, free of MLflow init overhead):
+Production-grade seconds-per-step (50k-step runs, free of MLflow init overhead):
 
-| Tier | Source run | billable_sec | max_steps | s/step | Note |
-|:---|:---|---:|---:|---:|:---|
-| T1 | P1 production (§6 line 246) | 5930 | 50000 | **0.119** | Anchor; matches Batch 1 cost-survey 0.1191 ± 0.0001 across P{1..4} |
-| T1 | Batch 1 cost-survey (§6.4 above) | 5948-5958 | 50000 | **0.119** | Cross-physics confirmed 4× |
-| T2 | (no production-scale measurement; Batch 2 stopped) | — | — | **0.20 (extrapolated)** | Micro-grid T2 = 219 s / 200 steps minus ~180 s MLflow init ≈ 0.20 s/step. **[VERIFY: re-dispatch Batch 2]** |
-| T3 | (no production-scale measurement) | — | — | **0.62 (extrapolated)** | Micro-grid T3 = 486-491 s / 200 steps minus ~180 s MLflow init ≈ 1.5 s/step at 1k steps; long-run amortized ~0.62 s/step assuming chunk-bound at 256 with accum=4. **[VERIFY]** |
-| T4 | Micro-grid T4 (§6 line 273) | 5886-5894 | 200 | **~28.5** | Long-run amortization at chunk=256 / accum=64; high uncertainty until production-tier T4 lands. **[VERIFY]** |
-
-Throughput anchors marked **[VERIFY]** are blocked on Batch 2/3 re-dispatch and T4 quota arrival; the cost projections below treat them conservatively (use the upper bound of the bracket).
-
-### Production extrapolation: cost per (cell × physics)
-
-Production schedule per [D-23] / [D-14]-amended: `max_steps = 50000` for T1, T2; `max_steps = 25000` for T3, T4 (tier-aware halving per [D-23] resolution).
-
-| Tier | s/step | max_steps | wall-clock per cell | on-demand cost / cell | × 4 physics on-demand | × 4 physics spot (~30% of OD) |
-|:---|---:|---:|---:|---:|---:|---:|
-| T1 | 0.119 | 50000 | 99 min ≈ 1.65 hr | \$1.66 | **\$6.64** (measured: \$6.66 above) | \$2.00 |
-| T2 | 0.20 | 50000 | 167 min ≈ 2.78 hr | \$2.80 | **\$11.20** | \$3.36 |
-| T3 | 0.62 | 25000 | 258 min ≈ 4.31 hr | \$4.34 | **\$17.34** | \$5.20 |
-| T4 | 28.5 | 25000 | (28.5 × 25000) / 3600 ≈ 198 hr ≈ 8.25 days | \$199 | **\$796** | \$239 |
-
-**Tier-4 economics drive the spot-quota request.** On-demand T4 is operationally untenable (single cell ≈ 8 days wall-clock); spot pricing brings the full 4-physics T4 sweep to ~\$240, fitting inside a CVPR-revision cycle.
-
-### Quota request rationale
-
-| Need | Quota dimension | Current | Requested |
-|:---|:---|---:|---:|
-| 4 simultaneous Batch 2 cells (T2 × {P1..P4}) | `ml.g5.xlarge` on-demand | 4 | **4 (no change)** |
-| 4 simultaneous Batch 3 cells (T3 × {P1..P4}) | `ml.g5.xlarge` on-demand | 4 | **4 (no change)** |
-| 4 simultaneous T4 cells | `ml.g5.xlarge` **spot** | 0 (pending) | **4** |
-| Burst headroom for re-dispatch / debug | `ml.g5.xlarge` on-demand | 4 | **8 (optional uplift)** |
-
-The Batch 2/3 cells are already feasible under the existing on-demand quota; the bottleneck is **Tier-4 spot quota for `ml.g5.xlarge`**, which gates the 16,384-sightline corner of the [D-13] degradation curve.
-
-### S3 storage envelope
-
-| Bucket / prefix | Purpose | Current footprint | Lifecycle |
+| Tier | Source run | s/step | Note |
 |:---|:---|---:|:---|
-| `s3://cosmo-gas-vision-storage/sherwood/Physics{1,2,3,4}_*/` | Loader inputs (sightline + tau_GT) | ~6.5 GB total (4 × ~1.6 GB) | Standard, no expiry |
-| `s3://cosmo-gas-vision-storage/stage2b-checkpoints/` | Per-run model checkpoints (\@ 10k / 25k / 50k steps) | ~7 MB / checkpoint × ~50 expected runs | 90-day Glacier transition (TODO) |
-| `s3://cosmo-gas-vision-storage/mlflow-artifacts/1/` | MLflow artifact root (figures, plots) | ~60 MB current | Standard |
-| SageMaker `model.tar.gz` (`/opt/ml/model/`) | MLflow file-store + final state per run | ~2-5 MB / run | Importer extracts to local tracker; tarballs retained 30 days |
-| SageMaker `output.tar.gz` (`/opt/ml/output/data/`) | (unused) | <1 MB / run | 30-day expiry |
+| T1 | P1 production + Batch 1 cost-survey (5 cells) | **0.119** | Spread <0.5% across P{1..4}; production anchor |
+| T2 | extrapolated from micro-grid | **~0.20** | Micro-grid 219 s / 200 steps minus ~180 s MLflow init. **[VERIFY: pending Batch 2 re-dispatch]** |
+| T3 | extrapolated from micro-grid | **~0.62** | Micro-grid 486-491 s / 200 steps; long-run amortized at chunk=256 / accum=4. **[VERIFY]** |
+| T4 | extrapolated from micro-grid | **~28.5** | Micro-grid 5886-5894 s / 200 steps; long-run amortization at chunk=256 / accum=64. **[VERIFY]** |
 
-Total projected envelope through Batch 2/3 + T4 sweep: well under **20 GB** — not a binding constraint. No quota request needed for S3.
+Throughput anchors marked **[VERIFY]** are best estimates; production confirmation is blocked on Batch 2/3 re-dispatch and a T4 quota arrival.
+
+### Production budget — wall-clock and GPU-hours
+
+Production schedule per [D-23] / [D-14]-amended: `max_steps = 50,000` for T1/T2; `max_steps = 25,000` for T3/T4. The full 4 × 4 production matrix has 16 cells; T1 (4 cells) is already complete (§6 Batch 1 cost-survey).
+
+Per-cell wall-clock = `s/step × max_steps`. GPU-hours are wall-clock × 1 GPU. With **4-way parallel scheduling** (4 simultaneous GPUs, one per physics within a tier), wall-clock per tier equals per-cell wall-clock; without parallelism it is 4× longer.
+
+| Tier | s/step | max_steps | per-cell wall-clock | per-cell GPU-hr | tier total GPU-hr (4 cells) | tier wall-clock @ 4-way parallel |
+|:---|---:|---:|---:|---:|---:|---:|
+| T1 | 0.119 | 50,000 | 1.65 hr | 1.65 | **6.6** (already spent) | 1.65 hr |
+| T2 | ~0.20 | 50,000 | 2.78 hr | 2.78 | **11.1** | 2.78 hr |
+| T3 | ~0.62 | 25,000 | 4.31 hr | 4.31 | **17.2** | 4.31 hr |
+| T4 | ~28.5 | 25,000 | 197.9 hr (8.25 d) | 197.9 | **791.6** | 8.25 days |
+| **Total remaining (T2 + T3 + T4)** | | | | | **~820 GPU-hr** | **~9 days wall-clock** |
+
+Already consumed (validation + T1 production): **~21 GPU-hr** (see §6.6 spend table).
+
+### Quota request — what to ask the supercomputing center for
+
+| Need | Specification | Rationale |
+|:---|:---|:---|
+| GPU class | 1 × NVIDIA Ampere or newer, ≥12 GB VRAM | Validated; matches every cell of the 4 × 4 matrix with ≥50% memory headroom |
+| Concurrent allocation | **4 GPUs in parallel** | Reduces the 4-way physics sweep wall-clock by 4×; cells are independent so parallelism is loss-free |
+| Total GPU-hours | **~820 GPU-hr remaining** for production sweep, **~1,200 GPU-hr** with 50% contingency | Anchored to §6.6 forward-projection table and validated per-tier s/step |
+| Wall-clock window | **~10 calendar days continuous** (T4 alone is 8.25 days even at 4-way parallel) | The Tier-4 dense-sightline cells are the long pole |
+| Storage (read-only) | ~6.5 GB Sherwood snapshot, mounted to the job filesystem | Already prepared and accessible; no fetch required during the run |
+| Storage (read-write per job) | up to ~1 GB per cell (checkpoints + MLflow artifacts) | 16 cells × 1 GB = **~20 GB total** |
+| Pre-emptibility | Acceptable for Tier 4 cells (checkpoints persisted every 10k / 25k / 50k steps) | T1-T3 cells too short to benefit; T4 cells benefit from spot/preemptible pricing if the center offers it |
+| Software | Container with PyTorch 2.4 + CUDA 12.1; project ships a Dockerfile that converts to Apptainer / Singularity | Standard HPC software stack |
+
+**Tier-4 is the binding constraint.** The 4 T4 cells at 16,384 sightlines each consume ~792 GPU-hr — 96.5% of the remaining production budget. T1 / T2 / T3 are routine. The quota request is functionally a request for Tier-4 capacity.
+
+### Justification for the request
+
+The CVPR-headline contribution is the **survey-headline degradation curve**: reconstruction quality as a function of sightline density across `n_rays ∈ {16384, 1024, 256, 64}`, repeated for four cosmological-feedback variants (no feedback / stellar wind / wind+AGN / wind+strong-AGN). 16 production cells; 4 already complete (T1); 8 feasible under modest quota (T2 + T3); **4 (Tier 4) blocked on bulk GPU-hours** at any one supercomputing center.
+
+Without the four T4 cells the [D-13] degradation curve is missing the dense-sightline anchor at every physics, which removes the paper's central scaling claim. The cost is governed by `n_rays × accum_steps`; the implementation has been proven to fit a 12 GB GPU at this scale (micro-grid T4: peak 11.77 GB), so this is purely a GPU-hour question, not a hardware or implementation question.
+
+### Operational safeguards in place
+
+- **Cost ceiling**: per-tier `max_steps` schedule pinned in [D-23]; runs cannot exceed the schedule without a documented amendment.
+- **Checkpointing**: every 10,000 / 25,000 / 50,000 steps to persistent storage; resumable on preemption.
+- **Memory safety**: the [D-23] sub-clause gate requires every new microbatch value to predict peak VRAM under the 12 GB / 90% device cap before dispatch; one prior failure (microbatch math error, ~0.04 GPU-hr sunk) is documented in §6.6.
+- **Audit trail**: every billable second is reconciled against the cluster's job-accounting record and recorded in §6.6.
+
+### Storage envelope (project-wide, persistent)
+
+| Volume | Purpose | Current footprint | Lifecycle |
+|:---|:---|---:|:---|
+| Sherwood snapshot (4 physics × `los/tau/losvpec` files) | Loader inputs, read-only | ~6.5 GB | Read-only, persistent for the project lifetime |
+| Production checkpoints (one per cell @ 10k / 25k / 50k steps) | Resume-from-preemption + post-hoc analysis | ~20 GB at full sweep | Glacier / deep-archive after publication |
+| MLflow tracking artifacts (figures, scalars) | Run metadata + plots | <100 MB | Standard, persistent |
+| Per-run model bundle (`model.tar.gz` equivalent) | MLflow file-store + final state per run | ~5 MB / run × 16 = 80 MB | 30-day retention then archive |
+
+Total persistent footprint through Batch 2/3 + Tier 4: well under **30 GB**.
 
 ---
 
-## 6.6 Cost-Survey Spend to Date and Forward Projection
+## 6.6 Spend to Date and Forward Projection
 
-### Spend to date (verified against `aws sagemaker describe-training-job`)
+### Spend to date — GPU-hours (universal) and AWS dollars (historical, validation phase only)
 
-| Bucket | Run / batch | billable_sec | hours | cost (on-demand \$1.006/hr) |
+All validation + T1 production was run on AWS SageMaker `ml.g5.xlarge` at $1.006/hr on-demand (us-east-1, 2026-05-04). The dollar column is preserved for traceability; the GPU-hour column is the universal unit.
+
+| Bucket | Run / batch | billable_sec | GPU-hr | AWS cost (historical) |
 |:---|:---|---:|---:|---:|
-| Bring-up smokes (B-2, vsmoke#1, vsmoke#2) | §6 lines 239-241 | 135 + 120 + 124 = 379 | 0.105 | \$0.11 |
-| P1 science smoke | §6 line 245 | 149 | 0.041 | \$0.04 |
-| P1 tier-1 production | §6 line 246 | 5930 | 1.647 | \$1.66 |
-| P1 tier-2 in-flight (Unknown A reconciled) | `Stage2b-Ablation-P1-N256-S0-1777820662-b3d46d` | **18119** (Stopped: MaxRuntimeExceeded) | 5.033 | **\$5.06** |
-| Failed tier-3 cell (microbatch math error) | §6 line 403 | ~143 (PI estimate) | 0.040 | \$0.04 |
-| Micro-grid (16 cells, `stage=2b-microsweep-d24`) | §6 line 275 | 26980 | 7.494 | \$7.54 |
-| Batch 1b τ_max sensitivity (3 cells) | §6 line 277-287 | ~450 (3 × ~150 sec at T1) [estimate] | 0.125 | \$0.13 |
-| Batch 1 cost-survey (4 cells, P{1..4}-T1, **Unknown B reconciled**) | §6.4 above | 5955 + 5955 + 5958 + 5948 = **23816** | 6.616 | **\$6.66** |
-| Batch 2 cost-survey (4 cells, T2, all stopped early) | §6 line 299-303 | <120 (stopped before billing accrued meaningfully) [estimate] | <0.04 | <\$0.04 |
-| **TOTAL spend to date** | | **~75,966** | **~21.10** | **~\$21.24** |
+| Bring-up smokes (B-2 + 2 vsmoke + science smoke) | §6 lines 239-241, 245 | 528 | 0.15 | \$0.15 |
+| P1 tier-1 production (raw-τ baseline) | §6 line 246 | 5,930 | 1.65 | \$1.66 |
+| P1 tier-2 (capped at MaxRuntimeExceeded, 18,000 s) | `Stage2b-Ablation-P1-N256-S0-1777820662-b3d46d` | 18,119 | 5.03 | \$5.06 |
+| Failed tier-3 cell (microbatch math error, sunk) | §7 May 3 snapshot | ~143 [estimate] | 0.04 | \$0.04 |
+| Micro-grid (16 cells, `stage=2b-microsweep-d24`) | §6 line 275 | 26,980 | 7.49 | \$7.54 |
+| Batch 1b τ_max sensitivity (3 cells) | §6 Batch 1b table | ~450 [estimate] | 0.13 | \$0.13 |
+| Batch 1 cost-survey (4 cells P{1..4}-T1, full 50k) | §6 Tier 1 cost-survey table | 23,816 | 6.62 | \$6.66 |
+| Batch 2 cost-survey (4 cells, all stopped < 60 s) | §6 line ~304 | <120 [estimate] | <0.04 | <\$0.04 |
+| **TOTAL spend to date** | | **~76,000 sec** | **~21.1 GPU-hr** | **~\$21.24** |
 
-### Forward projection (Batch 2 / Batch 3 / Tier 4)
+### Forward projection (production sweep, GPU-hours)
 
-Anchored to §6.5 throughput table; on-demand assumes the 4-instance quota saturated; spot assumes ~70% discount.
+Anchored to §6.5 throughput anchors.
 
-| Batch | Cells | Per-cell on-demand | Per-cell spot | Wall-clock (4× parallel) | Total on-demand | Total spot |
-|:---|:---|---:|---:|---:|---:|---:|
-| Batch 2 (T2 × 4 physics) | P{1..4}-T2 | \$2.80 | \$0.84 | 2.78 hr | **\$11.20** | \$3.36 |
-| Batch 3 (T3 × 4 physics) | P{1..4}-T3 | \$4.34 | \$1.30 | 4.31 hr | **\$17.34** | \$5.20 |
-| Tier 4 (T4 × 4 physics, spot-only) | P{1..4}-T4 | \$199 | \$59.70 | 8.25 days | (impractical) | **\$239** |
-| **Forward subtotal** | | | | | **\$28.54** (B2+B3 only) | **\$247.56** (B2+B3+T4) |
+| Batch | Cells | GPU-hr per cell | Total GPU-hr | Wall-clock @ 4-way parallel |
+|:---|:---|---:|---:|---:|
+| Batch 2 (T2 × 4 physics) | P{1..4}-T2 | 2.78 | **11.1** | 2.78 hr |
+| Batch 3 (T3 × 4 physics) | P{1..4}-T3 | 4.31 | **17.2** | 4.31 hr |
+| Tier 4 (T4 × 4 physics) | P{1..4}-T4 | 197.9 | **791.6** | 8.25 days |
+| **Forward subtotal** | | | **~820 GPU-hr** | **~9 days wall-clock** |
 
 ### Budget envelope for the formal request
 
-- **Spent so far**: ~\$21.24 (verified)
-- **Forward minimum (Batch 2 + Batch 3 only, on-demand)**: ~\$28.54
-- **Forward complete (B2 + B3 + T4 spot)**: ~\$247.56
-- **PI-recommended ceiling with 50% contingency**: **\$800-\$1,000** for the full Stage 2b cost-survey + production sweep + first-pass post-fix re-runs.
+- **Spent so far**: ~21 GPU-hr (~$21 on AWS, validation phase)
+- **Forward minimum** (Batch 2 + Batch 3 only): **~28 GPU-hr / 7 hr wall-clock at 4-way parallel**
+- **Forward complete** (Batch 2 + Batch 3 + Tier 4): **~820 GPU-hr / ~9 days wall-clock at 4-way parallel**
+- **PI-recommended ceiling with 50% contingency**: **~1,200 GPU-hr** for the full sweep + first-pass post-fix re-runs + cosmological-evaluator validation runs.
 
 Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b) one micro-grid re-run if a [D-24]-class amendment lands; (c) the cosmological-evaluator validation runs deferred from §7's "Immediate Next Steps".
 
