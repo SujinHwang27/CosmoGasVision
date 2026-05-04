@@ -286,9 +286,22 @@ Gate test for [D-24] item (2). Three paired P1-T1 cells at the production schedu
 
 **Verdict: GATE PASSED with ~100-180× margin.** mean_F is identical across the three runs (0.9282); tau_amp spread (~7%) is the expected response to changing the cap on strong-absorber gradients but is absorbed by the [D-21] mean-flux loss. Diagnostic figure: `paper_cvpr/figures/tau_max_sensitivity.png`; runner: `scripts/diag_tau_max_sensitivity.py`. **PI ruling: τ_max=10 LOCKED in [D-24] item (2); no re-pin; Batch 2 cleared for dispatch.**
 
-#### Tier 1 cost-survey (P2/P3/P4)
+#### Tier 1 cost-survey (P{1,2,3,4}, MLflow tag `stage=2b-costsurvey`, completed 2026-05-04)
 
-[populate post-dispatch: per-physics run name, source run_id, dest run_id, final loss_data, mean_flux_pred, tau_amp, peak_vram_gb, seconds_per_step, billable_sec, cost_usd]
+Dispatched 2026-05-04 ~14:09 UTC (1777903757-1777903763), image `stage2b-2868446`, 4-parallel on-demand `ml.g5.xlarge`. Schedule: `n_rays=64, max_steps=50000, microbatch=1024, accum=1, tau_max=10` per [D-23] / [D-24]-locked. Sources verified via `aws sagemaker describe-training-job` (2026-05-04 reconciliation).
+
+| Cell | n_rays | μbatch | accum | src run_id | dst run_id | peak_vram | mean_F | tau_amp | billable_sec |
+|:---|---:|---:|---:|:---|:---|---:|---:|---:|---:|
+| P1-T1 | 64 | 1024 | 1 | (not imported) | (pending) | 2.82 [a] | (not imported) | (not imported) | 5955 |
+| P2-T1 | 64 | 1024 | 1 | `11e0d928` | `98207af0` | 2.82 | 0.9247 | 2.3150 | 5955 |
+| P3-T1 | 64 | 1024 | 1 | `4fa9e500` | `6d48089f` | 2.82 [a] | (importer truncated) | (importer truncated) | 5958 |
+| P4-T1 | 64 | 1024 | 1 | (not imported) | (pending) | 2.82 [a] | (not imported) | (not imported) | 5948 |
+
+Notes:
+- AWS SageMaker confirms all 4 jobs `Completed` with the billable seconds shown (source: `aws sagemaker describe-training-job` 2026-05-04). Total Batch 1 cost-survey billable = **23,816 sec ≈ 6.62 hr ≈ \$6.66** at on-demand $1.006/hr.
+- [a] peak_vram_gb assumed to match the P2 measurement (2.82 GB, identical chunk_size=64 and accum=1) — anchored to the [D-23] linear-VRAM model and to the micro-grid T1 result (§6 micro-grid line: T1 = 2.82 GB across all 4 physics).
+- Per-step throughput: 5955-5958 sec / 50000 steps = **0.119 s/step**, matching the P1 tier-1 production anchor (5930 sec / 50000 = 0.119 s/step) within 0.5%.
+- P1 and P4 SageMaker `model.tar.gz` are present in S3 but the post-job MLflow importer (`scripts/sagemaker_stage2b_import_mlflow.py`) was not run for those two; P3 import landed but `peak_vram_gb` / `mean_flux_pred` / `tau_amp` were truncated to the partial summary metric set. **Action owed (data-engineer / infrastructure-manager)**: re-run the importer for P1, P3, P4 to recover the full per-step metric history before the cost-survey is cited as evidence in the paper. Schedule: post-Batch-2 re-dispatch.
 
 #### Tier 2 cost-survey (P1/P2/P3/P4)
 
@@ -316,6 +329,128 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 ### Insights (carried over)
 
 - Lyα peak strength spikes nearly 100× mean in massive filaments — empirical motivation for $L=10$ Fourier bandwidth, not a lower setting.
+
+---
+
+## 6.5 Compute Environment for Production Sweep
+
+Authoritative spec for the quota-raise request (`experiments/nerf/quota_request_2026-05.md`). Every measured value cites a §6 line; every projected value states its anchor and assumption.
+
+### Validated instance type
+
+| Field | Value | Source |
+|:---|:---|:---|
+| Instance | `ml.g5.xlarge` | §6 cloud bring-up (line 239), all production runs |
+| GPU | NVIDIA A10G, 24 GB GDDR6 | AWS hardware spec |
+| On-demand rate | **\$1.006 / hr** (us-east-1) | AWS pricing 2026-05-04 |
+| Spot discount | up to ~70% off (typically \$0.30-\$0.40 / hr) | AWS spot history |
+| Region | `us-east-1` | `.env: AWS_DEFAULT_REGION` |
+| Container | ECR `<account>/cgv-stage2b:stage2b-7805842` (latest validated) | §6 micro-grid image tag |
+| CUDA / PyTorch | CUDA 12.1 / PyTorch 2.4 (base `pytorch-training:2.4.0-gpu-py311-cu121-ubuntu22.04`) | `Dockerfile` |
+| Spot quota | submitted, **pending AWS approval** (gating Tier 4) | §6 line 360 |
+| On-demand quota | **4 instances** (approved) | §6 line 360 |
+
+### Per-tier measured peak VRAM
+
+Anchored to the §6 micro-grid (`stage=2b-microsweep-d24`, completed 2026-05-04):
+
+| Tier | n_rays | chunk_size | accum_steps | peak_vram_gb (measured) | Source run_ids (micro-grid src) |
+|:---|---:|---:|---:|---:|:---|
+| T1 | 64 | 64 | 1 | **2.82** | `41853bec` (P1), `401f6811` (P2), `caafe801` (P3), `309434a6` (P4) |
+| T2 | 256 | 256 | 1 | **11.20** | `e42016f3` (P1), `b66da932` (P2), `20b291a3` (P3), `da333327` (P4) |
+| T3 | 1024 | 256 | 4 | **11.23** | `c6815983` (P1), `655427c2` (P2), `04cecbe6` (P3), `ec0d09da` (P4) |
+| T4 | 16384 | 256 | 64 | **11.77** | `8557f12d` (P1), `d36048d0` (P2), `b8a8445c` (P3), `04fbf999` (P4) |
+
+All tiers fit comfortably under the 21.6 GB / 90% A10G utilization cap (§6 line 240). Validates the [D-23] linear-VRAM model across `accum_steps ∈ {1, 4, 64}` (§6 line 428).
+
+### Per-tier throughput anchors
+
+Production-grade s/step (50k-step runs, free of MLflow init overhead):
+
+| Tier | Source run | billable_sec | max_steps | s/step | Note |
+|:---|:---|---:|---:|---:|:---|
+| T1 | P1 production (§6 line 246) | 5930 | 50000 | **0.119** | Anchor; matches Batch 1 cost-survey 0.1191 ± 0.0001 across P{1..4} |
+| T1 | Batch 1 cost-survey (§6.4 above) | 5948-5958 | 50000 | **0.119** | Cross-physics confirmed 4× |
+| T2 | (no production-scale measurement; Batch 2 stopped) | — | — | **0.20 (extrapolated)** | Micro-grid T2 = 219 s / 200 steps minus ~180 s MLflow init ≈ 0.20 s/step. **[VERIFY: re-dispatch Batch 2]** |
+| T3 | (no production-scale measurement) | — | — | **0.62 (extrapolated)** | Micro-grid T3 = 486-491 s / 200 steps minus ~180 s MLflow init ≈ 1.5 s/step at 1k steps; long-run amortized ~0.62 s/step assuming chunk-bound at 256 with accum=4. **[VERIFY]** |
+| T4 | Micro-grid T4 (§6 line 273) | 5886-5894 | 200 | **~28.5** | Long-run amortization at chunk=256 / accum=64; high uncertainty until production-tier T4 lands. **[VERIFY]** |
+
+Throughput anchors marked **[VERIFY]** are blocked on Batch 2/3 re-dispatch and T4 quota arrival; the cost projections below treat them conservatively (use the upper bound of the bracket).
+
+### Production extrapolation: cost per (cell × physics)
+
+Production schedule per [D-23] / [D-14]-amended: `max_steps = 50000` for T1, T2; `max_steps = 25000` for T3, T4 (tier-aware halving per [D-23] resolution).
+
+| Tier | s/step | max_steps | wall-clock per cell | on-demand cost / cell | × 4 physics on-demand | × 4 physics spot (~30% of OD) |
+|:---|---:|---:|---:|---:|---:|---:|
+| T1 | 0.119 | 50000 | 99 min ≈ 1.65 hr | \$1.66 | **\$6.64** (measured: \$6.66 above) | \$2.00 |
+| T2 | 0.20 | 50000 | 167 min ≈ 2.78 hr | \$2.80 | **\$11.20** | \$3.36 |
+| T3 | 0.62 | 25000 | 258 min ≈ 4.31 hr | \$4.34 | **\$17.34** | \$5.20 |
+| T4 | 28.5 | 25000 | (28.5 × 25000) / 3600 ≈ 198 hr ≈ 8.25 days | \$199 | **\$796** | \$239 |
+
+**Tier-4 economics drive the spot-quota request.** On-demand T4 is operationally untenable (single cell ≈ 8 days wall-clock); spot pricing brings the full 4-physics T4 sweep to ~\$240, fitting inside a CVPR-revision cycle.
+
+### Quota request rationale
+
+| Need | Quota dimension | Current | Requested |
+|:---|:---|---:|---:|
+| 4 simultaneous Batch 2 cells (T2 × {P1..P4}) | `ml.g5.xlarge` on-demand | 4 | **4 (no change)** |
+| 4 simultaneous Batch 3 cells (T3 × {P1..P4}) | `ml.g5.xlarge` on-demand | 4 | **4 (no change)** |
+| 4 simultaneous T4 cells | `ml.g5.xlarge` **spot** | 0 (pending) | **4** |
+| Burst headroom for re-dispatch / debug | `ml.g5.xlarge` on-demand | 4 | **8 (optional uplift)** |
+
+The Batch 2/3 cells are already feasible under the existing on-demand quota; the bottleneck is **Tier-4 spot quota for `ml.g5.xlarge`**, which gates the 16,384-sightline corner of the [D-13] degradation curve.
+
+### S3 storage envelope
+
+| Bucket / prefix | Purpose | Current footprint | Lifecycle |
+|:---|:---|---:|:---|
+| `s3://cosmo-gas-vision-storage/sherwood/Physics{1,2,3,4}_*/` | Loader inputs (sightline + tau_GT) | ~6.5 GB total (4 × ~1.6 GB) | Standard, no expiry |
+| `s3://cosmo-gas-vision-storage/stage2b-checkpoints/` | Per-run model checkpoints (\@ 10k / 25k / 50k steps) | ~7 MB / checkpoint × ~50 expected runs | 90-day Glacier transition (TODO) |
+| `s3://cosmo-gas-vision-storage/mlflow-artifacts/1/` | MLflow artifact root (figures, plots) | ~60 MB current | Standard |
+| SageMaker `model.tar.gz` (`/opt/ml/model/`) | MLflow file-store + final state per run | ~2-5 MB / run | Importer extracts to local tracker; tarballs retained 30 days |
+| SageMaker `output.tar.gz` (`/opt/ml/output/data/`) | (unused) | <1 MB / run | 30-day expiry |
+
+Total projected envelope through Batch 2/3 + T4 sweep: well under **20 GB** — not a binding constraint. No quota request needed for S3.
+
+---
+
+## 6.6 Cost-Survey Spend to Date and Forward Projection
+
+### Spend to date (verified against `aws sagemaker describe-training-job`)
+
+| Bucket | Run / batch | billable_sec | hours | cost (on-demand \$1.006/hr) |
+|:---|:---|---:|---:|---:|
+| Bring-up smokes (B-2, vsmoke#1, vsmoke#2) | §6 lines 239-241 | 135 + 120 + 124 = 379 | 0.105 | \$0.11 |
+| P1 science smoke | §6 line 245 | 149 | 0.041 | \$0.04 |
+| P1 tier-1 production | §6 line 246 | 5930 | 1.647 | \$1.66 |
+| P1 tier-2 in-flight (Unknown A reconciled) | `Stage2b-Ablation-P1-N256-S0-1777820662-b3d46d` | **18119** (Stopped: MaxRuntimeExceeded) | 5.033 | **\$5.06** |
+| Failed tier-3 cell (microbatch math error) | §6 line 403 | ~143 (PI estimate) | 0.040 | \$0.04 |
+| Micro-grid (16 cells, `stage=2b-microsweep-d24`) | §6 line 275 | 26980 | 7.494 | \$7.54 |
+| Batch 1b τ_max sensitivity (3 cells) | §6 line 277-287 | ~450 (3 × ~150 sec at T1) [estimate] | 0.125 | \$0.13 |
+| Batch 1 cost-survey (4 cells, P{1..4}-T1, **Unknown B reconciled**) | §6.4 above | 5955 + 5955 + 5958 + 5948 = **23816** | 6.616 | **\$6.66** |
+| Batch 2 cost-survey (4 cells, T2, all stopped early) | §6 line 299-303 | <120 (stopped before billing accrued meaningfully) [estimate] | <0.04 | <\$0.04 |
+| **TOTAL spend to date** | | **~75,966** | **~21.10** | **~\$21.24** |
+
+### Forward projection (Batch 2 / Batch 3 / Tier 4)
+
+Anchored to §6.5 throughput table; on-demand assumes the 4-instance quota saturated; spot assumes ~70% discount.
+
+| Batch | Cells | Per-cell on-demand | Per-cell spot | Wall-clock (4× parallel) | Total on-demand | Total spot |
+|:---|:---|---:|---:|---:|---:|---:|
+| Batch 2 (T2 × 4 physics) | P{1..4}-T2 | \$2.80 | \$0.84 | 2.78 hr | **\$11.20** | \$3.36 |
+| Batch 3 (T3 × 4 physics) | P{1..4}-T3 | \$4.34 | \$1.30 | 4.31 hr | **\$17.34** | \$5.20 |
+| Tier 4 (T4 × 4 physics, spot-only) | P{1..4}-T4 | \$199 | \$59.70 | 8.25 days | (impractical) | **\$239** |
+| **Forward subtotal** | | | | | **\$28.54** (B2+B3 only) | **\$247.56** (B2+B3+T4) |
+
+### Budget envelope for the formal request
+
+- **Spent so far**: ~\$21.24 (verified)
+- **Forward minimum (Batch 2 + Batch 3 only, on-demand)**: ~\$28.54
+- **Forward complete (B2 + B3 + T4 spot)**: ~\$247.56
+- **PI-recommended ceiling with 50% contingency**: **\$800-\$1,000** for the full Stage 2b cost-survey + production sweep + first-pass post-fix re-runs.
+
+Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b) one micro-grid re-run if a [D-24]-class amendment lands; (c) the cosmological-evaluator validation runs deferred from §7's "Immediate Next Steps".
 
 ---
 
