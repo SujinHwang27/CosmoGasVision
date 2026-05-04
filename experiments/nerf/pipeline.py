@@ -131,9 +131,13 @@ def build_lr_lambda(warmup_steps: int, max_steps: int,
 def load_dataset(args):
     """Load sightlines or fall back to dummy data for smoke runs.
 
-    Returns ``(coords, vel_axis, tau_gt_profile, box_max)`` as float32 tensors.
-    The first axis of ``coords`` and ``tau_gt_profile`` has been truncated to
-    ``args.n_rays``. Coords are already normalized to the unit cube.
+    Returns ``(coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max)``
+    as float32/bool tensors. The first axis of ``coords``, ``tau_gt_profile``,
+    and ``mask_no_dla_profile`` has been truncated to ``args.n_rays``. Coords
+    are already normalized to the unit cube.
+
+    The ``mask_no_dla_profile`` (bool, ``True`` = include in loss/mean-flux
+    reductions) is the [D-24] DLA exclusion mask emitted by the loader.
     """
     if not os.path.exists(args.data_root):
         print(f"Warning: Data root {args.data_root} missing. Using dummy data.")
@@ -144,7 +148,9 @@ def load_dataset(args):
         coords = torch.rand(args.n_rays, nbins_dummy, 3, generator=gen)
         vel_axis = torch.linspace(0, 6000.0, nbins_dummy)
         tau_gt_profile = torch.rand(args.n_rays, nbins_dummy, generator=gen)
-        return coords, vel_axis, tau_gt_profile, box_max
+        # Synthetic data has no DLAs by construction; include every bin.
+        mask_no_dla_profile = torch.ones_like(tau_gt_profile, dtype=torch.bool)
+        return coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max
 
     loader = SherwoodLoader(args.data_root)
     sightlines = loader.load_sightlines(args.physics, 0.3)
@@ -157,11 +163,19 @@ def load_dataset(args):
     coords = torch.tensor(coords_raw[:n_rays], dtype=torch.float32) / box_max
     vel_axis = torch.tensor(sightlines['vel_axis'], dtype=torch.float32)
     tau_gt_profile = torch.tensor(sightlines['tau_h1'][:n_rays], dtype=torch.float32)
+    # [D-24]: per-bin DLA exclusion mask from the loader. True = include.
+    mask_no_dla_profile = torch.tensor(
+        sightlines['mask_no_dla'][:n_rays], dtype=torch.bool,
+    )
 
+    n_dla_bins = int((~mask_no_dla_profile).sum().item())
+    n_total_bins = int(mask_no_dla_profile.numel())
     print(f"Normalized coord range: [{coords.min().item():.4f}, "
           f"{coords.max().item():.4f}]")
     print(f"Run scope: {n_rays} rays x {coords.shape[1]} bins (full grid).")
-    return coords, vel_axis, tau_gt_profile, box_max
+    print(f"[D-24] DLA mask: {n_dla_bins}/{n_total_bins} bins excluded "
+          f"({100.0 * n_dla_bins / max(1, n_total_bins):.3f}%).")
+    return coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max
 
 
 def save_checkpoint(path, *, model, optimizer, scheduler, log_tau_amp,
@@ -243,10 +257,12 @@ def train(args):
     print(f"Using device: {device}", flush=True)
 
     # Dataset --------------------------------------------------------------
-    coords, vel_axis, tau_gt_profile, box_max = load_dataset(args)
+    coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max = load_dataset(args)
     coords = coords.to(device)
     vel_axis = vel_axis.to(device)
     tau_gt_profile = tau_gt_profile.to(device)
+    # [D-24] mask: bool, True = include in loss + mean-flux reductions.
+    mask_no_dla_profile = mask_no_dla_profile.to(device)
 
     # Available rays after potential truncation
     n_rays_actual = coords.shape[0]
@@ -269,7 +285,8 @@ def train(args):
         args.warmup_steps, args.max_steps, args.lr_max, args.lr_min,
     )
     scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
-    mse_loss = torch.nn.MSELoss()
+    # Note: pre-[D-24] used torch.nn.MSELoss() for the data term. The [D-24]
+    # log1p MSE is now computed inline below to apply the DLA mask correctly.
 
     # Resume --------------------------------------------------------------
     start_step = 0
@@ -333,7 +350,7 @@ def train(args):
                     "log_tau_amp_sigma": sigma_log,
                     "tau_amp_prior_weight": tau_amp_prior_weight,
                     "loss_form": (
-                        "tau_v_profile_mse + meanF_soft"
+                        "log1p_mse_capped_masked + meanF_soft_masked"  # [D-24]
                         + (" + log_tau_amp_prior" if args.use_log_prior else "")
                     ),
                 })
@@ -369,16 +386,23 @@ def train(args):
             # all rays * bins in the accumulation cycle. We need its current
             # value to linearize the squared loss for the per-microbatch
             # gradient pass. Pass 1 is grad-free, so memory stays bounded.
+            #
+            # [D-24]: reduce only over non-DLA bins. The mask is constant per
+            # microbatch (a per-bin attribute of the GT data, independent of
+            # tau_pred), so the [D-21] chain-rule identity still holds — the
+            # only change is that F_cycle is now the *masked* cycle mean.
             with torch.no_grad():
                 weighted_F_sum = 0.0
-                total_elems = 0
+                total_F_count = 0
                 for s, e in microbatch_slices():
                     tau_pred_mb = volume_render_physics(
                         model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp,
                     )
-                    weighted_F_sum += torch.exp(-tau_pred_mb).sum().item()
-                    total_elems += tau_pred_mb.numel()
-                mean_F_pred_val = weighted_F_sum / max(1, total_elems)
+                    mask_mb = mask_no_dla_profile[s:e]
+                    F_pred_mb = torch.exp(-tau_pred_mb)
+                    weighted_F_sum += (F_pred_mb * mask_mb).sum().item()
+                    total_F_count += int(mask_mb.sum().item())
+                mean_F_pred_val = weighted_F_sum / max(1, total_F_count)
             # Linearization coefficient: d/dF [lambda_F * (F - T)^2]
             #     = 2 * lambda_F * (F_cycle - T)
             # Surrogate per-microbatch loss to inject this gradient is just
@@ -394,6 +418,12 @@ def train(args):
             # plus, on the *first* microbatch only, the optional log-prior
             # (it has no microbatch dependence). One backward per microbatch
             # frees the graph immediately, keeping peak memory at one chunk.
+            # [D-24] Bolton+ 2017 forest cap: optical depths above this are
+            # numerically saturated (F = exp(-tau) is indistinguishable from
+            # zero) and the loss should not chase exact tau values in that
+            # regime. Hard-coded; PI re-tunes via a new D-XX, not a CLI flag.
+            TAU_MAX = 10.0
+
             data_loss_chunks = []
             for chunk_i, (s, e) in enumerate(microbatch_slices()):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
@@ -406,8 +436,29 @@ def train(args):
                 tau_pred_mb = volume_render_physics(
                     model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
                 )
-                loss_data_mb = mse_loss(tau_pred_mb, tau_gt_profile[s:e])
-                mean_F_mb = torch.exp(-tau_pred_mb).mean()
+                # ---- [D-24] data loss: log1p MSE, capped at TAU_MAX, masked. ----
+                # log1p(tau) compresses the long Lyman-alpha tail; cap at
+                # TAU_MAX = 10 so saturated bins don't dominate; mask out DLA
+                # bins entirely. Masked-mean form keeps loss finite even on
+                # the pathological microbatch where every bin is DLA-cored:
+                # zero-weight bins contribute zero gradient, exactly the
+                # supervision behavior PI specified.
+                tau_pred_eff = tau_pred_mb.clamp_max(TAU_MAX)
+                tau_gt_eff = tau_gt_profile[s:e].clamp_max(TAU_MAX)
+                mask_mb = mask_no_dla_profile[s:e]   # True = include
+                diff = torch.log1p(tau_pred_eff) - torch.log1p(tau_gt_eff)
+                diff_sq = diff * diff
+                loss_data_mb = (
+                    (diff_sq * mask_mb).sum() / mask_mb.sum().clamp(min=1)
+                )
+
+                # ---- [D-24] mean-F surrogate: same masked reduction. ----
+                # Mask is constant per microbatch (data attribute, not a
+                # function of tau_pred), so the [D-21] gradient identity
+                # ∂L_meanF/∂θ = 2 λ_F (F_cycle - F_obs) · ∂F_cycle/∂θ
+                # still holds — F_cycle is now the masked cycle mean.
+                F_pred_mb = torch.exp(-tau_pred_mb)
+                mean_F_mb = (F_pred_mb * mask_mb).sum() / mask_mb.sum().clamp(min=1)
 
                 loss_mb = loss_data_mb + mean_F_grad_coef * mean_F_mb
                 if chunk_i == 0 and args.use_log_prior:
