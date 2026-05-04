@@ -229,9 +229,30 @@ Report all primary metrics across these four sparsity regimes. The headline clai
 
 Disjoint from the publication-run subsection (post-quota). Per [D-23]: these runs use the tier-aware reduced schedule and are evidence for per-physics calibration (step rate, peak VRAM, convergence shape) only. They are **not** cited as evidence for [D-13] Stage 2b scientific gates.
 
-#### Micro-grid (16 cells, MLflow tag `stage=2b-microsweep`)
+#### Micro-grid (16 cells, MLflow tag `stage=2b-microsweep-d24`, completed 2026-05-04)
 
-[populate post-dispatch: cell name, source run_id, dest run_id, peak_vram_gb, mean_flux_pred(step=200), tau_amp(step=200), seconds_per_step, PASS/FAIL]
+Re-run under [D-24] (log1p + DLA mask + cap loss) on image `stage2b-7805842`. The original `stage=2b-microsweep` cells (raw-τ MSE) are superseded and not cited here.
+
+| Cell | n_rays | μbatch | accum | src run_id | dst run_id | peak_vram | data@10 | data@200 | descent ratio | `<F>`@200 | tau_amp@200 | billable_s |
+|:---|---:|---:|---:|:---|:---|---:|---:|---:|---:|---:|---:|---:|
+| P1-T1 | 64 | 1024 | 1 | `41853bec` | `d55c7af5` | 2.82 | 0.0217 | 0.0128 | 0.590 | 0.9275 | 0.9876 | 149 |
+| P2-T1 | 64 | 1024 | 1 | `401f6811` | `d8786af3` | 2.82 | 0.0319 | 0.0239 | 0.749 | 0.9238 | 0.9869 | 155 |
+| P3-T1 | 64 | 1024 | 1 | `caafe801` | `c315d322` | 2.82 | 0.0267 | 0.0180 | 0.674 | 0.9266 | 0.9857 | 158 |
+| P4-T1 | 64 | 1024 | 1 | `309434a6` | `df1c5445` | 2.82 | 0.0231 | 0.0131 | 0.567 | 0.9302 | 0.9865 | 149 |
+| P1-T2 | 256 | 1024 | 1 | `e42016f3` | `44bfb220` | 11.20 | 0.0206 | 0.0115 | 0.558 | 0.9281 | 0.9891 | 219 |
+| P2-T2 | 256 | 1024 | 1 | `b66da932` | `4945cbc7` | 11.20 | 0.0272 | 0.0189 | 0.695 | 0.9251 | 0.9877 | 220 |
+| P3-T2 | 256 | 1024 | 1 | `20b291a3` | `a5be0771` | 11.20 | 0.0258 | 0.0172 | 0.667 | 0.9290 | 0.9898 | 215 |
+| P4-T2 | 256 | 1024 | 1 | `da333327` | `001b4021` | 11.20 | 0.0257 | 0.0162 | 0.630 | 0.9287 | 0.9890 | 219 |
+| P1-T3 | 1024 | 256 | 4 | `c6815983` | `1ff3060b` | 11.23 | 0.0212 | 0.0121 | 0.571 | 0.9275 | 0.9911 | 491 |
+| P2-T3 | 1024 | 256 | 4 | `655427c2` | `b2ca97fd` | 11.23 | 0.0265 | 0.0180 | 0.679 | 0.9272 | 0.9908 | 486 |
+| P3-T3 | 1024 | 256 | 4 | `04cecbe6` | `a634ff0e` | 11.23 | 0.0251 | 0.0166 | 0.661 | 0.9256 | 0.9910 | 485 |
+| P4-T3 | 1024 | 256 | 4 | `ec0d09da` | `26b4d0d1` | 11.23 | 0.0244 | 0.0147 | 0.602 | 0.9301 | 0.9907 | 486 |
+| P1-T4 | 16384 | 256 | 64 | `8557f12d` | (TBD) | 11.77 | 0.0214 | 0.0126 | 0.589 | 0.9270 | 0.9933 | 5888 |
+| P2-T4 | 16384 | 256 | 64 | `d36048d0` | (TBD) | 11.77 | 0.0282 | 0.0201 | 0.713 | 0.9246 | 0.9933 | 5894 |
+| P3-T4 | 16384 | 256 | 64 | `b8a8445c` | (TBD) | 11.77 | 0.0258 | 0.0176 | 0.682 | 0.9251 | 0.9933 | 5894 |
+| P4-T4 | 16384 | 256 | 64 | `04fbf999` | (TBD) | 11.77 | 0.0241 | 0.0146 | 0.606 | 0.9293 | 0.9932 | 5886 |
+
+**Aggregate stats**: 16/16 PASS [D-19] descent (all ratios ≤ 0.85; range [0.558, 0.749] = 25-44% reduction). mean_F spread across all 16 cells: **0.0064** (0.9238-0.9302), well within the 5% bar (vs ~0.78 spread pre-[D-24]). peak_vram: T1=2.82, T2=11.20, T3=11.23, T4=**11.77 GB** (max, validates [D-23] linear-VRAM model at chunk_size=256 across accum_steps∈{1,4,64}). tau_amp@200 across 16 cells: 0.9857-0.9933 (consistent, small drift). Total billable: 26,980 sec ≈ 7.50 hr × ~$1/hr ≈ **~$7.50** (vs $1.50 estimate; T4's 64-chunk accumulation per step is ~4× slower per-cell than projected).
 
 #### Tier 1 cost-survey (P2/P3/P4)
 
@@ -357,3 +378,12 @@ Disjoint from the publication-run subsection (post-quota). Per [D-23]: these run
   3. mask-consistency unit test on the `pipeline.py` two-pass mean-F surrogate (core-implementer; closes the [D-11] sub-clause — S3)
   4. $\tau_{\max} \in \{5, 10, 20\}$ sensitivity test on a P1 micro-grid cell (support-researcher; calibrates [D-24] item (2))
   5. Danforth et al. 2016 PDF read for the verified $\tau_{\text{eff}}(z = 0.3)$ value (latex-author + PI; updates [D-11] anchor before publication run, not before cost-survey)
+
+### **Session Snapshot: May 4, 2026 ([D-24] micro-grid re-run completed — cross-physics scale closed)**
+
+- **16/16 cells passed** under tag `stage=2b-microsweep-d24` on image `stage2b-7805842` (commit `7805842`, includes loader DLA mask + log1p+cap+mask loss + mean-F mask consistency). Full matrix in §6.
+- **The cross-physics scale anomaly is closed.** Pre-[D-24] step-1 `data` MSE spread across physics was $10^{10}\times$ (P1: 0.05 → P2: 5e8); post-[D-24] step-200 `data` is consistent across all 16 cells in [0.0115, 0.0239]. mean_F across all 16 cells: **0.9238-0.9302 (0.7% spread)**, well within the 5% bar and consistent with the [D-11] anchor target 0.877 (modest overshoot is expected at 200 steps in warmup-dominated regime).
+- **All cells pass [D-19] descent**: ratios in [0.558, 0.749] = 25-44% reduction at step 200 vs step 10, vs the 15% bar (≤0.85 ratio). No NaN/Inf. tau_amp drift consistent: 0.9857-0.9933 across 16 cells.
+- **[D-23] linear-VRAM model validated up to T4 (accum_steps=64)**: peak_vram across tiers was 2.82 GB (T1 chunk=64), 11.20 GB (T2 chunk=256), 11.23 GB (T3 chunk=256, accum=4), 11.77 GB (T4 chunk=256, accum=64). Linearity in chunk_size confirmed to within ~0.5 GB across `accum_steps ∈ {1, 4, 64}`; the [D-23] sub-clause measured-VRAM gate is therefore satisfied retroactively for tier 4 by the micro-grid itself (T4 micro is structurally the smoke).
+- **Cost overrun**: total billable 26,980 sec (~$7.50) vs the original $1.50 estimate. Driver: T4 cells took ~98 min each at chunk=256/accum=64, vs the 15-25 min estimate. The estimate didn't account for the ~4× wallclock multiplier from 64 chunks/step. Recorded for the production-sweep wallclock projection to avoid a third such cascade.
+- **Dispatch**: project-architect commissioned with the full matrix to rule on cost-survey production sweep go/no-go. Pending verdict before dispatching `infrastructure-manager` for the 12-cell production sweep (P{1..4}×T{1,2,3}; T4 deferred to post-quota per [D-23]).
