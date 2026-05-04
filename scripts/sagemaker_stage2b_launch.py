@@ -132,6 +132,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
              "500 for tier 3/4 cost-survey runs (max_steps=12500).",
     )
     parser.add_argument(
+        "--tau_max",
+        type=float,
+        default=None,
+        help="[D-24] forest cap. None lets pipeline.py use its default 10.0. "
+             "Override for the cost-survey Batch 1b sensitivity sweep at "
+             "tau_max in {5, 10, 20}; if max(|delta P_F/P_F|) > 2%% in the "
+             "[D-13] inertial range, the cap is re-pinned with the measured "
+             "anchor.",
+    )
+    parser.add_argument(
         "--mlflow_uri",
         type=str,
         required=True,
@@ -264,6 +274,8 @@ def _build_payload(args: argparse.Namespace) -> Dict[str, Any]:
                 ["--microbatch", str(args.microbatch)] if args.microbatch is not None else []
             ) + (
                 ["--warmup_steps", str(args.warmup_steps)] if args.warmup_steps is not None else []
+            ) + (
+                ["--tau_max", str(args.tau_max)] if args.tau_max is not None else []
             ),
         },
         "InputDataConfig": [

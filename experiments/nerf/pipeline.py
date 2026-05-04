@@ -90,6 +90,14 @@ def parse_args(argv=None):
                    help="Observed mean flux <F> at z=0.3 [D-11].")
     p.add_argument("--lambda_F", type=float, default=1.0,
                    help="Weight on the mean-flux soft constraint [D-11].")
+    p.add_argument("--tau_max", type=float, default=10.0,
+                   help="Forest cap for the [D-24] log1p+cap+mask data loss. "
+                        "Default 10.0 per [D-24] item (2). PI mandated a "
+                        "sensitivity test at tau_max in {5, 10, 20}; this "
+                        "flag exposes the cap as a CLI override so the "
+                        "sweep can run without rebuilding the image. If the "
+                        "sensitivity test exceeds 2% in the [D-13] inertial "
+                        "range, the cap is re-pinned with the measured anchor.")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
@@ -418,11 +426,13 @@ def train(args):
             # plus, on the *first* microbatch only, the optional log-prior
             # (it has no microbatch dependence). One backward per microbatch
             # frees the graph immediately, keeping peak memory at one chunk.
-            # [D-24] Bolton+ 2017 forest cap: optical depths above this are
-            # numerically saturated (F = exp(-tau) is indistinguishable from
-            # zero) and the loss should not chase exact tau values in that
-            # regime. Hard-coded; PI re-tunes via a new D-XX, not a CLI flag.
-            TAU_MAX = 10.0
+            # [D-24] forest cap: optical depths above this are numerically
+            # saturated (F = exp(-tau) is indistinguishable from zero) and
+            # the loss should not chase exact tau values in that regime.
+            # Default 10.0 per [D-24]; CLI-configurable via --tau_max so the
+            # sensitivity sweep at tau_max in {5, 10, 20} can run without
+            # rebuilding the image (per PI cost-survey verdict, 2026-05-04).
+            TAU_MAX = args.tau_max
 
             data_loss_chunks = []
             for chunk_i, (s, e) in enumerate(microbatch_slices()):
