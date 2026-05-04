@@ -26,12 +26,18 @@ graph TD
         VOIGT --> RENDERED_FLUX["Rendered 1D Optical Depth<br/>(τ_rendered)"]
     end
 
-    subgraph Supervision["4. Optimization Objectives"]
+    subgraph Supervision["4. Optimization Objectives [D-24]/[D-11]/[D-21]"]
         TRUTH["Simulation Ground Truth<br/>(τ_GT)"]
-        MSE["Mean Squared Error Loss<br/>(L_flux)"]
-        
-        RENDERED_FLUX & TRUTH --> MSE
-        MSE -.-> |"Backpropagation (Stage 2b)"| MLP
+        DLAMASK["Saturated-Absorber Mask<br/>core τ_GT&gt;1e5; wing τ_GT&gt;10 [D-24]"]
+        L_DATA["L_data: log1p+cap+mask MSE<br/>τ_eff = min(τ, τ_max=10) [D-24]"]
+        L_MEANF["L_meanF: λ_F (⟨F_pred⟩ - ⟨F⟩_obs)²<br/>⟨F⟩_obs = 0.877 (Danforth+2016) [D-11]"]
+        TWOPASS["[D-21] Two-Pass Surrogate<br/>Pass1 cycle-mean (no_grad) → Pass2 per-microbatch backward"]
+
+        TRUTH --> DLAMASK
+        RENDERED_FLUX & TRUTH & DLAMASK --> L_DATA
+        RENDERED_FLUX & DLAMASK --> L_MEANF
+        L_DATA & L_MEANF --> TWOPASS
+        TWOPASS -.-> |"Backpropagation"| MLP
     end
 
     %% Styling
@@ -50,7 +56,7 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** (P1 tier 1 ✅; cost-survey across P2/P3/P4 dispatched per [D-23]; tier 4 deferred to post-quota) | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS (`stage=2b-microsweep-d24`); Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max ∈ {5,10,20} sensitivity) in flight; Batch 2 (T2×4) + Batch 3 (T3×4) pending; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
 | **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
@@ -88,8 +94,8 @@ graph TD
 - **Optical depth (RSD-convolved)**:
   $\tau(v_{\text{obs}}) = \mathcal{A} \sum_{\text{src}} n_{HI}^{\text{src}} \cdot \frac{H(a_{\text{src}}, x_{\text{src,obs}})}{b_{\text{src}} \sqrt{\pi}}$
   where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\text{src}}) / b_{\text{src}}$ and $\mathcal{A}$ is a learnable amplitude absorbing $\sigma_0$, the comoving cell length $ds$, and the mean-column conversion $\bar{n}_H$ (see [D-07]).
-- **Loss**: per-bin MSE on the full $\tau(v)$ profile (not the scalar sum used in the original Stage 2a runs); see [D-07].
-- **Re-validation**: smoke run on 10 sightlines at production scale (8 layers, $L=10$); ground-truth gradient flow + monotone profile-MSE convergence.
+- **Loss (Stage 2b production form per [D-24] / [D-11] / [D-21] coupled)**: data loss is per-bin **log1p+cap+mask MSE** — $\langle (\log(1+\tau_{\text{pred}}^{\text{eff}}) - \log(1+\tau_{GT}^{\text{eff}}))^2 \rangle_{\text{non-DLA}}$ with $\tau^{\text{eff}} = \min(\tau, \tau_{\max})$, $\tau_{\max} = 10$ ([D-24] item 2; sensitivity test in flight as cost-survey Batch 1b at $\tau_{\max} \in \{5, 10, 20\}$). Saturated-absorber mask `mask_no_dla` (per `src/data/loader.py:_detect_dla_mask`) excludes core $\tau_{GT} > 10^5$ + wing $\tau_{GT} > 10$ connected-component (catches DLAs $N_{HI} \geq 2 \times 10^{20}$ Wolfe+ 2005 plus strong LLS, derivation in [D-24] item 1). Mean-flux soft anchor $\mathcal{L}_{\text{meanF}} = \lambda_F (\langle F_{\text{pred}}\rangle - \langle F\rangle_{\text{obs}})^2$ with $\langle F\rangle_{\text{obs}} = 0.877$ at $z=0.3$ (Danforth et al. 2016, $\pm 15\%$ systematic per [D-11] amendment, **[VERIFY:]** PDF read pending). Both data-loss and mean-F reductions use the same `mask_no_dla` per [D-11] consistency clause; gradients delivered via the [D-21] two-pass surrogate (Pass 1 no-grad cycle-mean, Pass 2 per-microbatch backward of the linearized surrogate). The original Stage 2a-era specification (per-bin raw-τ MSE per [D-07]) is **superseded** for Stage 2b production runs.
+- **Re-validation**: Stage 2a smoke run on 10 sightlines at production scale (8 layers, $L=10$); ground-truth gradient flow confirmed end-to-end. Stage 2b validation: 16-cell `stage=2b-microsweep-d24` micro-grid passed all [D-19] criteria (16/16; full matrix in §6); cost-survey production sweep in flight per [D-23] (Batch 1 ✅, Batch 1b running, Batch 2/3 pending).
 
 ---
 
@@ -166,7 +172,7 @@ graph TD
 | Implementation Area | Primary Data File | Tracking Metadata |
 |:--- |:--- |:--- |
 | **Sightlines (1D)** | `los2048_n16384_z0.300.dat` | `NSPEC=16384, Z=0.3` |
-| **Optical Depth** | `tauH1_2048_n16384_z0.300.dat` | `MSE_Loss (Stage2a)` |
+| **Optical Depth** | `tauH1_2048_n16384_z0.300.dat` | redshift-space half (first $\text{nbins} \times \text{num\_los}$ doubles, per [D-06] target-space amendment 2026-05-04, ensemble-confirmed 40/40); supervision target for the [D-24] log1p+cap+mask loss |
 | **Ground Truth** | `SherwoodIGM_gal/` HDF5 Snapshots | `DVC/HDF5 Store` |
 
 ### Responsibility Matrix
@@ -178,17 +184,21 @@ graph TD
 
 ## 5. Evaluation Plan (Stage 2b)
 
-### Primary metrics (cosmologically meaningful — what an astro reviewer will demand)
+### Primary metrics ([D-13] gating set, with 2026-05-04 estimator-convention amendments)
 
-- **1D flux power spectrum** $P_F(k_\parallel)$: standard Lyα-forest community metric. Compare reconstructed vs. ground-truth spectra over the inertial-range scales $k_\parallel \sim 10^{-3}$–$10^{-1}$ s/km. This is the metric that catches under-/over-smoothing of small-scale absorption structure.
-- **3D density auto-power spectrum** $P_\delta(k_\parallel, k_\perp)$: probes whether transverse structure (the actual point of tomography) was recovered. Anisotropy of the recovered $P_\delta$ is the real test.
-- **Density-density cross-correlation** $\xi_{\hat{\rho}, \rho}(r)$ as a function of separation: the Stark+ 2015 bar for tomographic reconstruction quality.
-- **Flux PDF**: distribution of $F = e^{-\tau}$ values. Catches calibration drift in the absorber population.
+The three [D-13] gates that decide Stage 2b pass/fail (definitions in [D-13] post-amendment text; implementations in `src/analysis/`):
 
-### Secondary metrics (computer-vision style; sanity only)
+- **1D flux power spectrum** $P_F(k_\parallel)$ — Hann-windowed periodogram with $dv/\sum w^2$ leakage compensation, our simulator-side estimator (NOT inherited from Walther+ 2018 / Boera+ 2019, which use Lomb-Scargle on observational data). Angular wavenumber $k = 2\pi f$ in s/km. Pass condition: $|\Delta P_F / P_F| < 10\%$ averaged over the inertial range $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km. Implementation: `src/analysis/p_flux.compute_p_flux`.
+- **Density-density cross-correlation** $\xi_{\hat\rho, \rho}(r)$ — Pearson correlation coefficient (Stark et al. 2015 Eq. 13 normalization, **[VERIFY:]** §-level reference owed). Pass condition: $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$. Implementation: `src/analysis/cross_corr.compute_xi_pearson`.
+- **Flux PDF KS distance** — two-sample Kolmogorov-Smirnov on raw $F = e^{-\tau}$ samples restricted to $F \in [0.05, 0.95]$ (Bolton+ 2008 / Lee+ 2015 cut convention, **[VERIFY:]**). Pass condition: $\text{KS}(F\text{-PDF}) < 0.05$. Implementation: `src/analysis/flux_pdf.ks_distance`.
 
-- **PSNR / SSIM** on density slices: useful for visual comparison and qualitative figures, but not publishable as the primary tomography quality measure.
-- **Pearson correlation** between rendered and ground-truth $\tau$ profiles: smoke-test sanity check.
+All three evaluated at the fiducial point P1, $z=0.3$, $n_{\text{rays}}=1024$. Headline contribution is the **degradation curve** over $n_{\text{rays}} \in \{16384, 1024, 256, 64\}$ per physics, repeated for physics $\in \{1, 2, 3, 4\}$ (16-cell ablation matrix). Secondary requirement: monotonic degradation within each physics.
+
+### Diagnostic metrics (tracked but non-gating)
+
+- **3D density auto-power spectrum** $P_\delta(k_\parallel, k_\perp)$ — probes transverse-structure recovery and anisotropy. Diagnostic only; not in the [D-13] gate set, included for the discussion of where the model under-/over-smooths.
+- **PSNR / SSIM** on density slices — useful for visual comparison and qualitative figures, **NOT** publishable as primary tomography quality measure (demoted from Stage 2a's metric set).
+- **Pearson correlation** between rendered and ground-truth $\tau$ profiles — smoke-test sanity check, used in the [D-19] science smoke pass criteria not the [D-13] gates.
 
 ### Sightline-density ablation (the real scientific contribution)
 
