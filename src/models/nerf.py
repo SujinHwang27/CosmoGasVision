@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 
@@ -68,26 +70,33 @@ class IGMNeRF(nn.Module):
         
         return torch.stack([density, temp, h1_frac, vpec], dim=-1)
 
-def tepper_garcia_voigt(a, x):
+def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """
-    Tepper-García (2006) analytic approximation to the Voigt-Hjerting function H(a, x).
-    Highly efficient and differentiable for absorption profile modelling.
+    Tepper-García (2006) analytic approximation to the Voigt-Hjerting function
+    with a defensive Taylor branch for |x| << 1.
+
+    Fully gradient-safe and numerically stable.
     """
-    x2 = x**2
-    # Handling small x to avoid division by zero in (1.5 * x^-2)
-    # Using a small epsilon or clamping for the polynomial wings
-    x2_safe = torch.clamp(x2, min=1e-5)
-    
-    # H(a, x) ~ exp(-x^2) - (a / (sqrt(pi) * x^2)) * [exp(-2x^2)*(4x^4 + 7x^2 + 4 + 1.5x^-2) - 1.5x^-2 - 1]
-    exp_x2 = torch.exp(-x2)
-    exp_2x2 = torch.exp(-2 * x2)
-    
+    x2 = x ** 2
+    small = x2 < 1e-4
+
+    # Sanitize x2 for the main branch to avoid NaN/Inf in gradients
+    x2_safe = torch.where(small, torch.ones_like(x2), x2)
+
+    # Main branch (expanded LEDGER form)
+    exp_x2 = torch.exp(-x2_safe)
+    exp_2x2 = torch.exp(-2.0 * x2_safe)
     poly = 4 * x2_safe**2 + 7 * x2_safe + 4 + 1.5 / x2_safe
-    term1 = exp_2x2 * poly
-    term2 = 1.5 / x2_safe + 1
-    
-    h = exp_x2 - (a / (torch.sqrt(torch.tensor(torch.pi)) * x2_safe)) * (term1 - term2)
-    return torch.clamp(h, min=0.0)
+    bracket = exp_2x2 * poly - 1.5 / x2_safe - 1.0
+    H_main = exp_x2 - (a / (math.sqrt(math.pi) * x2_safe)) * bracket
+
+    # Leading-order Taylor expansion for very small |x|
+    H_small = torch.exp(-x2) - 2.0 * a / math.sqrt(math.pi)
+
+    # Blend branches
+    H = torch.where(small, H_small, H_main)
+
+    return torch.clamp(H, min=0.0)
 
 def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3):
     """
