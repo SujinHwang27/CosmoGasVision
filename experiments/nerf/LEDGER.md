@@ -288,7 +288,19 @@ Gate test for [D-24] item (2). Three paired P1-T1 cells at the production schedu
 
 #### Tier 2 cost-survey (P1/P2/P3/P4)
 
-[populate post-dispatch: same schema]
+Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsurvey`, 4-parallel on-demand `ml.g5.xlarge`. Schedule: `n_rays=256, max_steps=25000, warmup_steps=1000, microbatch=1024, tau_max=10` per [D-23] / [D-24]-locked.
+
+| Cell | Run name | status | final loss_data | mean_F | tau_amp | peak_vram_gb | sec/step | billable_sec | cost_usd |
+|:---|:---|:---|---:|---:|---:|---:|---:|---:|---:|
+| P1-T2 | `Stage2b-Ablation-P1-N256-S0-1777927887-d607dc` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P2-T2 | `Stage2b-Ablation-P2-N256-S0-1777927932-e2e58b` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P3-T2 | `Stage2b-Ablation-P3-N256-S0-1777927958-506193` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| P4-T2 | `Stage2b-Ablation-P4-N256-S0-1777927981-ab15e8` | running | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+
+ETA ~4 hr at ~$1/hr × 4-parallel ≈ **$16 envelope**. Importer command (run per cell after job completion):
+```
+uv run python scripts/sagemaker_stage2b_import_mlflow.py <run_name> --mlflow_uri http://127.0.0.1:5000
+```
 
 #### Tier 3 cost-survey (P1/P2/P3/P4, conditional on remaining budget)
 
