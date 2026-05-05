@@ -187,7 +187,7 @@ add_image(s2, COSMO_FIG, left=Inches(0.4), top=Inches(0.95), width=Inches(12.5))
 # A short caption strip below
 add_text(
     s2,
-    "Each spectrum is a 1D pencil through a 3D scene  —  thousands of pencils "
+    "Each sightline gives us one absorption spectrum  —  thousands of rays "
     "is what we have to reconstruct the volume.",
     left=Inches(0.5), top=Inches(6.65), width=Inches(12.3), height=Inches(0.45),
     size=14, color=NAVY, italic=True, align=PP_ALIGN.CENTER,
@@ -218,9 +218,9 @@ optical-depth profile as a function of observed velocity. Most of it is the
 fraction of sightlines hit dense neutral systems and saturate completely;
 those are the heavy-tailed outliers.
 
-Surveys like DESI will give us millions of these spectra. Each one is a 1D
-pencil through 3D structure. The reconstruction question is: how do we
-recover the 3D fields from these pencils?""")
+Surveys like DESI will give us millions of these spectra — one ray, one
+spectrum. The reconstruction question is: how do we recover the 3D fields
+from a few hundred to a few thousand of these rays?""")
 
 
 # =============================================================================

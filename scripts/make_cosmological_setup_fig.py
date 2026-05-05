@@ -34,7 +34,7 @@ ax_top.axis("off")
 # Bottom axes: 1D Lyman-alpha forest spectrum
 ax_bot = fig.add_axes([0.10, 0.10, 0.80, 0.28])
 ax_bot.set_xlim(0, 5400)         # km/s, full Sherwood range
-ax_bot.set_ylim(-0.4, 6.0)
+ax_bot.set_ylim(-0.2, 6.2)
 
 # -----------------------------------------------------------------------------
 # Top panel: cosmological volume + sightline
@@ -111,7 +111,7 @@ ax_top.text(ox, oy + 0.55, "observer\n(us)",
             ha="center", va="center", fontsize=11,
             color="#a8d8ea", fontweight="bold", zorder=7)
 
-# Sightline (yellow, with arrowhead at observer)
+# Sightline (yellow ray, with arrowhead at observer)
 sight_y = qy
 ax_top.add_patch(FancyArrowPatch(
     (qx + 0.25, qy), (ox - 0.25, oy),
@@ -119,7 +119,7 @@ ax_top.add_patch(FancyArrowPatch(
     linewidth=2.0, color="#ffd166", zorder=5,
 ))
 ax_top.text((qx + ox) / 2, sight_y + 0.18,
-            "sightline (1D pencil through the volume)",
+            "sightline (ray through the volume)",
             ha="center", va="bottom", fontsize=10,
             color="#ffd166", style="italic", zorder=7)
 
@@ -134,61 +134,52 @@ ax_top.text(box_x0 + box_w / 2, box_y0 - 0.30,
             fontsize=11, color="#a8d8ea", zorder=7)
 
 # -----------------------------------------------------------------------------
-# Bottom panel: synthetic Lyman-alpha forest spectrum
+# Bottom panel: τ(v) spectrum with realistic Sherwood-style structure
+#
+# The real Lyman-α forest at z = 0.3 is "thin": sparse, sharp, narrow
+# absorbers on a near-zero baseline (the universe has expanded, gas is
+# clumpy, most of the LOS is empty). A single dominant absorber dwarfs
+# the rest. This panel matches that profile.
 # -----------------------------------------------------------------------------
 v = np.linspace(0, 5400, 2048)
+tau = np.full_like(v, 0.02)  # near-zero baseline
 
-# Synthetic absorption profile:
-#   - dense low-tau forest baseline (smooth ~ 0.2–1.5)
-#   - a handful of narrow forest absorbers
-#   - one saturated DLA
-forest_baseline = 0.4 + 0.6 * np.abs(np.sin(v / 220.0))**2 \
-    + 0.3 * np.cos(v / 410.0 + 0.9)**2
-
-# Narrow forest absorbers
+# Narrow absorbers: (center_v in km/s, peak τ, FWHM in km/s)
 absorbers = [
-    (650, 0.4, 18),
-    (1350, 0.7, 14),
-    (1900, 0.55, 16),
-    (2150, 0.35, 12),
-    (3050, 0.5, 20),
-    (3750, 0.65, 13),
-    (4650, 0.45, 17),
+    (350,  0.45, 16),
+    (470,  0.20, 10),
+    (1180, 0.30, 14),
+    (1520, 0.18, 12),
+    (1640, 0.22, 14),
+    (2640, 5.20, 22),   # dominant absorber
+    (2900, 0.45, 14),
+    (3050, 0.55, 16),
+    (3220, 0.40, 14),
+    (3560, 0.50, 18),
+    (4470, 0.60, 18),
+    (4880, 0.45, 16),
+    (5180, 1.70, 18),   # late cluster, three close peaks
+    (5260, 1.20, 14),
+    (5320, 1.00, 14),
 ]
-tau = forest_baseline.copy()
-for v0, amp, sigma in absorbers:
-    tau += 4.0 * amp * np.exp(-((v - v0) / sigma) ** 2)
+for v0, peak, fwhm in absorbers:
+    sigma = fwhm / 2.355
+    tau += peak * np.exp(-((v - v0) / sigma) ** 2)
 
-# One saturated absorber (DLA)
-v_dla = 2700
-tau_dla = 6.0 / (1.0 + ((v - v_dla) / 28.0) ** 2)
-tau = tau + tau_dla * 50.0  # cap visualized below
+ax_bot.plot(v, tau, color="#1f77b4", linewidth=1.2)
+ax_bot.axhline(y=0, color="#bbb", linewidth=0.5, zorder=0)
 
-# Cap for display
-display_cap = 5.5
-tau_display = np.clip(tau, 0, display_cap)
-
-ax_bot.plot(v, tau_display, color="#222", linewidth=1.0)
-ax_bot.fill_between(v, 0, tau_display, color="#a8d8ea", alpha=0.6)
-ax_bot.axhline(y=0, color="#555", linewidth=0.6)
-
-# Mark the DLA cap
-ax_bot.fill_between(v[(v > v_dla - 60) & (v < v_dla + 60)],
-                    display_cap, display_cap + 0.5,
-                    color="#ffadad", alpha=0.6, zorder=4)
-ax_bot.annotate("saturated absorber (DLA)\n→ heavy-tailed outlier",
-                xy=(v_dla, display_cap + 0.05),
-                xytext=(v_dla + 700, display_cap + 0.5),
+# Annotate the dominant absorber
+v_dom = 2640
+ax_bot.annotate("dominant absorber",
+                xy=(v_dom, 5.20),
+                xytext=(v_dom + 800, 5.15),
                 fontsize=10, color="#a01313",
                 arrowprops=dict(arrowstyle="->", color="#a01313", lw=1.0),
                 zorder=5)
 
-# Annotate forest absorbers
-for v0, _, _ in absorbers[:3]:
-    ax_bot.annotate("", xy=(v0, 1.2), xytext=(v0, 2.5),
-                    arrowprops=dict(arrowstyle="-", color="#666",
-                                    lw=0.6, ls=":"))
-ax_bot.text(1100, 4.5, "Lyman-α forest absorbers",
+# Caption — what the field is called
+ax_bot.text(150, 4.0, r"Lyman-$\alpha$ forest spectrum  ($\tau$ vs. velocity)",
             fontsize=11, color="#222", fontweight="bold")
 
 # Axes
