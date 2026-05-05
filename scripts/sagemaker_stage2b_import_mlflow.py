@@ -112,6 +112,15 @@ def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
         action="store_true",
         help="Don't delete the extracted tarball directory (debugging).",
     )
+    parser.add_argument(
+        "--latest-only",
+        action="store_true",
+        help="Skip the per-step metric history replay; log only the final value "
+             "of each metric. Reduces import time from ~hours to ~seconds when "
+             "the destination MLflow tracker is SQLite-backed and the run has "
+             "tens of thousands of steps. Use when only headline numbers (final "
+             "loss, mean_F, tau_amp, peak_vram_gb) are needed for documentation.",
+    )
     return parser.parse_args(argv)
 
 
@@ -173,6 +182,7 @@ def _replay_run(
     src_run_id: str,
     dst_experiment_id: str,
     src_store_root: Path,
+    latest_only: bool = False,
 ) -> str:
     """Recreate one source run in the destination tracker.
 
@@ -203,13 +213,24 @@ def _replay_run(
     for k, v in src_data.params.items():
         dst_client.log_param(dst_run_id, k, v)
 
-    # Metrics: replay the full per-step history so charts in the UI look right.
+    # Metrics: by default replay the full per-step history so charts in the UI
+    # look right. With --latest-only we log just the final value per key — this
+    # cuts a 50k-step run import from ~hours (SQLite-backed dst) to ~seconds
+    # while preserving the headline numbers cited in the LEDGER and the paper.
     for metric_key in src_data.metrics:
         history = src_client.get_metric_history(src_run_id, metric_key)
-        for m in history:
+        if not history:
+            continue
+        if latest_only:
+            m = history[-1]
             dst_client.log_metric(
                 dst_run_id, m.key, m.value, timestamp=m.timestamp, step=m.step,
             )
+        else:
+            for m in history:
+                dst_client.log_metric(
+                    dst_run_id, m.key, m.value, timestamp=m.timestamp, step=m.step,
+                )
 
     # Artifacts: the artifact_uri stored in meta.yaml points to the path used
     # when the source store was first created (e.g. /opt/ml/model/mlflow/...
@@ -293,6 +314,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 dst_run_id = _replay_run(
                     src_client, dst_client, src_run.info.run_id, dst_experiment_id,
                     src_store_root=mlflow_dir,
+                    latest_only=args.latest_only,
                 )
                 replayed[src_run.info.run_id] = dst_run_id
                 print(f"  replayed src={src_run.info.run_id} -> dst={dst_run_id}")

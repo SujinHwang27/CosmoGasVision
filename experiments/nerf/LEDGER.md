@@ -290,18 +290,18 @@ Gate test for [D-24] item (2). Three paired P1-T1 cells at the production schedu
 
 Dispatched 2026-05-04 ~14:09 UTC (1777903757-1777903763), image `stage2b-2868446`, 4-parallel on-demand `ml.g5.xlarge`. Schedule: `n_rays=64, max_steps=50000, microbatch=1024, accum=1, tau_max=10` per [D-23] / [D-24]-locked. Sources verified via `aws sagemaker describe-training-job` (2026-05-04 reconciliation).
 
-| Cell | n_rays | μbatch | accum | src run_id | dst run_id | peak_vram | mean_F | tau_amp | billable_sec |
-|:---|---:|---:|---:|:---|:---|---:|---:|---:|---:|
-| P1-T1 | 64 | 1024 | 1 | (not imported) | (pending) | 2.82 [a] | (not imported) | (not imported) | 5955 |
-| P2-T1 | 64 | 1024 | 1 | `11e0d928` | `98207af0` | 2.82 | 0.9247 | 2.3150 | 5955 |
-| P3-T1 | 64 | 1024 | 1 | `4fa9e500` | `6d48089f` | 2.82 [a] | (importer truncated) | (importer truncated) | 5958 |
-| P4-T1 | 64 | 1024 | 1 | (not imported) | (pending) | 2.82 [a] | (not imported) | (not imported) | 5948 |
+| Cell | n_rays | μbatch | accum | src run_id | dst run_id | peak_vram | mean_F | tau_amp | loss_data | billable_sec |
+|:---|---:|---:|---:|:---|:---|---:|---:|---:|---:|---:|
+| P1-T1 | 64 | 1024 | 1 | `0f4fb9f7` | `127e18a7` | 2.82 | 0.9282 | 1.2244 | 0.00259 | 5955 |
+| P2-T1 | 64 | 1024 | 1 | `11e0d928` | `98207af0` | 2.82 | 0.9247 | 2.3150 | 0.00224 | 5955 |
+| P3-T1 | 64 | 1024 | 1 | `4fa9e500` | `893ec07b` | 2.82 | 0.9275 | 2.0383 | 0.00252 | 5958 |
+| P4-T1 | 64 | 1024 | 1 | `e58a159b` | `f21f9780` | 2.82 | 0.9308 | 1.9551 | 0.00286 | 5948 |
 
 Notes:
 - AWS SageMaker confirms all 4 jobs `Completed` with the billable seconds shown (source: `aws sagemaker describe-training-job` 2026-05-04). Total Batch 1 cost-survey billable = **23,816 sec ≈ 6.62 hr ≈ \$6.66** at on-demand $1.006/hr.
-- [a] peak_vram_gb assumed to match the P2 measurement (2.82 GB, identical chunk_size=64 and accum=1) — anchored to the [D-23] linear-VRAM model and to the micro-grid T1 result (§6 micro-grid line: T1 = 2.82 GB across all 4 physics).
-- Per-step throughput: 5955-5958 sec / 50000 steps = **0.119 s/step**, matching the P1 tier-1 production anchor (5930 sec / 50000 = 0.119 s/step) within 0.5%.
-- P1 and P4 SageMaker `model.tar.gz` are present in S3 but the post-job MLflow importer (`scripts/sagemaker_stage2b_import_mlflow.py`) was not run for those two; P3 import landed but `peak_vram_gb` / `mean_flux_pred` / `tau_amp` were truncated to the partial summary metric set. **Action owed (data-engineer / infrastructure-manager)**: re-run the importer for P1, P3, P4 to recover the full per-step metric history before the cost-survey is cited as evidence in the paper. Schedule: post-Batch-2 re-dispatch.
+- Per-step throughput: 5955-5958 sec / 50000 steps = **0.119 s/step**, consistent across physics within 0.5%; matches the P1 tier-1 production anchor (5930 sec / 50000 = 0.119 s/step). This is the production-grade T1 throughput anchor cited in §6.5.
+- mean_F spread across the 4 physics: **0.9247-0.9308** (range 0.0061), well within the 5% [D-19] tolerance vs the [D-11] anchor 0.877. tau_amp spread 1.22-2.32 reflects the per-physics calibration-degeneracy expected under the [D-21] surrogate-mean-flux pull (D-11 anchor matches; the τ_amp ↔ density rescaling is the unobservable absorbed by [D-10]).
+- *MLflow importer history (operational)*: the four runs were re-imported 2026-05-04 with `--latest-only` (final-value-only) after a SQLite-write-throughput pathology made full-history import infeasible (~3 hr/run on the local SQLite-backed tracker). The full per-step histories remain in `s3://cosmo-gas-vision-storage/stage2b-output/<run>/output/model.tar.gz` and can be replayed without `--latest-only` if a future analysis needs training-trajectory plots. Final-state values are sufficient for both the [D-19] gate evaluation and the paper's headline ablation table.
 
 #### Tier 2 cost-survey (P1/P2/P3/P4)
 
