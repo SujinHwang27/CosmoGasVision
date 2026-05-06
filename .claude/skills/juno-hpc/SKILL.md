@@ -25,20 +25,36 @@ Source of truth for cluster state: <https://hpc.utdallas.edu/systems-resources/j
 
   Load with `set -a; source .env; set +a` at the top of any host-side script that needs them; `dotenv.load_dotenv()` for Python (matches `mlflow-run` skill pattern).
 
-- **Login command**:
+- **SSH key auth (required for the dispatch workflow)** — UTD password login triggers Duo MFA on every connection, which makes the rsync + sbatch loops unworkable. Set up key auth once per workstation:
 
   ```bash
-  ssh "${JUNO_NETID}@${JUNO_HOST}"
-  ```
+  # 1. Generate a Juno-specific Ed25519 key (no passphrase = automation-friendly).
+  ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_juno -N "" -C "cosmogasvision-juno-$(date +%Y%m%d)"
 
-  Optional ergonomics — add a `Host juno` entry in `~/.ssh/config` so `ssh juno` Just Works without env vars:
+  # 2. Install the public half on Juno — prompts for UTD password + Duo ONCE.
+  #    -o IdentitiesOnly=no overrides the Host juno block we add in step 3.
+  ssh-copy-id -i ~/.ssh/id_ed25519_juno.pub -o IdentitiesOnly=no <netid>@juno.utdallas.edu
 
-  ```sshconfig
+  # 3. Add a Host alias so `ssh juno` (and `rsync ... juno:...`) just work.
+  cat >> ~/.ssh/config <<EOF
   Host juno
       HostName juno.utdallas.edu
-      User <utd-netid>
+      User <netid>
+      IdentityFile ~/.ssh/id_ed25519_juno
+      IdentitiesOnly yes
       ServerAliveInterval 60
       ServerAliveCountMax 3
+  EOF
+  chmod 600 ~/.ssh/config ~/.ssh/id_ed25519_juno
+  ```
+
+  Verify: `ssh juno "hostname; whoami"` should succeed silently with no prompt.
+
+- **Login commands** — both forms are supported; use `ssh juno` for daily work and the env form for portable scripts:
+
+  ```bash
+  ssh juno                              # via ~/.ssh/config alias (recommended)
+  ssh "${JUNO_NETID}@${JUNO_HOST}"      # via .env (portable across machines)
   ```
 
 - **Open OnDemand** (web UI for file browse / VS Code / Jupyter): <https://juno-ood.hpcre.utdallas.edu/>. Useful for ≤10 GB ad-hoc transfers; not suitable for the full Sherwood mirror.
@@ -197,13 +213,15 @@ The local MLflow tracker (`http://127.0.0.1:5000`, this machine, see CLAUDE.md "
 
 After the job completes:
 
-1. **Pull from Juno to host** (host-side `.env` provides `JUNO_NETID` and `JUNO_HOST`):
+1. **Pull from Juno to host** — uses the `Host juno` alias from `~/.ssh/config` (no password prompts during the loop):
 
    ```bash
    set -a; source .env; set +a
-   rsync -avzP "${JUNO_NETID}@${JUNO_HOST}:${JUNO_WORK%/CosmoGasVision}/stage2b_results/<RUN_TAG>/" \
+   rsync -avzP "juno:${JUNO_WORK%/CosmoGasVision}/stage2b_results/<RUN_TAG>/" \
        cloud_runs/<RUN_TAG>/
    ```
+
+   Portable alternative for machines without the `Host juno` alias set up: `rsync -avzP -e "ssh -i ~/.ssh/id_ed25519_juno" "${JUNO_NETID}@${JUNO_HOST}:..."`.
 
 2. **Replay into local tracker** using the existing SageMaker importer (`scripts/sagemaker_stage2b_import_mlflow.py`) — it operates on a local `mlruns/` tree and is platform-agnostic. Pass the pulled `mlflow/` directory as the source. If the importer is SageMaker-tarball-specific in current form, generalize it; do not write a parallel Juno-only importer.
 
