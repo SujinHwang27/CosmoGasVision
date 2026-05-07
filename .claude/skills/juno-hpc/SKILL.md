@@ -65,9 +65,9 @@ Source of truth for cluster state: <https://hpc.utdallas.edu/systems-resources/j
 | Path | Real location | Filesystem | Quota | Backed up | Purge | Use for |
 |---|---|---|---|---|---|---|
 | `~` (home) | `/home/<netid>` | MFS | 50 GB / 300k inodes | daily | none | login scripts, configs, small inputs only — **never** for batch I/O |
-| `~/work` → symlink | `/work/<netid>` | MFS | 1 TB / 3M inodes | daily | none | repo clone, conda envs, large source, kept results |
+| `~/work` → symlink | `/work/<netid>` (note: NOT `/home/<netid>/work`) | MFS | 1 TB / 3M inodes | daily | none | repo clone, conda envs, `.venv/`, kept results |
 | `/groups/<pi-name>` | (varies) | MFS | 1 TB+ | daily | none | shared group software/data/results |
-| `~/scratch` → symlink | `/scratch/juno/<netid>` | parallel FS (Lustre/BeeGFS) | 30 TB soft | **never** | **45 days no-access → deleted** | batch I/O — sightlines, GT τ, checkpoints, MLflow file store |
+| `~/scratch` → symlink | `/scratch/juno/<netid>` (note: NOT `/scratch/<netid>`) | parallel FS | 30 TB soft | **never** | **45 days no-access → deleted** | batch I/O — sightlines, GT τ, checkpoints, MLflow file store |
 
 Quota check: `mfsgetquota -H <directory>` for `~` and `~/work`. **`~/scratch` is not MFS** — `mfsgetquota` returns "not MFS object"; use `df -h ~/scratch` to see usage. The 30 TB cap is enforced at filesystem level.
 
@@ -100,24 +100,74 @@ Job-priority Fairshare resets monthly and heals to 1.0 in two weeks of disuse �
 
 ## Environment bring-up (one-time per project clone)
 
-Juno's default Python comes from the system; use Miniconda for an isolated env. The project uses `uv`, but `uv` should run **inside** a conda env on Juno so the Python interpreter is owned by miniconda.
+Juno's default Python comes from the system; use Miniconda to donate a Python interpreter, then let `uv` build a `.venv` next to the project. uv installs the project deps into `.venv/`, **not** into the conda env — the conda env's only job is to provide the interpreter `.venv` symlinks against. (Verified 2026-05-06: `.venv/bin/python` → `/work/<netid>/envs/cosmogasvision/bin/python3.12`.)
 
 ```bash
-# Login node, one-time. ${JUNO_WORK} from .env resolves to /home/<netid>/work/CosmoGasVision
-module load miniconda
-conda create -p ~/work/envs/cosmogasvision python=3.12 -y
-conda init bash && source ~/.bashrc
-conda activate ~/work/envs/cosmogasvision
+# Login node, one-time.
+# Use `eval "$(conda shell.bash hook)"` instead of `conda init bash` to avoid
+# polluting ~/.bashrc; the hook only affects the current session.
+module load miniconda/24.11.1
+eval "$(conda shell.bash hook)"
+conda create -p /work/<netid>/envs/cosmogasvision python=3.12 -y
+conda activate /work/<netid>/envs/cosmogasvision
 
-# Project sources in ~/work (NOT ~/scratch — scratch will purge)
-mkdir -p "$(dirname "${JUNO_WORK}")"
-git clone <repo-url> "${JUNO_WORK}"
+# Project sources in /work (NOT /scratch — scratch will purge after 45 days)
+git clone git@github.com:<gh-user>/CosmoGasVision.git "${JUNO_WORK}"
 cd "${JUNO_WORK}"
 pip install uv
-uv sync  # honors uv.lock from CLAUDE.md tooling section
+export UV_LINK_MODE=copy             # avoids cross-FS hardlink warning between cache and .venv
+uv sync                              # creates ./.venv with all project deps
 ```
 
-Sherwood data (sightlines + `tauH1_*.dat`) are ~1.6 GB per physics; mirror to `~/scratch/sherwood/` before each dispatch. They will be purged after 45 days of no-access — set a calendar reminder to `touch` them if a long pause is planned, or re-mirror from S3 (`s3://cosmo-gas-vision-storage/sherwood/`).
+**Driver / CUDA constraint** ([D-XX] candidate — see LEDGER): Juno's compute-node NVIDIA driver is `550.163.01` (probed 2026-05-06 on `g-01-01`/A30), which supports CUDA 12.4 maximum. The project's `pyproject.toml` pins `torch>=2.8.0`, but PyTorch 2.7+ ships only `cu126`/`cu128` wheels needing driver 560+/570+. **Force-replace torch with the cu124 wheel after `uv sync`**:
+
+```bash
+export VIRTUAL_ENV="${JUNO_WORK}/.venv"
+uv pip install --reinstall \
+    torch==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cu124 \
+    --extra-index-url https://pypi.org/simple
+.venv/bin/python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+# expected: 2.6.0+cu124 True   (cuda.is_available is False on login node — verify in salloc)
+```
+
+This downgrade is **Juno-side only**; the host machine's SageMaker venv keeps `torch 2.8+` per the lock. Re-running `uv sync` on Juno would clobber the override — re-run the `uv pip install` above any time the lock changes.
+
+**Awscli** is needed for the Sherwood mirror but is not in `pyproject.toml`. Install it the same way:
+
+```bash
+uv pip install awscli   # requires VIRTUAL_ENV exported as above; silent no-op otherwise
+```
+
+**Sherwood data** (sightlines + `tauH1_*.dat`) are ~1.6 GB per physics, ~6.4 GB total. Mirror to `${JUNO_SCRATCH}/sherwood/` once before the first dispatch:
+
+```bash
+set -a; source "${JUNO_WORK}/.env"; set +a
+mkdir -p "${JUNO_SCRATCH}/sherwood"
+.venv/bin/aws s3 sync s3://cosmo-gas-vision-storage/sherwood/ "${JUNO_SCRATCH}/sherwood/"
+```
+
+This requires the `cgv-juno-reader` IAM keys in `${JUNO_WORK}/.env` (mode 600) — see "AWS credentials on Juno" below. Mirror is purged after 45 days of no-access; either re-mirror or `touch` the files periodically if a long pause is planned.
+
+## AWS credentials on Juno
+
+Use a **scoped IAM user** (`cgv-juno-reader`) with read-only on `s3://cosmo-gas-vision-storage/sherwood/*`. Do NOT copy the host's `cgv-infrastructure-user` keys to the cluster — those have full SageMaker/ECR/S3 power and would multiply blast radius if Juno is compromised.
+
+Provision in AWS console (one-time):
+1. IAM → Users → Create user `cgv-juno-reader` (programmatic access only).
+2. Attach inline policy `CGV-JunoSherwoodReadOnly`:
+   ```json
+   {"Version":"2012-10-17","Statement":[
+     {"Sid":"ListSherwoodPrefix","Effect":"Allow","Action":"s3:ListBucket",
+      "Resource":"arn:aws:s3:::cosmo-gas-vision-storage",
+      "Condition":{"StringLike":{"s3:prefix":["sherwood/*","sherwood"]}}},
+     {"Sid":"ReadSherwoodObjects","Effect":"Allow","Action":"s3:GetObject",
+      "Resource":"arn:aws:s3:::cosmo-gas-vision-storage/sherwood/*"}
+   ]}
+   ```
+3. Create access key, paste the pair into `${JUNO_WORK}/.env` alongside the `JUNO_*` block. The `.env` must be mode 600.
+
+If the dispatch ever needs DVC pulls from Juno, extend the policy with `s3:GetObject` on `cosmo-gas-vision-storage/dvc-data/*` and `ListBucket` with that prefix — narrowest-needed scope still applies.
 
 ## Canonical Stage 2b sbatch script
 
@@ -160,11 +210,11 @@ cp -r "${JUNO_WORK}"/{src,experiments,scripts,pyproject.toml,uv.lock} .
 ln -s "${JUNO_SCRATCH}/sherwood" Sherwood   # sightlines + tauH1_*.dat (mirrored once, kept warm)
 
 # --- 2. Environment ---
-# Pin module versions to avoid silent toolchain upgrades between runs.
-# Probed 2026-05-06: Juno default is cuda/13.0; PyTorch 2.x wheels
-# bundle CUDA 12.x runtime and run fine on the 13.0 driver layer.
-module load miniconda/24.11.1 cuda/13.0
-conda activate "${JUNO_WORK%/CosmoGasVision}/envs/cosmogasvision"
+# torch 2.6.0+cu124 in .venv bundles its own CUDA 12.4 runtime libraries
+# (nvidia-cuda-runtime-cu12, libcudnn, etc.) — module load cuda is NOT needed
+# at job runtime. The bundled libs link against the kernel-side driver
+# (550.163.01 → CUDA 12.4 max) which is why we pin to cu124 wheels.
+source "${JUNO_WORK}/.venv/bin/activate"
 export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
 
