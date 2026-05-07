@@ -62,14 +62,16 @@ Source of truth for cluster state: <https://hpc.utdallas.edu/systems-resources/j
 
 ## Storage layout — pick the right filesystem
 
-| Path | Quota | Backed up | Purge | Use for |
-|---|---|---|---|---|
-| `~` (home) | 50 GB | daily | none | login scripts, configs, small inputs only — **never** for batch I/O |
-| `~/work` | 1 TB | daily | none | user-installed software (conda envs), large source tarballs, results to keep |
-| `/groups/<pi-name>` | 1 TB+ | daily | none | shared group software/data/results |
-| `~/scratch` | 30 TB soft | **never** | **45 days no-access → deleted** | all batch I/O — sightlines, GT τ, checkpoints, MLflow file store |
+| Path | Real location | Filesystem | Quota | Backed up | Purge | Use for |
+|---|---|---|---|---|---|---|
+| `~` (home) | `/home/<netid>` | MFS | 50 GB / 300k inodes | daily | none | login scripts, configs, small inputs only — **never** for batch I/O |
+| `~/work` → symlink | `/work/<netid>` | MFS | 1 TB / 3M inodes | daily | none | repo clone, conda envs, large source, kept results |
+| `/groups/<pi-name>` | (varies) | MFS | 1 TB+ | daily | none | shared group software/data/results |
+| `~/scratch` → symlink | `/scratch/juno/<netid>` | parallel FS (Lustre/BeeGFS) | 30 TB soft | **never** | **45 days no-access → deleted** | batch I/O — sightlines, GT τ, checkpoints, MLflow file store |
 
-Quota check: `mfsgetquota -H <directory>` (also reports inode quota).
+Quota check: `mfsgetquota -H <directory>` for `~` and `~/work`. **`~/scratch` is not MFS** — `mfsgetquota` returns "not MFS object"; use `df -h ~/scratch` to see usage. The 30 TB cap is enforced at filesystem level.
+
+Inode-quota footnote: a conda env contains millions of small files; install it under `~/work` (3M inodes), never under `~` (300k will blow within minutes).
 
 **Hard rules**:
 1. Compute jobs read/write to `~/scratch`, never to `~` or `/groups`. Scratch is up to 10× faster for large I/O.
@@ -158,7 +160,10 @@ cp -r "${JUNO_WORK}"/{src,experiments,scripts,pyproject.toml,uv.lock} .
 ln -s "${JUNO_SCRATCH}/sherwood" Sherwood   # sightlines + tauH1_*.dat (mirrored once, kept warm)
 
 # --- 2. Environment ---
-module load miniconda cuda
+# Pin module versions to avoid silent toolchain upgrades between runs.
+# Probed 2026-05-06: Juno default is cuda/13.0; PyTorch 2.x wheels
+# bundle CUDA 12.x runtime and run fine on the 13.0 driver layer.
+module load miniconda/24.11.1 cuda/13.0
 conda activate "${JUNO_WORK%/CosmoGasVision}/envs/cosmogasvision"
 export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
