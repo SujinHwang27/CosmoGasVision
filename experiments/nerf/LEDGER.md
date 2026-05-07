@@ -332,6 +332,25 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 
 - Lyα peak strength spikes nearly 100× mean in massive filaments — empirical motivation for $L=10$ Fourier bandwidth, not a lower setting.
 
+### Stage 2b Juno cost-survey — Batch 2 (T2 × {P1,P2,P3,P4}), 2026-05-07
+
+First production sweep on the UTD Juno HPC dispatch path ([D-25] torch override applied). All 4 cells PASSED [D-19] safety rails. Disjoint from the SageMaker cost-survey subsection per [D-23] two-tier framework — these are *Juno cost-survey* runs.
+
+| Cell | sbatch JobID | MLflow run_id | Elapsed | `loss_data` | `mean_flux_pred` | `tau_amp` | `peak_vram_gb` |
+|---|---|---|---|---|---|---|---|
+| P1-T2 | 193043 | `77e72e760de54b5d906bc3a78b0330f1` | 02:56:04 | 0.00259 | 0.9282 | 1.0077 | 11.27 |
+| P2-T2 | 193044 | `efd33742a557487c8d2417bf99856bc6` | 02:56:13 | 0.00243 | 0.9266 | 1.0296 | 11.27 |
+| P3-T2 | 193045 | `ac44356d3b2c47ad84911e5e1d51e31e` | 02:55:16 | 0.00248 | 0.9272 | 1.0204 | 11.27 |
+| P4-T2 | 193046 | `c6ef049ed968446a976098bd58650944` | 02:56:06 | 0.00280 | 0.9302 | 1.0288 | 11.27 |
+
+Tags on every imported run: `model_type=nerf`, `stage=2b`, `physics_id=P{1..4}`, `redshift=0.3`, `n_rays=256`, `seed=0`, `compute=juno`, `juno_batch=batch2`, `juno_cell_dir=<cell>`. MLflow file-stores tarballed by Juno babysitter `193076` (`afterany` dependency) into `batch2-20260507-045203.tar.gz` (11 MB, 209 members), pulled to `cloud_runs/` on host, replayed via `scripts/juno_stage2b_import_mlflow.py` (this commit).
+
+**Cross-physics consistency**: `loss_data` 0.0024-0.0028 (16% spread), `mean_flux_pred` 0.9266-0.9302 (0.39% spread; obs target 0.877 per [D-11], all within $\pm 6\%$ — well inside the $\pm 15\%$ systematic), `tau_amp` 1.008-1.030 (~2% spread). The micro-grid 16/16 PASS at 200 steps converged to the same regime but with $\sim$4× the loss magnitude; tier-2 25k-step runs reach the loss floor and plateau ~step 23000. **`peak_vram_gb=11.27` to 4 decimal places across all 4 cells** — empirical confirmation of [D-23] linear-VRAM model independence from physics variant.
+
+**Wallclock note**: actual ~2:56/cell vs the [D-23] amendment's 3.5-hr/cell projection — under-shot by 16%. Source: 0.422 s/step at chunk_size=256/accum=1 (calibration anchor for tier 3 wallclock projection per the [D-23] sub-clause). Total Batch-2 wallclock: 11:43:39 GPU-hours across 2 a30 nodes (in-flight 06:56–09:52 UTC; net consumed-hours = 4 × 2:56 = 11:44).
+
+**Status**: Tier-2 cost-survey closed for Juno. Tier-3 (`N_RAYS=1024 MICROBATCH=256 ACCUM_STEPS=4 MAX_STEPS=12500 WARMUP_STEPS=500`) is queued behind PI go/no-go review of the Batch 2 metrics above. Per [D-18] within-tier amendment, "4-parallel within tier, sequential across tiers" — Batch 3 dispatches as the next 4-cell parallel wave on cleared `a30` once approved.
+
 ---
 
 ## 6.5 Compute Environment for Production Sweep
