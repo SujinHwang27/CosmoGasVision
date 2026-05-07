@@ -56,7 +56,7 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS (`stage=2b-microsweep-d24`); Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max ∈ {5,10,20} sensitivity) in flight; Batch 2 (T2×4) + Batch 3 (T3×4) pending; tier 4 deferred to post-quota; + Juno HPC dispatch path live (cu124 torch override per [D-25]) | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS (`stage=2b-microsweep-d24`); Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max ∈ {5,10,20}) ✅ τ_max=10 locked; **Batch 2 (T2×4 on Juno) ✅ all 4 PASS [D-19]**; Batch 3 (T3×4) **pending PI go**; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
 | **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
@@ -65,6 +65,7 @@ graph TD
 - **2026-03-27**: Established consolidated **LEDGER** workflow on the host-mediated AI environment.
 - **2026-03-27**: Verified gradient flow on the host Edge environment via cross-WSL sync.
 - **2026-05-01**: **Stage 2a re-validation** at production architecture (8 layers, $L=10$) following project-architect review. Fixed coordinate normalization bug ([D-08]); lifted integrator simplifications to full RSD convolution ([D-06]); switched to per-bin $\tau(v)$ MSE ([D-07]); paper-vs-code drift retired ([D-09]). Smoke run: 10 rays × 256 bins (subsampled), gradient flow confirmed end-to-end.
+- **2026-05-07**: **Stage 2b Batch 2 (Juno T2 × {P1,P2,P3,P4}) complete**, all 4 cells PASSED [D-19] safety rails; cross-physics consistency well inside [D-13] tolerances (`mean_flux_pred` spread 0.39%, `loss_data` spread 16%, `peak_vram_gb` identical to 4 decimals at 11.27 GB confirming [D-23] linear-VRAM model is physics-invariant); first production sweep on the Juno HPC dispatch path under [D-25]; runs imported to local MLflow tagged `compute=juno`; LEDGER §6 has the run-id table.
 
 ---
 
