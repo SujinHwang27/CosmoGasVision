@@ -56,7 +56,7 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS (`stage=2b-microsweep-d24`); Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max ∈ {5,10,20}) ✅ τ_max=10 locked; **Batch 2 (T2×4 on Juno) ✅ all 4 PASS [D-19]**; Batch 3 (T3×4) **pending PI go**; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS; Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max sensitivity) ✅ τ_max=10 locked; **Batch 2 (T2×4 on Juno) ✅ all 4 PASS [D-19]**; **Batch 3 (T3 on Juno): P1 ✅, P3 ✅, P2 ❌ softplus collapse, P4 cancelled** — re-dispatch P2+P4 with seed=1 owed; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
 | **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
@@ -332,6 +332,29 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 ### Insights (carried over)
 
 - Lyα peak strength spikes nearly 100× mean in massive filaments — empirical motivation for $L=10$ Fourier bandwidth, not a lower setting.
+
+### Stage 2b Juno cost-survey — Batch 3 (T3 × {P1,P2,P3,P4}), 2026-05-07/08
+
+Second production sweep on the Juno path. **Outcome: 2 PASS, 1 FAIL (softplus collapse), 1 CANCELLED** — the run set is incomplete pending re-dispatch of P2 + P4 with a different seed.
+
+| Cell | sbatch JobID | MLflow run_id | Elapsed | `loss_data` | `mean_flux_pred` | `tau_amp` | `peak_vram_gb` | [D-19] |
+|---|---|---|---|---|---|---|---|---|
+| P1-T3 | 194519 | `fe38351e2a8843fc8a42cdc273d990d1` | 05:43:35 | 0.00266 | 0.9283 | 0.9947 | 11.30 | ✅ PASS |
+| P2-T3 | 194520 | `c1862a151ac04279bd43e63d84e82805` | 05:46:38 | 0.01660 | **1.0000** | 1.0306 | 11.30 | ❌ **FAIL — softplus collapse @ step 3350** |
+| P3-T3 | 194521 | `1b9bfe97f515476d8bfb32e8dd657e60` | 05:43:48 | 0.00260 | 0.9271 | 1.0255 | 11.30 | ✅ PASS |
+| P4-T3 | 194522 | — | 00:27:57 | — | — | — | — | CANCELLED (PI kill-switch decision after P2 collapse) |
+
+Tags on imported runs: `compute=juno`, `juno_batch=batch3`, `juno_cell_dir=<X>`, `passed_d19=true|false`, `failure_mode=softplus_collapse_step3350` (P2 only).
+
+**P2 failure mode (forensic)**: at step 3300 the Adam update pushed the ρ-output softplus pre-activation deeply negative; `softplus(very_negative) → 0` and its derivative also → 0, freezing the network in a degenerate "predict-no-absorption" attractor (ρ ≈ 0 → n_HI ≈ 0 → τ ≈ 0 → F = e⁰ = 1.0). Confirmed by the loss decomposition: `loss_meanF = (1.0 - 0.877)² = 0.01513` exactly, with `grad_norm ~ 5e-13` for the remaining 9000 steps. The collapse fired in 1-2 optimizer steps between step 3300 (F=0.94, tau_amp=1.035, grad=0.047) and step 3350 (F=1.0000, grad=0.0). Source `/work/sxh240010/CosmoGasVision/stage2b-juno-194520.out`.
+
+**P3 differentiated from P2**: at step 3200 P3 had a transient F=0.96 spike but the optimizer recovered by step 3250 (F=0.928); at step 3300 P3 was at F=0.926, tau_amp=1.019 (vs P2's 1.035 immediately pre-collapse) and continued cleanly to step 12500. **Same seed=0, same LR schedule, same Physics-feedback class** (Physics 3 windAGN ≥ Physics 2 stellar wind in absorber strength) → the P2 collapse is a **stochastic optimization event**, not a deterministic feedback-strength × T3 intersection. PI live kill-switch on P3 (auto-cancel on F ≥ 0.99 hard ceiling) never fired.
+
+**Cross-physics consistency on the 2 PASS cells** (P1, P3): `loss_data` 0.00260-0.00266 (2.3% spread), `mean_flux_pred` 0.9271-0.9283 (0.13% spread; both ~6% above [D-11] anchor 0.877, well inside ±15% Danforth+ 2016 systematic), `tau_amp` 0.9947-1.0255, `peak_vram_gb` 11.30 to 4 decimals (matches Batch 2's 11.27 to within 0.03 GB across the n_rays change — empirical evidence the linear-VRAM model holds across **both** the chunk_size and the n_rays axes). Production wallclock 5:43-5:46 per cell vs the [D-23]-amendment 5.9 hr/cell projection (~3% under).
+
+**Re-dispatch plan (PI go pending)**: P2 + P4 with `--seed 1` (single-flag override, no methodology change, no D-XX amendment). Estimated ~12 GPU-hr × 2 cells. P1, P3 results are publication-quality as-is.
+
+**Babysitter consolidation**: 3 cells × MLflow file-stores tarballed by Juno babysitter `194523` (`afterany`) into `batch3-20260507-211853.tar.gz` (3.8 MB, 157 members) — pulled to `cloud_runs/`, replayed via `scripts/juno_stage2b_import_mlflow.py`. P4's CANCELLED state contributed no result dir (cancel fired before mkdir completed full state).
 
 ### Stage 2b Juno cost-survey — Batch 2 (T2 × {P1,P2,P3,P4}), 2026-05-07
 
