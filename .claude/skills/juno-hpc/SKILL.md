@@ -233,14 +233,35 @@ python -u experiments/nerf/pipeline.py \
     --seed "${SEED}" \
     --stage_tag "2b-juno"
 
-# --- 4. Copy out ---
+# --- 4. Copy out + Producer-Consumer Verification (PCV) ---
+# pipeline.py writes step_*.pt under experiments/nerf/artifacts/checkpoints/
+# (its --checkpoint_dir default), NOT under ./checkpoints/. Cite the producer's
+# source-of-truth path; recall-confidence here cost ~30 GPU-hr on 2026-05-08.
+# See infrastructure-manager.md "Producer-Consumer Verification" section.
 DEST="${JUNO_WORK%/CosmoGasVision}/stage2b_results/${RUN_TAG}"
 mkdir -p "${DEST}"
-cp -r mlflow checkpoints "${DEST}/"
+
+# 1. MLflow file-store — required for downstream metric replay.
+[[ -d mlflow ]] || { echo "FATAL: pipeline produced no mlflow/ store" >&2; exit 2; }
+cp -r mlflow "${DEST}/"
+
+# 2. Checkpoints — required for [D-13] evaluators downstream. Hard-fail on absence.
+CKPT_SRC="experiments/nerf/artifacts/checkpoints"
+[[ -d "${CKPT_SRC}" ]] || { echo "FATAL: no checkpoint dir at ${CKPT_SRC}" >&2; exit 3; }
+N_CKPT=$(ls -1 "${CKPT_SRC}"/*.pt 2>/dev/null | wc -l)
+[[ "${N_CKPT}" -gt 0 ]] || { echo "FATAL: ${CKPT_SRC} contains zero *.pt files" >&2; exit 4; }
+mkdir -p "${DEST}/checkpoints"
+cp "${CKPT_SRC}"/*.pt "${DEST}/checkpoints/"
+
+# 3. Verify what was copied — visible in the .out log for downstream debugging.
+echo "=== copied artifacts ==="
+find "${DEST}/mlflow" -maxdepth 4 -type d | head -10
+ls -la "${DEST}/checkpoints/"
 
 # --- 5. Cleanup ---
 cd "${HOME}"
 rm -rf "${RUN_DIR}"
+echo "=== done, results at ${DEST} ==="
 ```
 
 Submit per-cell with environment overrides (run from inside `${JUNO_WORK}` on the login node):
