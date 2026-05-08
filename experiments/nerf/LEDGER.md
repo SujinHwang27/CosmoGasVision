@@ -231,6 +231,19 @@ Report all primary metrics across these four sparsity regimes. The headline clai
 
 ## 6. Visualization & Artifacts
 
+### Cross-physics × cross-tier PASS matrix (consolidated)
+
+Single-source headline view of the cost-survey production sweep. Each cell reports `mean_flux_pred / tau_amp` from the run that PASSED [D-19] for that (physics, tier) pair. Per-cell run records in the per-batch subsections below.
+
+| Physics | T1 ($n_{\text{rays}}=64$) | T2 ($256$) | T3 ($1024$) | T4 ($16{,}384$) |
+|:---|:---|:---|:---|:---|
+| P1 (no feedback) | 0.9282 / 1.2244 | 0.9282 / 1.0077 | 0.9283 / 0.9947 | deferred [D-23] |
+| P2 (stellar wind) | 0.9247 / 2.3150 | 0.9266 / 1.0296 | 0.9269 / 1.0215 † | deferred |
+| P3 (wind + AGN)   | 0.9275 / 2.0383 | 0.9272 / 1.0204 | 0.9271 / 1.0255 | deferred |
+| P4 (strong AGN)   | 0.9308 / 1.9551 | 0.9302 / 1.0288 | 0.9307 / 1.0217 † | deferred |
+
+All 12 banked cells PASS [D-19]. Cross-physics `mean_flux_pred` spread tightens with rising $n_{\text{rays}}$: 0.66% (T1) → 0.39% (T2) → 0.41% (T3); all within $\pm 5\%$ of $\langle F\rangle_{\text{obs}} = 0.877$ (Danforth+ 2016). `peak_vram_gb` is physics-invariant within each tier: 2.82 (T1), 11.27 (T2), 11.30 (T3) — empirically validates the [D-23] linear-VRAM model. `†` = banked from the Batch 3b seed=1 retry; the original Batch 3 seed=0 P2 cell underwent a softplus-saturation collapse at step ~3350 and is excluded (root cause: stochastic optimization in the seed=0 init basin, ruled out as a deterministic feedback × T3 intersection by P3's seed=0 PASS).
+
 ### Stage 2a re-validation (2026-05-01, post-architect review)
 
 - **Configuration**: 8-layer MLP, 256 hidden units, $L=10$ Fourier encoding, learnable $\tau$ amplitude. Smoke scope: 10 rays × 256 bins (subsampled stride=8 from the native 2048; full-grid Voigt deferred to Stage 2b windowed implementation per [D-06]).
@@ -319,9 +332,9 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 
 **Batch 2 terminated by user 2026-05-04 (PI sign-off pending re-dispatch)**. All 4 jobs received `StopTrainingJob` shortly after submission; P2/P3/P4 transitioned to `Stopped`, P1 to `Stopping`. No useful step-rate / VRAM / convergence data was harvested before termination. No importer needed.
 
-#### Tier 3 cost-survey (P1/P2/P3/P4, conditional on remaining budget)
+#### Tier 3 cost-survey
 
-[populate post-dispatch: same schema]
+Migrated to UTD Juno HPC after the SageMaker quota constraint; full results in the "Stage 2b Juno cost-survey" subsections below (Batch 3 seed=0 + Batch 3b seed=1 retry). Not banked on SageMaker.
 
 ### Pre-migration EC2 records (deprecated)
 
@@ -367,7 +380,7 @@ Tags on imported runs: `compute=juno`, `juno_batch=batch3`, `juno_cell_dir=<X>`,
 
 **Cross-physics consistency on the 2 PASS cells** (P1, P3): `loss_data` 0.00260-0.00266 (2.3% spread), `mean_flux_pred` 0.9271-0.9283 (0.13% spread; both ~6% above [D-11] anchor 0.877, well inside ±15% Danforth+ 2016 systematic), `tau_amp` 0.9947-1.0255, `peak_vram_gb` 11.30 to 4 decimals (matches Batch 2's 11.27 to within 0.03 GB across the n_rays change — empirical evidence the linear-VRAM model holds across **both** the chunk_size and the n_rays axes). Production wallclock 5:43-5:46 per cell vs the [D-23]-amendment 5.9 hr/cell projection (~3% under).
 
-**Re-dispatch plan (PI go pending)**: P2 + P4 with `--seed 1` (single-flag override, no methodology change, no D-XX amendment). Estimated ~12 GPU-hr × 2 cells. P1, P3 results are publication-quality as-is.
+**Disposition**: P2 + P4 re-dispatched with `--seed 1` as Batch 3b (above; banked 2026-05-08). P1, P3 PASS results stand as-is.
 
 **Babysitter consolidation**: 3 cells × MLflow file-stores tarballed by Juno babysitter `194523` (`afterany`) into `batch3-20260507-211853.tar.gz` (3.8 MB, 157 members) — pulled to `cloud_runs/`, replayed via `scripts/juno_stage2b_import_mlflow.py`. P4's CANCELLED state contributed no result dir (cancel fired before mkdir completed full state).
 

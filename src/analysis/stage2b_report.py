@@ -76,7 +76,9 @@ def _load_mlflow_run(run_id: str):
 
 def _build_model_from_run(run, ckpt_path: Optional[str]) -> IGMNeRF:
     """Instantiate IGMNeRF using the run's hyperparameters and load weights
-    if available. Falls back to defaults / random init otherwise."""
+    if available. Random-init is allowed only in the explicit ``mock=True``
+    path (run is None); a real run without a checkpoint is a hard error to
+    avoid silent-bogus-gate evaluation."""
     hidden_dim = 256
     num_layers = 8
     L = 10
@@ -93,18 +95,31 @@ def _build_model_from_run(run, ckpt_path: Optional[str]) -> IGMNeRF:
         # No try/except: a checkpoint-load failure must NOT be silently swallowed
         # — random-init eval produces meaningless [D-13] gates that look real.
         state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
-        if isinstance(state, dict) and "model_state_dict" in state:
-            state = state["model_state_dict"]
+        # pipeline.py:save_checkpoint stores weights under "model_state" (not
+        # the more conventional "model_state_dict") alongside optimizer /
+        # scheduler / log_tau_amp / rng_state. Probe in order to remain
+        # tolerant of bare-state-dict checkpoints from external sources.
+        if isinstance(state, dict):
+            for key in ("model_state", "model_state_dict"):
+                if key in state:
+                    state = state[key]
+                    break
         model.load_state_dict(state)
         print(f"[stage2b_report] Loaded weights from {ckpt_path}")
-    elif ckpt_path is None:
+    elif run is not None:
+        # A real MLflow run was found but no checkpoint artifact resolved.
+        # This is the silent-failure mode that produced bogus gates on 2026-05-08.
         raise RuntimeError(
-            "[stage2b_report] no checkpoint resolved for this run. Random-init "
-            "eval was the silent-failure mode that produced bogus gates on "
-            "2026-05-08; refusing to proceed. Pass a valid run_id whose MLflow "
-            "artifacts include a *.pt, or use mock=True to explicitly request "
-            "a random-init smoke."
+            f"[stage2b_report] run {run.info.run_id} has no checkpoint artifact "
+            "(*.pt). Refusing to evaluate on random init — those would look like "
+            "real [D-13] numerics. Either log_artifact the *.pt for this run, or "
+            "pass mock=True to opt into a random-init smoke."
         )
+    else:
+        # Explicit mock=True path — random-init smoke. Loud warning so the
+        # caller can't mistake this for real evidence later.
+        print("[stage2b_report] WARNING: mock=True — random-init IGMNeRF; "
+              "[D-13] gate values are NOT science evidence.")
     model.eval()
     return model
 
