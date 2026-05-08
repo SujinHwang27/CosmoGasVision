@@ -346,6 +346,18 @@ Migrated to UTD Juno HPC after the SageMaker quota constraint; full results in t
 
 - Lyα peak strength spikes nearly 100× mean in massive filaments — empirical motivation for $L=10$ Fourier bandwidth, not a lower setting.
 
+### Stage 2b cosmological evaluator — partial pass at T3 fiducial (2026-05-08)
+
+Prong 3 P1-T3 with the PCV-fixed sbatch banked a clean checkpoint (`step_010000.pt` under `/work/sxh240010/stage2b_results/P1-N1024-S0-1778229084-c08848/checkpoints/`); Juno run_id `f74dbb669c9641568ab883023a84d1fa`. Two of the three [D-13] gates were evaluated (the third — $\xi_{\hat\rho,\rho}$ — needs `SherwoodIGM_gal/extracted/` on Juno, ~40 GB transfer deferred):
+
+| Gate | Pass | Observed (T3, step 10k) | Verdict |
+|---|---|---|---|
+| $\langle\|\Delta P_F/P_F\|\rangle_{k\in[10^{-2.5},10^{-1.5}]}$ | $< 10\%$ | **31.0%** | fail (cost-survey class) |
+| KS distance, $F$-PDF on $F\in[0.05,0.95]$ | $< 0.05$ | **0.553** | fail (cost-survey class) |
+| $\xi_{\hat\rho,\rho}(2\,h^{-1}\,\text{Mpc})$ | $> 0.6$ | (deferred) | pending IGM_gal |
+
+Cost-survey-class fail is consistent with [D-23]: the reduced schedule (12,500 steps for T3, $\frac{1}{4}$ of the publication-class 50k-step budget per [D-14]) is calibration evidence for pipeline maturity, not the science gate. Loss plateaued by step ~9000 in this run, so the step-10k checkpoint is near-fully-trained at the reduced budget. The publication-class verdict requires the post-quota Tier-1 50k-step run at the same fiducial point, deferred per [D-23]. Driver: `scripts/eval_partial_d13.py`; sbatch: `scripts/submit_juno_eval_partial.sh`; figures pulled to `experiments/nerf/artifacts/eval/{pf_compare,flux_pdf}.png` and to `paper_cvpr/figures/d13_{pf,flux_pdf}_fiducial.png`. Paper §3 reports the cost-survey numerics with the publication-class column as `[planned]`.
+
 ### Stage 2b Juno cost-survey — Batch 3b (P2 + P4 seed=1 retry), 2026-05-08
 
 Retry of the two cells that didn't bank in Batch 3 (P2 collapsed; P4 was kill-switch-cancelled). Override: `--seed 1` only — no methodology change, no D-XX amendment. Both PASSED [D-19] cleanly with no collapse signature in the danger zone.
