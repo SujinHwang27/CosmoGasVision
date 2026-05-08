@@ -88,14 +88,23 @@ def _build_model_from_run(run, ckpt_path: Optional[str]) -> IGMNeRF:
 
     model = IGMNeRF(hidden_dim=hidden_dim, num_layers=num_layers, L=L)
     if ckpt_path is not None and os.path.exists(ckpt_path):
-        try:
-            state = torch.load(ckpt_path, map_location="cpu")
-            if isinstance(state, dict) and "model_state_dict" in state:
-                state = state["model_state_dict"]
-            model.load_state_dict(state)
-            print(f"[stage2b_report] Loaded weights from {ckpt_path}")
-        except Exception as exc:
-            print(f"[stage2b_report] checkpoint load failed ({exc}); random init.")
+        # weights_only=False because pipeline.py saves numpy RNG state alongside
+        # model weights for bit-identical resume; torch>=2.6 default rejects it.
+        # No try/except: a checkpoint-load failure must NOT be silently swallowed
+        # — random-init eval produces meaningless [D-13] gates that look real.
+        state = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        if isinstance(state, dict) and "model_state_dict" in state:
+            state = state["model_state_dict"]
+        model.load_state_dict(state)
+        print(f"[stage2b_report] Loaded weights from {ckpt_path}")
+    elif ckpt_path is None:
+        raise RuntimeError(
+            "[stage2b_report] no checkpoint resolved for this run. Random-init "
+            "eval was the silent-failure mode that produced bogus gates on "
+            "2026-05-08; refusing to proceed. Pass a valid run_id whose MLflow "
+            "artifacts include a *.pt, or use mock=True to explicitly request "
+            "a random-init smoke."
+        )
     model.eval()
     return model
 
