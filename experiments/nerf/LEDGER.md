@@ -56,7 +56,7 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS; Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max sensitivity) ✅ τ_max=10 locked; **Batch 2 (T2×4 on Juno) ✅ all 4 PASS [D-19]**; **Batch 3 (T3 on Juno): P1 ✅, P3 ✅, P2 ❌ softplus collapse, P4 cancelled** — re-dispatch P2+P4 with seed=1 owed; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS; Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max sensitivity) ✅; Batch 2 (T2×4 on Juno) ✅ all 4 PASS; Batch 3 (T3 seed=0 on Juno): P1 ✅, P3 ✅, P2 ❌ softplus-collapse, P4 cancelled; **Batch 3b (P2+P4 seed=1 retry) ✅ both PASS** (cycle complete); **Prong 3 P1-T3 with PCV-fixed sbatch in flight** to capture the [D-13] fiducial-point checkpoint; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
 | **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
@@ -332,6 +332,21 @@ Dispatched 2026-05-04 ~16:53 UTC, image `stage2b-2868446`, tag `stage=2b-costsur
 ### Insights (carried over)
 
 - Lyα peak strength spikes nearly 100× mean in massive filaments — empirical motivation for $L=10$ Fourier bandwidth, not a lower setting.
+
+### Stage 2b Juno cost-survey — Batch 3b (P2 + P4 seed=1 retry), 2026-05-08
+
+Retry of the two cells that didn't bank in Batch 3 (P2 collapsed; P4 was kill-switch-cancelled). Override: `--seed 1` only — no methodology change, no D-XX amendment. Both PASSED [D-19] cleanly with no collapse signature in the danger zone.
+
+| Cell | sbatch JobID | MLflow run_id | Elapsed | `loss_data` | `mean_flux_pred` | `tau_amp` | `peak_vram_gb` | [D-19] |
+|---|---|---|---|---|---|---|---|---|
+| P2-T3 seed=1 | 196173 | `aaf2e0010b414e2ba4807d27c39c045a` | 05:43:51 | 0.00257 | 0.9269 | 1.0215 | 11.30 | ✅ PASS |
+| P4-T3 seed=1 | 196174 | `50b59f6e3720404abdac3f9f13e77da6` | 05:44:24 | 0.00293 | 0.9307 | 1.0217 | 11.30 | ✅ PASS |
+
+Tags: `compute=juno`, `juno_batch=batch3b`, `juno_cell_dir=<X>`, `passed_d19=true`, `seed_override=1`, `retry_of=batch3_seed0_softplus_collapse`. Babysitter `196180` produced `batch3b-20260508-033000.tar.gz` (2.8 MB, 105 members).
+
+**Diagnostic outcome on the collapse mechanism**: P2 seed=1 traversed step ~3300 (the canonical collapse step from seed=0) without anomaly — F=0.925, tau_amp=1.024, vs seed=0 P2's F=0.94, tau_amp=1.035 immediately pre-collapse. **Confirms the failure was a stochastic optimization event in the seed=0 init basin, not a deterministic feedback × T3 intersection.** Re-running with a different seed was the correct mitigation; no LR or activation change needed.
+
+**Checkpoint capture (PCV incident note)**: Batch 3b ran with the **pre-fix** sbatch script (the FATAL-asserts version was scp'd to Juno after dispatch and only affects subsequent jobs). The broken copy-out silently dropped `${RUN_DIR}/experiments/nerf/artifacts/checkpoints/`; checkpoints were rescued out-of-band by a Monitor that polled the live RUN_DIR every 60s and copied to `_rescue/checkpoints/` before the cleanup-rm fired. Rescue captured `step_005000.pt` + `step_010000.pt` per cell (the regular checkpoint cadence; pipeline.py's `--checkpoint_interval=5000` does not save the final non-multiple-of-5000 step). For [D-13] evaluation, `step_010000.pt` is past the loss-floor plateau (visible in P1-T3's loss trajectory at step ~9000) and is acceptable. The PCV-asserted sbatch on Juno is in effect from job 196611 forward.
 
 ### Stage 2b Juno cost-survey — Batch 3 (T3 × {P1,P2,P3,P4}), 2026-05-07/08
 
