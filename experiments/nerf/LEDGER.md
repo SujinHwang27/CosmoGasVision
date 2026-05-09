@@ -211,6 +211,25 @@ graph TD
   **New stage-gate criterion (process)**: every analysis utility in `src/analysis/` that computes a flux-domain or τ-domain reduction must include a unit test asserting invariance under the relevant transformation (uniform rescale for absolute-calibrated metrics; shift-invariance for residual metrics). The [D-35] cross-physics empirical demo is the template; same pattern owed for any future eval driver.
 
   **Cross-references**: supersedes the [D-34] "Empirical anchor-invariance gate" sub-clause; [D-34]'s primary anchor re-pin disposition (Kirkman+2007 0.979 ± 0.005) and the kept-existing-runs decision both stand; [D-13] gate definitions unchanged; [D-11] $\mathcal{L}_{\text{meanF}}$ form unchanged.
+
+- **[D-36] Citation Audit Discharge — Bib Corrections + Weakened-Attribution for the [D-13] Gate Bars (2026-05-09)** — Pre-submission `\todo{[VERIFY:]}` discharge pass on `paper_cvpr/main.bib` and `paper_cvpr/sec/3_experiments.tex`. Findings:
+
+  **Bib errors corrected** (verified against ADS):
+  - `stark2015tomography`: prior entry had wrong first author (Antony A. Stark — a CMB / sub-mm cosmologist), wrong title ("Towards 3D mapping of the cosmic web"), and wrong page (311–327). Corrected to **Casey W. Stark**, Andreu Font-Ribera, Martin White, Khee-Gan Lee — "Finding high-redshift voids using Lyman α forest tomography", MNRAS 453, 4311–4324, DOI `10.1093/mnras/stv1868`. Same value-cascade pattern as the Kirkman/Danforth correction in [D-34].
+  - `lee2015`: bib KEY is `lee2015` but the entry IS Lee+ **2014** ApJ 788:49 (the year field was already correct; the KEY is misleading). Comment added documenting the year mismatch; KEY retained for backward compatibility with prior LEDGER cite-history. DOI `10.1088/0004-637X/788/1/49` added.
+  - `bi_davidsen1997`: DOI `10.1086/303908` verified and added.
+  - `hui_gnedin1997`: DOI `10.1093/mnras/292.1.27` verified and added.
+  - All four `% TODO: verify DOI` comments cleared.
+
+  **Weakened-attribution discharge for the $\xi_{\hat\rho,\rho} > 0.6$ at $r=2$ h$^{-1}$ Mpc gate bar** (paper §3 line 13): WebFetch verification of Stark+ 2015 (the corrected first-author paper) showed the paper does **not** define this Pearson-ξ-on-density bar — they use a match-error $\epsilon$ on void catalogues plus volume-overlap fractions. The 0.6 threshold is a project-side adoption inspired by the broader sparse-tomography literature, not a specific paper's quoted value. Paper text re-worded from "the sparse-tomography bar of Stark et al." to "a stringent reconstruction-quality target consistent with sparse-tomography requirements" with a generic Lee+2014 / Stark+2015 cite.
+
+  **Weakened-attribution discharge for the flux-PDF cut $F \in [0.05, 0.95]$** (paper §3 line 14): the "Bolton+2008 / Lee+2015 PDF-cut convention" claim could not be verified in either paper at the abstract level; the convention is a project-side adoption for excluding saturated absorbers (low-F) and continuum-fit/metal-line residuals (high-F), in the spirit of standard flux-PDF analyses. Paper text re-worded to attribute the cuts to "the spirit of the cuts adopted in flux-PDF estimator papers" rather than a specific source.
+
+  **Process implication**: every load-bearing numeric *bar* or *threshold* in the paper text now must trace either to (a) a value tabulated/derived in a specific cited paper (verified) or (b) a project-side adoption with explicit acknowledgment that it is project-side. No more "the bar of X" claims unless X actually quotes the bar. This generalizes the [D-34]/[D-35] "value verification" rule from numeric anchors to threshold values.
+
+  **Out of scope for this entry**: re-running any [D-13] gate evaluation. The 0.6 threshold and the [0.05, 0.95] cuts are unchanged in their numerical values; only the attribution language in the paper changes. Existing rescaled-column verdicts (2/3 KS PASS at 0.05; 0/3 $P_F$ PASS at 10%; 1D-proxy +0.077 vs 0.6 bar) are unaffected.
+
+  **Cross-references**: parallel discharge to [D-34] / [D-35] value-cascade fixes; same audit discipline now extended to thresholds; no LEDGER re-rules forced by this entry.
 ---
 
 ## 4. The Data (Lineage & Governance)
@@ -735,3 +754,24 @@ Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b)
 - **Paper edits**: `sec/0_abstract.tex` closing clause rewritten (3/3 fail → 2/3 KS PASS post-rescale, $P_F$ binding); `sec/3_experiments.tex` Tab. `tab:d13-gates` extended with "Cost-survey rescaled" column + cross-physics-range caption; §3.5 prose retracted "all three fail" framing; implementation-history disclosure of the mean-subtracted convention folded into §3.5.
 - **Process implication for [D-35]**: every `src/analysis/` reduction utility henceforth needs a unit test asserting invariance under the relevant transformation (uniform rescale for absolute-calibrated metrics, etc.). [D-35] sets the template.
 - **Deferred**: P3 cross-physics row (checkpoint extraction from MLflow tarball, ~30 min orchestration); KS-shift overlay diagnostic figure (optional, post-merge); publication-class re-train at corrected anchor (post-quota per [D-23]/[D-27]).
+
+### **Session Snapshot: 2026-05-09 cont. (deck-clearing for next-session T4 dispatch)**
+
+User directive: do everything that can be done locally so next-session is just T4 + T4-dependent work. Five tasks attempted (ranked by leverage at session start):
+
+- **(2) Citation discharge — DONE**, formalized as **[D-36]**. Bib errors corrected (Stark first author, page, DOI; Lee year-mismatch in key; Bi-Davidsen + Hui-Gnedin DOIs verified). Two paper-text `\todo{[VERIFY:]}` tags removed in `sec/3_experiments.tex` lines 13–14: ξ > 0.6 sparse-tomography bar weakened to "stringent reconstruction-quality target consistent with sparse-tomography requirements" (Stark+ 2015 verified to NOT define this bar — uses match-error ε); F ∈ [0.05, 0.95] PDF cuts re-attributed to "spirit of standard flux-PDF analyses" rather than a specific paper. Process implication: every load-bearing threshold now must trace to a verified source or be acknowledged as project-side adoption.
+
+- **(3) P3 cross-physics row — UNRECOVERABLE THIS SESSION**. Checkpoint not on local disk; not on Juno `/work/sxh240010/stage2b_results/P3-N1024-S0-1778186107-61459e/` (only MLflow store, no `.pt`); not on Juno `/scratch/`; not on S3 (only P3-N64 T1 tier present). Most likely cause: Juno scratch 45-day purge OR sbatch never persisted the .pt. Documented as a deferred row of the [D-35] cross-physics table; will be filled by the publication-class re-train when post-quota dispatch lands.
+
+- **(4) KS-shift overlay diagnostic figure — DONE**. `scripts/ks_shift_overlay_d35.py` produces a 1×3 figure (P1, P2, P4) of three histograms each (truth, predicted as-is, predicted rescaled) restricted to F ∈ [0.05, 0.95]. Numerics match `eval_anchor_invariance_d34.py` exactly: KS as-is = {0.5525, 0.5704, 0.6193}, rescaled = {0.0387, 0.0687, 0.0217}, 2/3 PASS the 0.05 gate after rescale. Visualizes WHY the rescale-passes-KS finding is real: the broken anchor shifts the predicted-flux histogram in F-space without distorting its shape. Saved to `paper_cvpr/figures/ks_shift_overlay_d35.png`. Cross-references the [D-35] gate-table caption.
+
+- **(1) S5/S7 ablation bundle — DISPATCHED to Juno** (infrastructure-manager). Three short cells at T2-P1 seed=1: full / no-cap / no-mask. Closes panel attacks #5 (log1p+cap+mask novelty without precedent — what fails without the cap?) and #7 (cross-physics 10^10× → 1.4× spread is bounded-loss tautology). Expected wallclock ~6 hr parallel or ~16 hr sequential; results land in MLflow on Juno; next-session importer round-trips them to local. Run-name pattern: `Stage2b-AblationS5S7-P1-T2-S1-{cell}-{timestamp}-{hash}`. The post-run figure-of-three-loss-curves goes into `sec/2_method.tex` to defend the methods-novelty claim.
+
+- **(5) IGM_gal → S3 → Juno transfer — IN FLIGHT** (host upload phase). `aws s3 sync SherwoodIGM_gal/extracted/ s3://cosmo-gas-vision-storage/sherwood-igm-gal/extracted/` running in background (PID 14492; log at `cloud_runs/igm_gal_s3_upload.log`). Win 11 host lacks `rsync` so the transfer goes through S3 as intermediary. 40 GB at residential upload speed → 2-4 hr ETA. Resumable on retry (aws cli skips matched-ETag files). Next-session pull command (to be run on Juno; needs aws CLI configured per [D-25] / juno-hpc skill IAM): `aws s3 sync s3://cosmo-gas-vision-storage/sherwood-igm-gal/extracted/ /scratch/juno/sxh240010/SherwoodIGM_gal/extracted/`. Closes the deferred ξ_{ρ̂,ρ} 3D-structure gate dependency.
+
+**Open carry-forwards for next session** (clean handoff):
+1. Round-trip the S5/S7 MLflow tarballs from Juno; produce the three-loss-curves figure for `sec/2_method.tex`.
+2. Confirm IGM_gal S3 upload completed cleanly (`tail cloud_runs/igm_gal_s3_upload.log` for `EXIT_CODE=0`); pull on Juno; run the full ξ_{ρ̂,ρ} eval driver to close the third [D-13] gate row.
+3. Dispatch the publication-class T1 + T4 runs at the corrected [D-34] anchor — this absorbs the [D-27] learning-curve sweep and the deferred T4 row of the degradation matrix.
+4. P3 cross-physics row will be filled organically by (3) when the publication-class re-train lands; no separate dispatch needed.
+5. After (3) lands, run `eval_anchor_invariance_d34.py` against the publication-class checkpoints to confirm KS gate passes (rescale evidence predicts it should at the corrected anchor + extended schedule).
