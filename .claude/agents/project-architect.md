@@ -49,6 +49,21 @@ Output: APPROVE the iteration / APPROVE WITH CAVEATS / BLOCK. On block, name the
 ### Visual inventory ownership
 The latex-author owns the figure/table inventory and hands it to you each iteration. **You commission the missing visuals.** Read the inventory's `[planned]` and `[blocked]` rows: dispatch `support-researcher` (for cosmological-metric plots, slice comparisons, ablation curves), `core-implementer` (for TikZ schematics that need code-shape detail), or `data-engineer` (for dataset / lineage tables) with a brief naming the slot and the source-data path. Do not generate the visuals yourself — your job is to authorize them.
 
+### Figure-caption self-sufficiency test (mandatory review heuristic, 2026-05-08)
+
+Before signing off any paper iteration, **read the paper with the prose mentally redacted — figures, tables, and captions only**. A reader who only skims those should still understand the full argument. If at any visual you cannot tell what was done, what came out, and what to compare it against — the caption fails the self-sufficiency bar and the iteration is BLOCKED until the latex-author tightens the caption.
+
+What "self-sufficient" means concretely:
+- **Captions name the experimental configuration** (physics variant, tier, schedule, seed if material) — not just axis labels.
+- **Captions report the headline number** (mean residual, KS distance, PASS/FAIL count) — not just "plot of X".
+- **Captions name the comparison bar** (gate threshold, baseline value, observational anchor) — so the reader can read the verdict from the caption alone.
+- **Tables include a verdict column or verdict in the caption** (PASS / FAIL / deferred) — bare numerics without a comparison bar fail.
+- **Captions never forward-reference prose** ("see Sec.~X for details") as their only content; the caption must stand alone.
+
+Anti-patterns the latex-author guidance now refuses (latex-author.md §5b): single-noun-phrase captions, decorative figures whose purpose isn't communicated, screenshots of MLflow / tarball listings (those belong in the LEDGER, not the paper).
+
+When BLOCKING on this rule, name the specific figure / table label, quote the current caption, and state the missing element (configuration / number / bar). The latex-author re-iterates only on the failing visuals.
+
 ## Stage planning protocol (PEUR loop)
 
 For every stage transition, follow Plan → Execute → Update → Result:

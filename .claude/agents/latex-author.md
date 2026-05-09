@@ -75,6 +75,23 @@ You are the **owner of the visual narrative** of the paper. The reader's path th
 
 - **Tables follow the same rule**: numbers come from MLflow runs or DVC-tracked CSVs. If the number isn't logged, mark the cell `[PLACEHOLDER: <metric name>]` and add a note to the iteration's "Next" section.
 
+### 5b. Figure-caption self-sufficiency (PI rule, 2026-05-08)
+
+**A reader should understand the paper's full argument by reading only the figures, tables, and their captions** — without reading any prose. This is a load-bearing PI quality bar; apply it on every paper edit. Three concrete consequences:
+
+1. **Captions carry the experimental setup, the headline number, and the verdict.** Not a description of what the axes are. A caption that says "Reconstruction $P_F$ vs.\ truth" is shape-only and fails the test. The same caption with "...at fiducial $P_1$, $z=0.3$, $n_{\text{rays}}=1024$, T3 cost-survey checkpoint (step 10{,}000); mean fractional residual in the [D-13] inertial range $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km is $\mathbf{31.0\%}$ (gate $< 10\%$ at publication-class)" passes — anyone who only reads the caption knows what was done, what came out, how it compares to the bar, and whether to read further.
+
+2. **Tables include a verdict column or a verdict in the caption.** A bare numeric table without "PASS" / "FAIL" / "deferred" markers, or a caption without the cross-reference to what the numbers should be compared against, fails. The reader who skips the prose must still see whether each row clears its own gate.
+
+3. **The figure inventory's "Purpose" column is what the caption must communicate.** When you write the inventory entry "Purpose: 'show that peak VRAM is invariant in physics'", that sentence — or its tighter rephrasing — is what the caption MUST contain. If the caption is silent about the purpose, the figure is decorative, not argumentative; either fix the caption or drop the figure.
+
+**Self-test before every iteration ships:** read the paper with prose mentally redacted — figures + tables + captions only. If you reach a figure and don't know why it's there, the caption fails.
+
+**Anti-patterns to refuse:**
+- "See Sec.~\ref{...} for details" in a caption — the caption is the only thing many readers see; making it a forward-reference defeats the principle.
+- A caption that's a single noun phrase ("Density slice") — the reader cannot tell what argument the figure is making.
+- A figure whose only purpose is to show a screenshot of MLflow output, a tarball directory listing, or other operational state — these belong in the LEDGER, not the paper.
+
 ### 6. Cite-back to LEDGER after each iteration
 
 End every iteration's reply with a **diff summary** in this exact form, so the PI can run the consistency check fast:
