@@ -770,7 +770,7 @@ User directive: do everything that can be done locally so next-session is just T
 - **(5) IGM_gal → S3 → Juno transfer — IN FLIGHT** (host upload phase). `aws s3 sync SherwoodIGM_gal/extracted/ s3://cosmo-gas-vision-storage/sherwood-igm-gal/extracted/` running in background (PID 14492; log at `cloud_runs/igm_gal_s3_upload.log`). Win 11 host lacks `rsync` so the transfer goes through S3 as intermediary. 40 GB at residential upload speed → 2-4 hr ETA. Resumable on retry (aws cli skips matched-ETag files). Next-session pull command (to be run on Juno; needs aws CLI configured per [D-25] / juno-hpc skill IAM): `aws s3 sync s3://cosmo-gas-vision-storage/sherwood-igm-gal/extracted/ /scratch/juno/sxh240010/SherwoodIGM_gal/extracted/`. Closes the deferred ξ_{ρ̂,ρ} 3D-structure gate dependency.
 
 **Open carry-forwards for next session** (clean handoff):
-1. Round-trip the S5/S7 MLflow tarballs from Juno; produce the three-loss-curves figure for `sec/2_method.tex`.
+1. Round-trip the four S5/S7 MLflow tarballs from Juno (cells: full / no-cap / no-mask / no-cap-no-mask); produce the four-loss-curves figure for `sec/2_method.tex`.
 2. Confirm IGM_gal S3 upload completed cleanly (`tail cloud_runs/igm_gal_s3_upload.log` for `EXIT_CODE=0`); pull on Juno; run the full ξ_{ρ̂,ρ} eval driver to close the third [D-13] gate row.
 3. Dispatch the publication-class T1 + T4 runs at the corrected [D-34] anchor — this absorbs the [D-27] learning-curve sweep and the deferred T4 row of the degradation matrix.
 4. P3 cross-physics row will be filled organically by (3) when the publication-class re-train lands; no separate dispatch needed.
