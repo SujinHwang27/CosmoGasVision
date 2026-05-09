@@ -30,7 +30,7 @@ graph TD
         TRUTH["Simulation Ground Truth<br/>(τ_GT)"]
         DLAMASK["Saturated-Absorber Mask<br/>core τ_GT&gt;1e5; wing τ_GT&gt;10 [D-24]"]
         L_DATA["L_data: log1p+cap+mask MSE<br/>τ_eff = min(τ, τ_max=10) [D-24]"]
-        L_MEANF["L_meanF: λ_F (⟨F_pred⟩ - ⟨F⟩_obs)²<br/>⟨F⟩_obs = 0.877 (Danforth+2016) [D-11]"]
+        L_MEANF["L_meanF: λ_F (⟨F_pred⟩ - ⟨F⟩_obs)²<br/>⟨F⟩_obs = 0.979 (Kirkman+2007) [D-11]/[D-34]"]
         TWOPASS["[D-21] Two-Pass Surrogate<br/>Pass1 cycle-mean (no_grad) → Pass2 per-microbatch backward"]
 
         TRUTH --> DLAMASK
@@ -172,6 +172,18 @@ graph TD
   **τ_max=10 LOCKED (2026-05-04, Batch 1b verdict)**: gate PASSED with ~100-180× margin. Measured max(|ΔP_F/P_F|) over the [D-13] inertial range: **0.0180% (τ_max=5 vs τ_max=10)** and **0.0113% (τ_max=20 vs τ_max=10)**, both far below the 2% bar. mean_F is identical across the three runs (0.9282); tau_amp converges to {1.152, 1.224, 1.234} (~7% spread, expected since the cap shapes the strong-absorber gradient). Diagnostic figure: `paper_cvpr/figures/tau_max_sensitivity.png`; runner: `scripts/diag_tau_max_sensitivity.py`. **PI verdict: τ_max stays at 10; no re-pin; Batch 2 cleared for dispatch.** [D-24] item (2)'s sensitivity test is closed.
 
 - **[D-25] Juno-Side Torch Pin Override (Driver-Constraint Workaround)**: Juno's compute-node NVIDIA driver is `550.163.01` (probed 2026-05-06 on `g-01-01`/A30, current as of cluster status that day), supporting CUDA 12.4 maximum. Project's `pyproject.toml` pins `torch>=2.8.0`, which uv resolves to a `cu130` wheel that fails to initialize against the older driver. PyTorch 2.7+ ships only `cu126`/`cu128` wheels (driver 560+/570+). For Juno dispatch only, override the lock with `torch==2.6.0+cu124` (last PyTorch release with cu124 wheels), installed via `uv pip install --reinstall torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124` after `uv sync`. Host machine's SageMaker `.venv` retains `torch>=2.8.0` per the lock — Stage 2b SageMaker baselines (P1 tier-1 `b20df1`, the [D-24] micro-grid 16/16 PASS) are the numerical reference; Juno cost-survey runs are validated against them. Numerical drift between torch 2.6 and 2.8 is bounded by the [D-13] gates (10% on $P_F$, 0.6 on Pearson ξ, 0.05 on KS) — last-decimal differences on autograd-stable ops are well within these. Trigger to revisit: HPC staff upgrades GPU drivers to ≥560 (CUDA 12.6 support), at which point `torch>=2.8.0` becomes installable on Juno and the override is dropped. Owner: PI for the [D-XX] write; infrastructure-manager for the install path (already in `juno-hpc` skill commit `db344fe`).
+
+- **[D-34] Mean-Flux Anchor Re-pinning (2026-05-08)** — Phase A.1 literature audit found the [D-11] anchor value 0.877 to be the FG+2008 high-z (z~2) ⟨F⟩, mislabeled as z=0.3 somewhere in project history. The 2026-05-04 Danforth+2016 re-attribution did not catch the value error (Danforth+2016 reports column-density distributions, not direct ⟨F⟩(z) tabulations). Verified primary source: **Kirkman et al. 2007, MNRAS 376:1227**, "Continuous statistics of the Lyα forest at 0 < z < 1.6", Table 2 + Section 4 power-law fit DA(z) = 0.016(1+z)^1.01. At z=0.3: DA = 0.0209 → ⟨F⟩ = 0.979; combined statistical (±0.003 on DA) + continuum-systematic (relative 0.21 on DA → absolute ±0.004 on ⟨F⟩) → **⟨F⟩_obs(z=0.3) = 0.979 ± 0.005**.
+
+  **Existing Stage 2b runs (Batches 2, 3, 3b, Prong 3 — 12 PASS cells): KEPT.** The [D-13] gates ($P_F$ residual, KS-PDF, $\xi_{\hat\rho,\rho}$) are anchor-invariant by construction (per [D-11] sub-clause: invariant to uniform multiplicative rescaling of predicted flux). The structure-gate evidence (31% $P_F$ residual, 0.553 KS at cost-survey schedule) survives unchanged. What does not survive: the §3.4 "consistent with anchor" claim retracts; `mean_flux_pred` ≈ 0.928 was trained against an incorrect target; `tau_amp` absolute values are uninterpretable (a footnote warns the reader). Re-training rejected: anchor-invariance means re-training cannot move the [D-13] residuals; only scalar reporting changes.
+
+  **Publication run** (post-quota, deferred per [D-23]): trains against the corrected anchor 0.979 ± 0.005, recovers interpretable `mean_flux_pred` and `tau_amp`.
+
+  **Process implication**: every literature attribution in the LEDGER is now subject to a "value verification" check, not just a "paper attribution" check. Historical cascade: FG+2008 → Danforth+2016 (paper-attribution fix only) → Kirkman+2007 (value fix). Going forward, every numeric anchor must trace to a value tabulated or formula-derivable in the cited paper, not just the paper title.
+
+  **Cross-references**: supersedes the [D-11] amendment dated 2026-05-04 (Danforth+2016 re-attribution); the [D-11] $\mathcal{L}_{\text{meanF}}$ form is unchanged; the [D-13] gates are unchanged.
+
+  **Empirical anchor-invariance gate (added by this entry)**: a support-researcher dispatch is owed to re-evaluate the [D-13] $P_F$ inertial residual and KS-PDF distance with the predicted flux uniformly rescaled by 0.979/0.928 ≈ 1.055; pass criterion is <0.5% drift in $P_F$ residual and <0.01 in KS distance. Falsification re-opens the option-(b) re-training path. Currently blocked behind a torch DLL load failure in `.venv` (Path β infrastructure-manager dispatch in flight).
 ---
 
 ## 4. The Data (Lineage & Governance)
@@ -681,3 +693,7 @@ Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b)
 ### **Session Snapshot: 2026-05-06 (Juno HPC bring-up)**
 
 - Repo + conda env + .venv (uv sync 144 pkgs) + scoped IAM `cgv-juno-reader` + Sherwood mirror (6.1 GB) + torch 2.6.0+cu124 override + GPU smoke (sbatch 192999, A30, 12s, `cuda.is_available True`). [D-25] logs the torch override. juno-hpc skill at `.claude/skills/juno-hpc/SKILL.md` is the canonical contract; commits 7c4dbfd → db344fe.
+
+### **Session Snapshot: 2026-05-08 (Phase A.1 close — mean-flux anchor re-pinned to Kirkman+2007)**
+
+- Phase A.1 closed; [D-34] re-pins anchor to Kirkman+2007 ⟨F⟩=0.979 ± 0.005; existing 12 PASS cells kept under anchor-invariance; publication run will use corrected anchor; empirical invariance demo deferred behind Path β torch-DLL fix.
