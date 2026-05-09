@@ -98,6 +98,15 @@ def parse_args(argv=None):
                         "sweep can run without rebuilding the image. If the "
                         "sensitivity test exceeds 2% in the [D-13] inertial "
                         "range, the cap is re-pinned with the measured anchor.")
+    p.add_argument("--disable_dla_mask", action="store_true",
+                   help="[ablation S5/S7] Force the [D-24] saturated-absorber "
+                        "mask to all-True, i.e. include every bin in the data "
+                        "MSE and mean-F surrogate. Reproduces the pre-[D-24] "
+                        "supervision regime; expected to re-open the "
+                        "cross-physics scale spread per the panel S7 attack. "
+                        "The [D-21] two-pass gradient identity holds "
+                        "regardless because the same mask tensor is reused "
+                        "in Pass 1 and Pass 2 by construction.")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
@@ -271,6 +280,13 @@ def train(args):
     tau_gt_profile = tau_gt_profile.to(device)
     # [D-24] mask: bool, True = include in loss + mean-flux reductions.
     mask_no_dla_profile = mask_no_dla_profile.to(device)
+    if args.disable_dla_mask:
+        mask_no_dla_profile = torch.ones_like(mask_no_dla_profile, dtype=torch.bool)
+        print(
+            f"[ablation] --disable_dla_mask: mask forced all-True "
+            f"(0/{mask_no_dla_profile.numel()} bins excluded).",
+            flush=True,
+        )
 
     # Available rays after potential truncation
     n_rays_actual = coords.shape[0]
@@ -357,8 +373,13 @@ def train(args):
                     "use_log_prior": args.use_log_prior,
                     "log_tau_amp_sigma": sigma_log,
                     "tau_amp_prior_weight": tau_amp_prior_weight,
+                    "tau_max": args.tau_max,
+                    "disable_dla_mask": args.disable_dla_mask,
                     "loss_form": (
-                        "log1p_mse_capped_masked + meanF_soft_masked"  # [D-24]
+                        ("log1p_mse_capped" if args.tau_max < 1e8 else "log1p_mse_uncapped")
+                        + ("_masked" if not args.disable_dla_mask else "_unmasked")
+                        + " + meanF_soft"
+                        + ("_masked" if not args.disable_dla_mask else "_unmasked")
                         + (" + log_tau_amp_prior" if args.use_log_prior else "")
                     ),
                 })
