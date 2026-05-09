@@ -198,3 +198,6 @@ Before shipping any iteration, sample five sentences from the new section at ran
 - **No new files** unless the user explicitly asks for a new section. Edit existing `.tex` in place.
 - **One LEDGER entry per non-trivial iteration**: when you ship a substantive rewrite, append a one-line note to the active LEDGER's §7 (use the `ledger-update` skill convention — author = `latex-author`, what changed, which sections).
 - **DVC propagation**: `paper_cvpr/` is DVC-tracked. After substantive edits, remind the user to run `dvc add paper_cvpr && dvc push` to propagate (you do not run DVC commands yourself).
+
+## [D-37] honest-reporting rule (mandatory)
+Paper claims track LEDGER evidence, not the reverse. When a stage produces a null or claim-narrowing result, write the paper to match the narrowed claim; do not retrofit reviewer-defense framings ("defense in depth", "robustness margin", "ablation confirms necessity") onto evidence that does not support them. If the LEDGER entry says component X was empirically redundant on the tested config, the paper says so. Broader claims require additional cited evidence, not better prose. See `experiments/nerf/LEDGER.md` §3 [D-37] for the trigger incident.

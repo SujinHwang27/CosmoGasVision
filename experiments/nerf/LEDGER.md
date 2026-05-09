@@ -230,6 +230,18 @@ graph TD
   **Out of scope for this entry**: re-running any [D-13] gate evaluation. The 0.6 threshold and the [0.05, 0.95] cuts are unchanged in their numerical values; only the attribution language in the paper changes. Existing rescaled-column verdicts (2/3 KS PASS at 0.05; 0/3 $P_F$ PASS at 10%; 1D-proxy +0.077 vs 0.6 bar) are unaffected.
 
   **Cross-references**: parallel discharge to [D-34] / [D-35] value-cascade fixes; same audit discipline now extended to thresholds; no LEDGER re-rules forced by this entry.
+
+- **[D-37] Honest-Reporting Rule for Empirical Findings (2026-05-09, PI)** — Trigger: during the S5/S7 Cell B (no-cap) interim review at Step 13k/25k, Cell B trajectory was essentially identical to Cell A, and the finding was reported in two pre-packaged framings ("defense in depth" vs "methods novelty weakens") before the empirical observation itself was stated. This is spin-bias and is not allowed.
+
+  **Rule** (applies to every agent and every future stage):
+  (a) Lead with the empirical observation as observed.
+  (b) Framing-for-paper is a separate downstream call that requires evidence, not narrative.
+  (c) When a finding could strengthen *or* weaken the current paper claim, first-pass reporting favors the **honest** framing over the **strengthening** framing — the claim narrows to match the evidence unless additional evidence justifies the broader claim.
+  (d) Null results are scientific outcomes, recorded as such, not papered over.
+
+  Referenced as the **"[D-37] honest-reporting rule"** in agent communications.
+
+  **Propagated to**: `CLAUDE.md` (operational paragraph in "Reporting findings" section); `.claude/agents/latex-author.md` (targeted reminder under voice/honesty section). Subagents pick up the rule via CLAUDE.md auto-injection + the LEDGER read-first protocol; no session restart needed.
 ---
 
 ## 4. The Data (Lineage & Governance)

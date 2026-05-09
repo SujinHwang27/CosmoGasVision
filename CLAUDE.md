@@ -37,6 +37,9 @@ CosmoGasVision: 3D IGM gas density reconstruction from Lyman-alpha sightlines (S
 ## Failure handling
 If the same command fails 3 times with no progress, **stop and surface the issue to the user** with: exact commands run, observed output, hypothesized cause, proposed fix. Don't keep retrying. Don't fabricate an "Error Report" file unless asked.
 
+## Reporting findings ([D-37] honest-reporting rule)
+Lead with the empirical observation as observed. Framing-for-paper is a separate, downstream call. When a finding could either strengthen or weaken a current paper claim, the first-pass report favors the **honest** framing over the **strengthening** framing — the claim narrows to match the evidence unless extra evidence justifies the broader claim. Null results are scientific outcomes, not problems to spin. Reference: `experiments/nerf/LEDGER.md` §3 [D-37]. Anti-pattern of record: presenting a Cell B ≈ Cell A null as "defense in depth vs methods-novelty weakens" before stating the observation itself.
+
 ## Subagents and commands
 - `.claude/agents/` — specialized agents (data-engineer, core-implementer, infrastructure-manager, project-architect, support-researcher, latex-author). Dispatched by description match — see each file for triggers.
 - `.claude/commands/` — slash commands: `/new-experiment <name>`, `/update-ledger`.
