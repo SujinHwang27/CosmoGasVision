@@ -183,7 +183,34 @@ graph TD
 
   **Cross-references**: supersedes the [D-11] amendment dated 2026-05-04 (Danforth+2016 re-attribution); the [D-11] $\mathcal{L}_{\text{meanF}}$ form is unchanged; the [D-13] gates are unchanged.
 
-  **Empirical anchor-invariance gate (added by this entry)**: a support-researcher dispatch is owed to re-evaluate the [D-13] $P_F$ inertial residual and KS-PDF distance with the predicted flux uniformly rescaled by 0.979/0.928 ≈ 1.055; pass criterion is <0.5% drift in $P_F$ residual and <0.01 in KS distance. Falsification re-opens the option-(b) re-training path. Currently blocked behind a torch DLL load failure in `.venv` (Path β infrastructure-manager dispatch in flight).
+  **Empirical anchor-invariance gate (added by this entry; FALSIFIED — see [D-35])**: re-evaluation of the [D-13] $P_F$ residual and KS-PDF distance with predicted flux rescaled by $r = 0.979/\langle\hat F\rangle \approx 1.055$ ran on three physics (P1, P2, P4) and showed both gates exceed their drift thresholds — $P_F$ drift 2.77%–5.26% (gate <0.5%), KS drift 0.502–0.598 (gate <0.01). The 1D-proxy drift was exactly zero, confirming the implementation. Anchor-invariance argument did not survive contact with this codebase's mean-subtracted $\delta_F$ implementation in `src/analysis/p_flux.py:73`. The "re-training rejected" disposition above is **superseded by [D-35]**.
+
+- **[D-35] Empirical Anchor-Invariance Falsification + Cross-Physics Rescale Preview (2026-05-09)** — The [D-34] "Empirical anchor-invariance gate" sub-clause was empirically falsified by `scripts/eval_anchor_invariance_d34.py` (committed `5905988`) against three of four physics. Cross-physics result table at T3 cost-survey schedule (step 10000/12500):
+
+  | physics                | KS as-is | KS rescaled | rescaled-KS gate (<0.05) | $P_F$ as-is | $P_F$ rescaled | $P_F$ gate (<10%) | 1D proxy $r_\rho^{\log}$ | proxy drift |
+  |---                     |---       |---          |---                       |---          |---             |---                |---                       |---          |
+  | P1 (no feedback)       | 0.553    | **0.039**   | **PASS**                 | 31.03%      | 28.25%         | FAIL by 2.8×      | +0.077                   | 0 (exact)   |
+  | P2 (stellar wind)      | 0.570    | 0.069       | fail (by 0.019)          | 31.09%      | 26.50%         | FAIL by 2.65×     | +0.066                   | 0 (exact)   |
+  | P4 (strong AGN)        | 0.619    | **0.022**   | **PASS**                 | 48.33%      | 43.07%         | FAIL by 4.3×      | +0.069                   | 0 (exact)   |
+
+  P3 (weak AGN) deferred — checkpoint not on local disk; only MLflow tarball artifact in `cloud_runs/batch3-extracted/P3-N1024-S0-1778186107-61459e/`. Cross-physics signal is sufficient with N=3 spanning both feedback extremes (P1 = no, P4 = strong AGN) plus stellar (P2).
+
+  **Two implementation findings drove the falsification**:
+  1. `src/analysis/p_flux.py:73` used **mean-subtracted** $\delta_F = F - \langle F\rangle$ instead of the textbook **normalized** $\delta_F = F/\langle F\rangle - 1$. Under uniform rescale $F \to r F$, mean-subtracted gives $\delta_F \to r\delta_F$, so $P_F \to r^2 P_F$ — NOT anchor-invariant. The [D-11] sub-clause assumed normalized.
+  2. KS-PDF distance is evaluated at fixed flux bins in $[0.05, 0.95]$ — a uniform rescale shifts the histogram across the gate window non-trivially. KS *shape* would be invariant; KS at *fixed flux bins* is sensitive to the absolute $\langle F\rangle$ level by design (this is correct behavior for an absolute-calibrated forest, not a bug).
+
+  **Silver-lining finding (load-bearing for the paper)**: the rescaled KS distance is dramatically smaller than the as-is value — by factors of 14× (P1) to 28× (P4). 2 of 3 physics pass the 0.05 KS gate after a plain uniform rescale, with no re-training. The model has been training against the wrong target distribution because of the broken 0.877 anchor; the predicted flux distribution is *much closer to truth in shape* than the as-is KS implies. We treat the rescaled column as a **partial preview of the corrected-anchor publication run**.
+
+  **Disposition (PI ruling 4)**: **(a′) + (c)** — KEEP existing 12 cells with two-column reporting in paper §3.5, AND fix `p_flux.py` to use normalized $\delta_F$. **REJECT (b) re-train**.
+  - (c) Code fix: `src/analysis/p_flux.py:73` switched to normalized convention; future evals are anchor-invariant. Owner: core-implementer (in flight). Unit test in `tests/analysis/test_pf_anchor_invariance_d35.py` asserts $P_F$ invariant under $F \to r F$ to ~1e-12 (positive control includes the buggy mean-subtracted direction reproducing the $r^2$ scaling).
+  - (a′) Paper §3.5 + abstract + Tab. `tab:d13-gates`: rewritten to add a "Cost-survey rescaled" column and reframe the prose from "all three fail" to "two of three fail; $P_F$ is the binding gate". Implementation footnote discloses the historical mean-subtracted convention. Owner: latex-author (in flight).
+  - (b) rejected: 2 weeks of Juno compute to confirm what the rescale demonstration already shows in 30 min — diminishing returns. The publication-class run on the corrected anchor is naturally absorbed into [D-27] (post-quota learning-curve sweep) when it dispatches.
+
+  **Phase B / submission timeline**: unchanged. [D-27] learning-curve at T1 publication-class remains the next compute burn; the publication-class re-train at corrected anchor naturally absorbs option (b) when scheduled. Submission slot stays at the next post-quota window.
+
+  **New stage-gate criterion (process)**: every analysis utility in `src/analysis/` that computes a flux-domain or τ-domain reduction must include a unit test asserting invariance under the relevant transformation (uniform rescale for absolute-calibrated metrics; shift-invariance for residual metrics). The [D-35] cross-physics empirical demo is the template; same pattern owed for any future eval driver.
+
+  **Cross-references**: supersedes the [D-34] "Empirical anchor-invariance gate" sub-clause; [D-34]'s primary anchor re-pin disposition (Kirkman+2007 0.979 ± 0.005) and the kept-existing-runs decision both stand; [D-13] gate definitions unchanged; [D-11] $\mathcal{L}_{\text{meanF}}$ form unchanged.
 ---
 
 ## 4. The Data (Lineage & Governance)
@@ -697,3 +724,14 @@ Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b)
 ### **Session Snapshot: 2026-05-08 (Phase A.1 close — mean-flux anchor re-pinned to Kirkman+2007)**
 
 - Phase A.1 closed; [D-34] re-pins anchor to Kirkman+2007 ⟨F⟩=0.979 ± 0.005; existing 12 PASS cells kept under anchor-invariance; publication run will use corrected anchor; empirical invariance demo deferred behind Path β torch-DLL fix.
+
+### **Session Snapshot: 2026-05-09 ([D-35] anchor-invariance falsified + cross-physics rescale preview + p_flux fix)**
+
+- Path β torch DLL was a transient no-op (clean re-run; venv intact at torch 2.11.0+cpu). Empirical anchor-invariance demo (`scripts/eval_anchor_invariance_d34.py`) ran on T3 fiducials for P1, P2, P4 (P3 deferred — only MLflow tarball on disk).
+- **[D-35] FALSIFIES the [D-34] "anchor-invariance" sub-clause**. Cross-physics result: $P_F$ drift 2.77%–5.26% (gate <0.5%); KS drift 0.502–0.598 (gate <0.01); 1D-proxy drift exactly 0 across all three physics (sanity check OK). Two implementation findings: (i) `src/analysis/p_flux.py:73` used mean-subtracted $\delta_F$ instead of normalized → $P_F \to r^2 P_F$; (ii) KS at fixed flux bins is not shape-invariant to absolute $\langle F\rangle$ shifts.
+- **Silver-lining (load-bearing for paper)**: rescaled KS dropped 14×–28×; 2/3 physics PASS the 0.05 KS gate at cost-survey schedule under uniform rescale to corrected anchor. Reframed in paper §3.5 as "partial preview of the corrected-anchor publication run." $P_F$ named as the binding gate (FAIL by 2.6×–4.3× even after rescale).
+- **PI ruling 4: (a′) + (c)** — KEEP existing runs with two-column reporting; FIX `p_flux.py` to use normalized $\delta_F$. REJECT (b) re-train. Submission timeline unchanged.
+- **Code fix**: `src/analysis/p_flux.py:72-79` switched to normalized $\delta_F = F/\langle F\rangle - 1$. Unit test `tests/analysis/test_pf_anchor_invariance_d35.py` asserts $P_F$ invariance under $F \to r F$ for $r \in \{0.5, 0.8, 1.0, 1.2, 2.0\}$ to atol=rtol=1e-12, with positive control reproducing the buggy $r^2$ scaling.
+- **Paper edits**: `sec/0_abstract.tex` closing clause rewritten (3/3 fail → 2/3 KS PASS post-rescale, $P_F$ binding); `sec/3_experiments.tex` Tab. `tab:d13-gates` extended with "Cost-survey rescaled" column + cross-physics-range caption; §3.5 prose retracted "all three fail" framing; implementation-history disclosure of the mean-subtracted convention folded into §3.5.
+- **Process implication for [D-35]**: every `src/analysis/` reduction utility henceforth needs a unit test asserting invariance under the relevant transformation (uniform rescale for absolute-calibrated metrics, etc.). [D-35] sets the template.
+- **Deferred**: P3 cross-physics row (checkpoint extraction from MLflow tarball, ~30 min orchestration); KS-shift overlay diagnostic figure (optional, post-merge); publication-class re-train at corrected anchor (post-quota per [D-23]/[D-27]).

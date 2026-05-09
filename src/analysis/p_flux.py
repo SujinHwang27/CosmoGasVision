@@ -69,8 +69,14 @@ def compute_p_flux(
     if not np.allclose(np.diff(vel_axis_kms), dv, rtol=1e-3):
         raise ValueError("vel_axis_kms must be uniformly spaced for FFT-based PSD")
 
-    # Per-sightline mean subtraction; standard for the Lyα flux power.
-    delta_F = F - F.mean(axis=1, keepdims=True)
+    # normalized delta_F = F/<F> - 1; anchor-invariant under uniform F -> r*F
+    # ([D-35] fix; the mean-subtracted form delta_F = F - <F> picks up an
+    # overall r-scaling and breaks the [D-13] invariance gate). The Lyα
+    # mean transmitted flux is bounded below by ~0.5 at z=0.3, so
+    # divide-by-zero is structurally impossible — the two-line form is
+    # kept for debuggability of F_mean if a future loader violates that.
+    F_mean = F.mean(axis=1, keepdims=True)
+    delta_F = F / F_mean - 1.0
 
     # Hann window apodization to suppress periodic-window leakage.
     # Walther+ 2018 / Boera+ 2019 convention. Normalization below uses

@@ -118,13 +118,15 @@ def test_compute_PF_1d_recovers_flat_psd():
         tau, vel_axis, n_kbins=20, k_range=(1e-3, 1e-1)
     )
 
-    # Expected one-sided PSD for white noise of std sigma:
-    # the two-sided PSD of zero-mean white noise is sigma^2 * dv
-    # (since variance = sigma^2 = integral of S(f) over [-f_Nyq, f_Nyq]
-    # = S * 2 f_Nyq = S / dv  =>  S = sigma^2 * dv). compute_PF_1d returns
-    # the one-sided PSD (factor 2 already applied), so the target is
-    # 2 * sigma^2 * dv.
-    P_expected = 2.0 * sigma ** 2 * dv
+    # Expected one-sided PSD for white noise of std sigma. compute_PF_1d
+    # uses the normalized delta_F = F/<F> - 1 convention per [D-35], so
+    # var(delta_F) = (sigma/<F>)^2; the two-sided PSD of zero-mean white
+    # noise is var * dv (since variance = integral of S(f) over the
+    # Nyquist band = S * 2 f_Nyq = S / dv  =>  S = var * dv).
+    # compute_PF_1d returns the one-sided PSD (factor 2 already applied),
+    # so the target is 2 * (sigma / <F>)^2 * dv.
+    F_mean = float(F_true.mean())
+    P_expected = 2.0 * (sigma / F_mean) ** 2 * dv
 
     band = (centers >= 10 ** -2.5) & (centers <= 10 ** -1.5) & np.isfinite(P_F)
     assert band.sum() >= 3, "not enough k bins in the [D-13] band"
