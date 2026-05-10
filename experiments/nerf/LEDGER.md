@@ -344,6 +344,23 @@ graph TD
   **Paper §4.1 narrow re-iteration owed** (latex-author dispatched this session): list of three intervention classes becomes ranked-with-justification per this mechanism call. §3.5 and §0 abstract stand as written.
 
   **Artifacts:** `experiments/nerf/artifacts/eval/wrinkle1/{diagnostic.json, w1e_trajectory.json}`; `scripts/wrinkle1_diagnostic.py`.
+
+  **Task C — anchor-invariance probe on pub-t1 P1–P4 (2026-05-10).** Reframed from "validate rescale-as-preview" to "quantify (c)-attributable gap across pub-t1 family". Driver: `scripts/eval_anchor_invariance_d34.py --cells pub-t1` (patched this session by support-researcher; legacy single-cell mode preserved). Output: `experiments/nerf/artifacts/eval/task_c/pub_t1_anchor_invariance.json`.
+
+  | Cell | r (rescale) | P_F as-is | P_F rescaled | ΔP_F | KS as-is | KS rescaled | 1D r_ρ^log |
+  |------|-------------|------------|---------------|------|----------|-------------|-------------|
+  | P1   | 1.0128 | 0.4155 | 0.4023 | +0.0132 | 0.0325 | 0.0549 | +0.031 |
+  | P2   | 1.0097 | 0.3757 | 0.3701 | +0.0057 | 0.0742 | 0.0919 | +0.015 |
+  | P3   | 1.0075 | 0.3591 | 0.3561 | +0.0030 | 0.0408 | 0.0561 | +0.033 |
+  | P4   | 1.0060 | 0.3613 | 0.3598 | +0.0015 | 0.0389 | 0.0347 | +0.032 |
+
+  **Empirical observation (per [D-37]):** rescale factor r ≈ 1.006–1.013 (near-identity), confirming the model converged at the corrected anchor. ΔP_F = (as-is − rescaled) is small in absolute terms (+0.001 to +0.013) and **tiny relative to the as-is P_F residual** (~0.4% to ~3.2%). KS gets *worse* when rescaled in P1–P3 (pushing flux up moves the F-PDF away from truth at the converged anchor); P4 is borderline (KS improves by 0.004). 1D r_ρ^log proxy is positive but small (+0.015 to +0.033), with P2 the smallest — consistent with P2's worst-cell pattern in [D-39] gate table.
+
+  **Interpretation:** the rescale **does not close P_F** at the converged anchor — because the rescale is already a near-no-op. This is the empirical footprint of mechanism (c): the P_F gap at 3.6×–4.2× over gate is NOT a calibration artifact (rescale would fix calibration), but a structural F(τ)=exp(−τ) saturation-curve issue that no uniform F-rescale can address. The cross-physics ΔP_F ordering (P1 > P2 > P3 > P4) tracks the as-is mean_F_pred distance from the 0.979 anchor — physics where mean_F was furthest from anchor see slightly larger ΔP_F — but all four are small. Not a P1-vs-others split; (c) applies uniformly across the four physics.
+
+  **Cross-references**: completes [D-39]'s §3.2 1D r_log ≥ 0 closure (4/4 PASS); documents the (c)-uniformity across physics; retires `rescale-as-preview` as a forward diagnostic tool (it's now a backward-looking calibration footprint only).
+
+  **Driver:** `scripts/eval_anchor_invariance_d34.py` (extended; legacy `--cells legacy` mode preserved; new `--cells pub-t1` mode adds PUB_T1_CELLS pack + `_build_model_with_fallback` for non-MLflow-registered juno-trained runs).
 ---
 
 ## 4. The Data (Lineage & Governance)
