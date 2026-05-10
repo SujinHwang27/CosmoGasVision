@@ -361,6 +361,33 @@ graph TD
   **Cross-references**: completes [D-39]'s §3.2 1D r_log ≥ 0 closure (4/4 PASS); documents the (c)-uniformity across physics; retires `rescale-as-preview` as a forward diagnostic tool (it's now a backward-looking calibration footprint only).
 
   **Driver:** `scripts/eval_anchor_invariance_d34.py` (extended; legacy `--cells legacy` mode preserved; new `--cells pub-t1` mode adds PUB_T1_CELLS pack + `_build_model_with_fallback` for non-MLflow-registered juno-trained runs).
+
+  **Addendum 3 — τ-binned residual decomposition, P1 (2026-05-10).** Driver: `scripts/tau_binned_residual.py`; artifacts: `experiments/nerf/artifacts/eval/tau_binned/{p1_residual.json, p1_residual.png}`. Reproducibility: aggregate P_F=0.4155 matches W1-A exactly.
+
+  Ten log-spaced τ_truth bins over [10⁻³, 10²]:
+
+  | Bin | τ_truth range | F range | N pix | ⟨Δτ⟩ | ⟨ΔF⟩ (pred−truth) | r_pearson(τ) | sat? |
+  |-----|--------------|---------|-------|------|--------------------|--------------|------|
+  | 1   | 10⁻³–10⁻²·⁵ | 0.997–0.999 | 1,322,819 | +0.036 | −0.030 | +0.017 |   |
+  | 2   | 10⁻²·⁵–10⁻² | 0.990–0.997 | 328,125   | +0.034 | −0.028 | +0.016 |   |
+  | 3   | 10⁻²–10⁻¹·⁵ | 0.969–0.990 | 201,698   | +0.029 | −0.021 | +0.016 |   |
+  | 4   | 10⁻¹·⁵–10⁻¹ | 0.905–0.969 | 134,589   | −0.007 | +0.014 | +0.006 |   |
+  | 5   | 10⁻¹–10⁻⁰·⁵ | 0.729–0.905 |  70,646   | −0.122 | +0.117 | −0.000 |   |
+  | 6   | 10⁻⁰·⁵–10⁰  | 0.368–0.729 |  29,051   | −0.482 | +0.363 | +0.013 |   |
+  | **7** | **10⁰–10⁰·⁵** | **0.042–0.368** | **8,476** | **−1.574** | **+0.733** | **−0.016** | **★** |
+  | 8   | 10⁰·⁵–10¹   | 0.000–0.042 |   1,424   | −4.751 | +0.936 | −0.032 |   |
+  | 9   | 10¹–10¹·⁵   | ≈0          |     288   | −16.97 | +0.979 | +0.097 |   |
+  | 10  | 10¹·⁵–10²   | ≈0          |      36   | −42.98 | +0.991 | −0.370 |   |
+
+  Saturation band (F∈[0.05, 0.30], bin 7, [D-24] definition): residual-mass share **0.0762** on pixel share **0.0040**. **Concentration ratio R = 18.87** (positive-ID floor 1.5; weakened 1.2; uniform 0.83–1.2; inverted <0.83). Linear regime (bins 1–4, F>0.9, 99.6% of pixels): |⟨ΔF⟩|≤0.03. Saturation core (bin 7): ⟨Δτ⟩=−1.574, ⟨ΔF⟩=+0.733, r_pearson(τ)=−0.016 — τ-rank order collapses where it matters most for P_F.
+
+  **Mechanism call upgraded — P1-scoped per PI ruling**: "consistent with (c)" → "**positively identified (c) on P1 pub-t1 step_050000**". The r-collapse to ~0 in the saturation core (bin 7, 8,476 pixels) is the load-bearing distinguishing observation between (c) miscalibration and a generic global bias: where the model needs to rank τ correctly to recover P_F, it cannot.
+
+  **Track-wide upgrade deferred** pending P2/P3/P4 replication via the same driver (authorized; host-only; ~few min/cell). Per [D-37] discipline, §3.5 may carry the positive-ID verb with P1 scope explicit; §0 abstract and §4 successor framing stay at "consistent with" wording until cross-physics lands.
+
+  **Successor direction sharpened**: **saturation-aware P_F loss term** up-weighting F∈[0.05, 0.30] AND preserving per-sightline τ rank order in-band — not just mean amplitude. The in-band r-collapse rules out a global τ rescaling fix; the loss must protect ordering inside the saturation band.
+
+  **Next dispatches** (this session): (i) support-researcher extends `tau_binned_residual.py` to P2/P3/P4; (ii) latex-author pending P2–P4 R values rewrites §3.5 with `p1_residual.png` as primary figure (P1-scoped "positively identified" verb).
 ---
 
 ## 4. The Data (Lineage & Governance)
