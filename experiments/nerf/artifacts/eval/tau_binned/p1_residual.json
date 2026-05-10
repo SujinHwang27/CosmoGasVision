@@ -197,6 +197,7 @@
       0.05,
       0.3
     ],
-    "driver_version": "tau_binned_residual.py v1 (2026-05-10)"
+    "driver_version": "tau_binned_residual.py v2 (2026-05-10, cross-physics P1-P4)",
+    "cell_label": "P1"
   }
 }

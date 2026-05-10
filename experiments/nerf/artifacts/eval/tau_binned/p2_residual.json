@@ -1,0 +1,203 @@
+{
+  "physics_id": 2,
+  "redshift": 0.3,
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "checkpoint": "D:\\Data\\sujin\\CosmoGasVision\\cloud_runs\\pub-t1-extracted\\P2-N64-S0-1778430089-0f7fc8\\checkpoints\\step_050000.pt",
+  "run_id": "f7fafa2320164a9cb7c9c29fad74474d",
+  "aggregate_P_F_residual": 0.37572397536697755,
+  "expected_P_F_from_d39_W1A": null,
+  "tau_bin_edges": [
+    0.001,
+    0.0031622776601683794,
+    0.01,
+    0.03162277660168379,
+    0.1,
+    0.31622776601683794,
+    1.0,
+    3.1622776601683795,
+    10.0,
+    31.622776601683793,
+    100.0
+  ],
+  "bins": [
+    {
+      "bin_index": 1,
+      "tau_truth_lo": 0.001,
+      "tau_truth_hi": 0.0031622776601683794,
+      "F_truth_lo": 0.9968427170735329,
+      "F_truth_hi": 0.999000499833375,
+      "count": 1309160,
+      "mean_tau_residual": 0.035906507437976305,
+      "median_tau_residual": -0.00045929752795697176,
+      "mean_F_residual": -0.026462403573421875,
+      "median_F_residual": 0.0004591843380425398,
+      "pearson_r_tau": 0.02203723835823978,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.6242561340332031
+    },
+    {
+      "bin_index": 2,
+      "tau_truth_lo": 0.0031622776601683794,
+      "tau_truth_hi": 0.01,
+      "F_truth_lo": 0.9900498337491681,
+      "F_truth_hi": 0.9968427170735329,
+      "count": 328082,
+      "mean_tau_residual": 0.04018430461612788,
+      "median_tau_residual": -0.004233014302280571,
+      "mean_F_residual": -0.027110277127426016,
+      "median_F_residual": 0.004223525191039579,
+      "pearson_r_tau": 0.013895859940760917,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.15644168853759766
+    },
+    {
+      "bin_index": 3,
+      "tau_truth_lo": 0.01,
+      "tau_truth_hi": 0.03162277660168379,
+      "F_truth_lo": 0.9688719943400754,
+      "F_truth_hi": 0.9900498337491681,
+      "count": 204107,
+      "mean_tau_residual": 0.030134612320713183,
+      "median_tau_residual": -0.013766118279543677,
+      "mean_F_residual": -0.01688742186052567,
+      "median_F_residual": 0.013665746377060084,
+      "pearson_r_tau": 0.005677017802570302,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.09732580184936523
+    },
+    {
+      "bin_index": 4,
+      "tau_truth_lo": 0.03162277660168379,
+      "tau_truth_hi": 0.1,
+      "F_truth_lo": 0.9048374180359595,
+      "F_truth_hi": 0.9688719943400754,
+      "count": 135775,
+      "mean_tau_residual": -0.00477532606418657,
+      "median_tau_residual": -0.04478542188450947,
+      "mean_F_residual": 0.017029978110122586,
+      "median_F_residual": 0.04369765822013272,
+      "pearson_r_tau": 0.017567027075351373,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.0647425651550293
+    },
+    {
+      "bin_index": 5,
+      "tau_truth_lo": 0.1,
+      "tau_truth_hi": 0.31622776601683794,
+      "F_truth_lo": 0.7288934141100246,
+      "F_truth_hi": 0.9048374180359595,
+      "count": 72984,
+      "mean_tau_residual": -0.1142455843711664,
+      "median_tau_residual": -0.14511842393665034,
+      "mean_F_residual": 0.1194810296324736,
+      "median_F_residual": 0.13428502097670975,
+      "pearson_r_tau": -0.008228454618020652,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.034801483154296875
+    },
+    {
+      "bin_index": 6,
+      "tau_truth_lo": 0.31622776601683794,
+      "tau_truth_hi": 1.0,
+      "F_truth_lo": 0.36787944117144233,
+      "F_truth_hi": 0.7288934141100246,
+      "count": 32033,
+      "mean_tau_residual": -0.4796123721870141,
+      "median_tau_residual": -0.4632287477263093,
+      "mean_F_residual": 0.3680114748686622,
+      "median_F_residual": 0.36612778603203555,
+      "pearson_r_tau": 0.002081701324489695,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.015274524688720703
+    },
+    {
+      "bin_index": 7,
+      "tau_truth_lo": 1.0,
+      "tau_truth_hi": 3.1622776601683795,
+      "F_truth_lo": 0.04232921962320499,
+      "F_truth_hi": 0.36787944117144233,
+      "count": 10187,
+      "mean_tau_residual": -1.6033466822084794,
+      "median_tau_residual": -1.465780630904162,
+      "mean_F_residual": 0.7381064359858,
+      "median_F_residual": 0.7487527116080018,
+      "pearson_r_tau": -0.02144782165524883,
+      "in_saturation_band": true,
+      "frac_of_total_pixels": 0.004857540130615234
+    },
+    {
+      "bin_index": 8,
+      "tau_truth_lo": 3.1622776601683795,
+      "tau_truth_hi": 10.0,
+      "F_truth_lo": 4.5399929762484854e-05,
+      "F_truth_hi": 0.04232921962320499,
+      "count": 2604,
+      "mean_tau_residual": -5.3585950881466005,
+      "median_tau_residual": -4.847393620498121,
+      "mean_F_residual": 0.931068948189586,
+      "median_F_residual": 0.9817480084591564,
+      "pearson_r_tau": 0.040703016660335045,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.0012416839599609375
+    },
+    {
+      "bin_index": 9,
+      "tau_truth_lo": 10.0,
+      "tau_truth_hi": 31.622776601683793,
+      "F_truth_lo": 1.8467266624096945e-14,
+      "F_truth_hi": 4.5399929762484854e-05,
+      "count": 828,
+      "mean_tau_residual": -17.07180065096819,
+      "median_tau_residual": -15.51451782457009,
+      "mean_F_residual": 0.9579422274528864,
+      "median_F_residual": 0.999961662048398,
+      "pearson_r_tau": -0.09521327610506156,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.0003948211669921875
+    },
+    {
+      "bin_index": 10,
+      "tau_truth_lo": 31.622776601683793,
+      "tau_truth_hi": 100.0,
+      "F_truth_lo": 3.720075976020836e-44,
+      "F_truth_hi": 1.8467266624096945e-14,
+      "count": 470,
+      "mean_tau_residual": -55.30228635378947,
+      "median_tau_residual": -49.81413336486317,
+      "mean_F_residual": 0.98169611076061,
+      "median_F_residual": 0.9999998781314549,
+      "pearson_r_tau": -0.03474702621875396,
+      "in_saturation_band": false,
+      "frac_of_total_pixels": 0.00022411346435546875
+    }
+  ],
+  "decision": {
+    "saturation_band_F": [
+      0.05,
+      0.3
+    ],
+    "saturation_residual_mass_share": 0.09282382541381388,
+    "saturation_pixel_share": 0.004859676657618678,
+    "concentration_ratio": 19.10082335792668,
+    "concentration_thresholds": {
+      "positive_id": ">=1.5",
+      "weakened_id": ">=1.2",
+      "uniform_band": "0.83-1.2",
+      "anti": "<0.83"
+    },
+    "mechanism_call": "c-positive-id-residual-concentrates-in-saturation"
+  },
+  "metadata": {
+    "p_f_band_s_per_km": [
+      0.0031622776601683794,
+      0.03162277660168379
+    ],
+    "saturation_F_range": [
+      0.05,
+      0.3
+    ],
+    "driver_version": "tau_binned_residual.py v2 (2026-05-10, cross-physics P1-P4)",
+    "cell_label": "P2"
+  }
+}

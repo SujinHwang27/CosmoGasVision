@@ -388,6 +388,25 @@ graph TD
   **Successor direction sharpened**: **saturation-aware P_F loss term** up-weighting F∈[0.05, 0.30] AND preserving per-sightline τ rank order in-band — not just mean amplitude. The in-band r-collapse rules out a global τ rescaling fix; the loss must protect ordering inside the saturation band.
 
   **Next dispatches** (this session): (i) support-researcher extends `tau_binned_residual.py` to P2/P3/P4; (ii) latex-author pending P2–P4 R values rewrites §3.5 with `p1_residual.png` as primary figure (P1-scoped "positively identified" verb).
+
+  **Addendum 4 — Track-wide (c) positive ID confirmed cross-physics (2026-05-10).** Driver `scripts/tau_binned_residual.py --cell all` extended the P1 τ-binned residual analysis to P2/P3/P4. Per-cell saturation-band concentration ratio R (sat mass/pixel, F ∈ [0.05, 0.30]):
+
+  | Cell | P_F aggregate | R     | Call            |
+  |------|---------------|-------|-----------------|
+  | P1   | 0.4155        | 18.87 | c-positive-id   |
+  | P2   | 0.3757        | 19.10 | c-positive-id   |
+  | P3   | 0.3591        | 20.47 | c-positive-id   |
+  | P4   | 0.3613        | 23.75 | c-positive-id   |
+
+  All four cells exceed the positive-ID floor (R ≥ 1.5) by >12×. Relative spread ~25%; P4 (strongest feedback) shows the highest R, indicating the saturation deficit intensifies where cool dense structure is most prevalent. Mechanism (c) — saturation-regime under-fitting — is hereby **positively identified track-wide across the pub-t1 family**, not P1-scoped.
+
+  **PI track-wide ruling**: §0 abstract and §4 successor framing upgrade from "consistent with mechanism (c)" to "**positively identified across all four Sherwood physics variants (P1–P4)**". Counterfactual closure (saturation-aware loss term) deferred to successor work; current claim ceiling is **"positively identified residually-supported mechanism,"** not "(c) is the cause." The strict cause claim requires a counterfactual run (a model trained with saturation-aware loss that closes the gap).
+
+  **Primary figure in §3.5**: `experiments/nerf/artifacts/eval/tau_binned/all_residual.png` (4-panel composite, shared y-scale, saturation band shaded). `p1_residual.png` demotes to supplementary.
+
+  **Successor ranking unchanged**: (1) saturation-aware P_F loss up-weighting F ∈ [0.05, 0.30] with per-sightline τ rank-order preservation in-band, (2) FGPA-tail regularizer, (3) velocity-gradient conditioning. **Cross-physics R-uniformity strengthens #1 priority**: a physics-invariant re-weighting scheme is the cleanest counterfactual.
+
+  **Artifacts**: `experiments/nerf/artifacts/eval/tau_binned/{p1,p2,p3,p4}_residual.{json,png}`, `all_residual.png`. Driver: `scripts/tau_binned_residual.py`.
 ---
 
 ## 4. The Data (Lineage & Governance)
