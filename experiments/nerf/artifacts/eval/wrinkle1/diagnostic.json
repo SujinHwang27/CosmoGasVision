@@ -1,0 +1,73 @@
+{
+  "W1-A": {
+    "checkpoint": "D:\\Data\\sujin\\CosmoGasVision\\cloud_runs\\pub-t1-extracted\\P1-N64-S0-1778430089-7f65fe\\checkpoints\\step_050000.pt",
+    "run_id": "31acdf9d900e447081e6d051f7d42c0e",
+    "eval_seed": 42,
+    "anchor": "trained",
+    "rescale_r": null,
+    "mean_F_pred_raw": 0.9666049480438232,
+    "mean_F_pred_used": 0.9666049480438232,
+    "P_F": 0.4155053062248997,
+    "KS": 0.03252944369451872
+  },
+  "W1-B": {
+    "checkpoint": "D:\\Data\\sujin\\CosmoGasVision\\cloud_runs\\pub-t1-extracted\\P1-N64-S0-1778430089-7f65fe\\checkpoints\\step_050000.pt",
+    "run_id": "31acdf9d900e447081e6d051f7d42c0e",
+    "eval_seed": 1,
+    "anchor": "trained",
+    "rescale_r": null,
+    "mean_F_pred_raw": 0.9646302461624146,
+    "mean_F_pred_used": 0.9646302461624146,
+    "P_F": 0.48285267329646786,
+    "KS": 0.04583556803522315
+  },
+  "W1-C": {
+    "checkpoint": "D:\\Data\\sujin\\CosmoGasVision\\cloud_runs\\prong3-p1-t3\\P1-N1024-S0-1778229084-c08848\\checkpoints\\step_010000.pt",
+    "run_id": "f74dbb669c9641568ab883023a84d1fa",
+    "eval_seed": 42,
+    "anchor": "rescale",
+    "rescale_r": 1.0583122838338972,
+    "mean_F_pred_raw": 0.9250577688217163,
+    "mean_F_pred_used": 0.9768704226817754,
+    "P_F": 0.26386141623540393,
+    "KS": 0.03871033698064791
+  },
+  "W1-D": {
+    "checkpoint": "D:\\Data\\sujin\\CosmoGasVision\\cloud_runs\\prong3-p1-t3\\P1-N1024-S0-1778229084-c08848\\checkpoints\\step_010000.pt",
+    "run_id": "f74dbb669c9641568ab883023a84d1fa",
+    "eval_seed": 1,
+    "anchor": "rescale",
+    "rescale_r": 1.0608507557148898,
+    "mean_F_pred_raw": 0.9228442311286926,
+    "mean_F_pred_used": 0.975801925793301,
+    "P_F": 0.30016944135733115,
+    "KS": 0.06241064895717413
+  },
+  "decision": {
+    "seed_sensitivity_pubt1": "|W1-A - W1-B|/W1-A = 16.21% (W1-A=0.4155, W1-B=0.4829)",
+    "seed_sensitivity_costsurvey": "|W1-C - W1-D|/W1-C = 13.76% (W1-C=0.2639, W1-D=0.3002)",
+    "rescale_vs_trained_same_seed": "P_F(W1-A) - P_F(W1-C) = +0.1516 (at eval_seed=42)",
+    "costsurvey_reproduces_d35_0_2825": true,
+    "decision_matrix": {
+      "arm_b_seed_sensitivity": false,
+      "arm_c_rescale_intrinsic": false,
+      "arm_ac_ambiguous_commission_W1E": false
+    },
+    "mechanism_call": "ambiguous"
+  },
+  "metadata": {
+    "physics_id": 1,
+    "redshift": 0.3,
+    "n_rays_eval": 1024,
+    "target_mean_flux": 0.979,
+    "p_f_band_s_per_km": [
+      0.0031622776601683794,
+      0.03162277660168379
+    ],
+    "ks_F_range": [
+      0.05,
+      0.95
+    ],
+    "driver_version": "wrinkle1_diagnostic.py v1 (2026-05-10)"
+  }
+}

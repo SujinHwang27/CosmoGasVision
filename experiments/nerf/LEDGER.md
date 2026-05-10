@@ -56,7 +56,7 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🚀 **IN PROGRESS** — micro-grid 16/16 PASS; Batch 1 (T1×{P2,P3,P4} + P1-T1-tmax10) ✅; Batch 1b (τ_max sensitivity) ✅; Batch 2 (T2×4 on Juno) ✅ all 4 PASS; Batch 3 (T3 seed=0 on Juno): P1 ✅, P3 ✅, P2 ❌ softplus-collapse, P4 cancelled; **Batch 3b (P2+P4 seed=1 retry) ✅ both PASS** (cycle complete); **Prong 3 P1-T3 with PCV-fixed sbatch in flight** to capture the [D-13] fiducial-point checkpoint; tier 4 deferred to post-quota | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13]. | Sec 4.1 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🟥 **PASS_T1_pub FAIL — [D-39] RESOLVED-as-FALSIFICATION** — Cost-survey 12/12 PASS [D-19] safety; T1 publication-class (P1–P4 @ corrected anchor 0.979, 50k steps, seed=0) completed ExitCode 0:0 but **fails the [D-13] gate on P_F in all 4 cells (3.6×–4.2× over)** and on KS in P2 (1.5× over). mean_flux gate and cross-physics spread (0.63%) PASS. The corrected-anchor full-schedule result **falsifies the [D-35] rescale-preview interpretation**; the P_F gap is structural, not calibration. **T4 (792 GPU-hr) BLOCKED** pending Wrinkle-1 diagnostic ([D-39] §"Decision"). | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13], [D-39]. | Sec 4.1 (Next) |
 | **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
@@ -268,6 +268,58 @@ graph TD
   **Cross-references**: [D-24] item (3) "log-space supervision (novel methods contribution; reframed)" framing is **superseded by [D-38] for the cap+mask portion only**; [D-24] item (3)'s log1p physical-grounds defense survives unchanged; [D-24] item (1) (saturated-absorber threshold derivation, the τ>10⁵ mask criterion) and item (2) (τ_max=10 sensitivity-locked) are unaffected; [D-13] gates unchanged.
 
   **Propagated to**: `paper_cvpr/sec/2_method.tex` §2.4 (narrowing edits + new `tab:s5s7-ablation`); `paper_cvpr/figures/s5s7_loss_curves.{png,pdf}` (four-loss-curves overlay figure); §7 history entry dated 2026-05-10.
+
+- **[D-39] T1 publication-class bundle (P1–P4, juno_batch=pub-t1) — PASS_T1_pub FAILS on P_F (binding gate) (2026-05-10, PI)** —
+
+  **Status:** RESOLVED-as-FALSIFICATION. The corrected-anchor full-schedule run does not pass the §3.1 publication gate. The failure is structural in P_F across all four physics cells, not anchor calibration and not seed-collapse.
+
+  **Provenance:**
+  - Dispatch: PI spec from this session (see §7 History entry 2026-05-10 cont.). 4-way parallel on Juno a30 g-01-01 + g-02-01; ExitCode 0:0 per cell; ~1h37m each (Juno JobIDs 197227/197228/197229/197230 + babysitter 197231).
+  - MLflow: 4 source-run-IDs `31acdf9d900e447081e6d051f7d42c0e` (P1) / `f7fafa2320164a9cb7c9c29fad74474d` (P2) / `62aeb93aacd44cb0aeca5b51f802a352` (P3) / `fc3817b3b3114cae8b134800aedf20e1` (P4); tagged `juno_batch=pub-t1` under `CosmoGasVision/NeRF`.
+  - Eval: `scripts/eval_partial_d13.py` ~40 s/cell, ExitCode 0:0 (Juno JobIDs 197273/197274/197275/197276).
+  - Figures: `experiments/nerf/artifacts/eval/pub-t1/P{1..4}/{flux_pdf,pf_compare}.png`.
+
+  **Empirical observation (lead, per [D-37]):**
+
+  Full gate table:
+
+  | Cell | mean_F_pred | mean_F gate (0.974–0.984) | tau_amp@50k | peak_vram | [D-19] safety | KS distance | KS gate (<0.05) | P_F residual | P_F gate (<0.10) | final loss |
+  |------|------------|---------------------------|-------------|-----------|---------------|-------------|-----------------|--------------|------------------|------------|
+  | P1   | 0.97895    | PASS                      | 1.0455      | 2.84 GB   | PASS          | 0.0325      | PASS            | **0.4155**   | **FAIL (4.2×)**  | 1.27e-07   |
+  | P2   | 0.97536    | PASS                      | 1.1169      | 2.84 GB   | PASS          | **0.0742**  | **FAIL (1.5×)** | **0.3757**   | **FAIL (3.8×)**  | 1.84e-04   |
+  | P3   | 0.97819    | PASS                      | 1.0920      | 2.84 GB   | PASS          | 0.0408      | PASS            | **0.3591**   | **FAIL (3.6×)**  | 4.14e-06   |
+  | P4   | 0.98154    | PASS                      | 1.0610      | 2.84 GB   | PASS          | 0.0389      | PASS            | **0.3613**   | **FAIL (3.6×)**  | 1.28e-05   |
+
+  Cross-physics mean_F_pred spread: 0.97895 / 0.97536 / 0.97819 / 0.98154 → **0.63 %** (§3.2 gate <1 %: PASS).
+
+  **Aggregate PASS_T1_pub status (conjunction over §3.1 conditions 1–4):**
+  - [D-19] safety: 4/4 PASS
+  - mean_flux_pred ∈ [0.974, 0.984]: 4/4 PASS
+  - KS < 0.05: 3/4 PASS (P2 fails at 0.0742, 1.5×)
+  - P_F residual < 0.10: 0/4 PASS (3.6×–4.2×)
+  - §3.2 cross-physics spread < 1 %: PASS
+  - §3.2 1D r_log ≥ 0: NOT YET MEASURED (Task C `eval_anchor_invariance_d34.py` rerun pending — gated on Wrinkle-1 below)
+
+  **PASS_T1_pub: FAIL.** Binding gate is P_F (gate 3); KS is secondary (gate 4, single-cell breach).
+
+  **Load-bearing wrinkles recorded as findings, not framing:**
+
+  - **Wrinkle 1 (rescale-vs-trained-at-target divergence).** P1 publication-class P_F = 0.4155 is **larger** than the cost-survey post-hoc rescaled P_F = 0.2825 at the same 0.979 anchor (see [D-35]). 4× more training and the corrected anchor did not reduce P_F — it increased it. Candidate mechanisms (disambiguation recipe in §7 dispatch entry, this date): (a) overfitting in P_F-relevant modes from 4× more updates; (b) sightline-selection sensitivity (eval seed=42 vs training seed=0); (c) uniform post-hoc rescale ≠ trained-at-target in nonlinear flux ↔ τ saturation.
+
+  - **Wrinkle 2 (P2 KS failure is not pure seed-collapse).** P2 has the highest final loss (1.84e-04, ~3 dex above P1) and the only KS breach, consistent with prior P2 seed=0 softplus-collapse fragility ([D-19] / Batch-3 history). But the seed-collapse story is **incomplete**: P_F fails for P1/P3/P4 too, which did **not** collapse. P2's KS breach is a P2-specific symptom on top of a population-level P_F structural failure.
+
+  - **Wrinkle 3 (data-MSE ⊥ spectroscopic gates).** All four cells reached small log1p-τ MSE (P1: 1.27e-07; even P2: 1.84e-04) without reproducing P_F. **log1p-MSE-of-τ is not a sufficient proxy for the spectroscopic gates.** Recorded as a methodology finding independent of the publication verdict; informs any future loss-design decision (cross-references [D-13], [D-35]).
+
+  **Diagnosis (binding gate):**
+  P_F is structurally bound across all physics cells at the publication schedule and the corrected anchor. The mean-flux and KS gates are essentially closed (4/4 and 3/4 respectively); the gap is in second-order spectroscopic statistics. This **falsifies the [D-35] rescale-preview interpretation** that the cost-survey predictions were already P_F-shape-correct and only mis-anchored.
+
+  **Decision:**
+  1. T1 publication-class is not a PASS-verdict run. Recorded as **calibration-falsification + structural-P_F discovery**.
+  2. T4 (792 GPU-hr) is **BLOCKED** until Wrinkle-1 is disambiguated. Sightline density alone is not expected to close a 3.6–4.2× P_F residual; if mechanism resolves to (c) or (a) the budget is wasted, if (b) a 1-cell T4 pilot is the conditional unlock.
+  3. Task C (`eval_anchor_invariance_d34.py` rerun against pub-t1 checkpoints) is owed for §3.2 closure (1D r_log ≥ 0) and runs **after** Wrinkle-1 (shared eval surface; seed-convention may change).
+  4. Paper §3.5 reframing dispatched to latex-author (2026-05-10 §7 entry): retract rescale-as-preview, abstract changes, retire `PASS_T1_pub`-as-achieved language; frame around the falsification + Wrinkle-3 decoupling finding.
+
+  **References:** [D-13], [D-19], [D-35], [D-37]; PI dispatch spec §3.1 / §3.2 / §3.3 / §3.4 / §5 (this session §7 History entry 2026-05-10 cont.).
 ---
 
 ## 4. The Data (Lineage & Governance)
@@ -792,6 +844,17 @@ Contingency covers: (a) re-runs if peer review demands a longer T4 schedule; (b)
 - **Paper edits**: `sec/0_abstract.tex` closing clause rewritten (3/3 fail → 2/3 KS PASS post-rescale, $P_F$ binding); `sec/3_experiments.tex` Tab. `tab:d13-gates` extended with "Cost-survey rescaled" column + cross-physics-range caption; §3.5 prose retracted "all three fail" framing; implementation-history disclosure of the mean-subtracted convention folded into §3.5.
 - **Process implication for [D-35]**: every `src/analysis/` reduction utility henceforth needs a unit test asserting invariance under the relevant transformation (uniform rescale for absolute-calibrated metrics, etc.). [D-35] sets the template.
 - **Deferred**: P3 cross-physics row (checkpoint extraction from MLflow tarball, ~30 min orchestration); KS-shift overlay diagnostic figure (optional, post-merge); publication-class re-train at corrected anchor (post-quota per [D-23]/[D-27]).
+
+### **Session Snapshot: 2026-05-10 EOD (T1 publication-class returned: PASS_T1_pub FAIL; [D-39] FALSIFICATION; T4 BLOCKED)**
+
+- **All 4 cells COMPLETED cleanly** at 2026-05-10T13:00 UTC. Wallclock 1h36m–1h38m per cell; ExitCode 0:0 for all 4 + babysitter. Tarball `pub-t1-20260510-130005.tar.gz` (241.8 MB) pulled to host `cloud_runs/`, extracted to `cloud_runs/pub-t1-extracted/{P1,P2,P3,P4}-N64-S0-1778430089-*/`. 4 source mlflow run-IDs captured (see [D-39] entry).
+- **Gate eval** ran ~40 sec/cell on Juno a30 (`eval_partial_d13.py` via `submit_juno_eval_partial.sh`; Juno JobIDs 197273/197274/197275/197276; ExitCode 0:0). Figures pulled to `experiments/nerf/artifacts/eval/pub-t1/P{1..4}/{flux_pdf,pf_compare}.png`.
+- **Empirical observation (per [D-37], lead with numbers)**: see [D-39] full gate table. KS<0.05 in 3/4 cells (P1=0.0325, P3=0.0408, P4=0.0389; P2=0.0742 FAIL). **P_F<0.10 in 0/4 cells** (P1=0.4155, P2=0.3757, P3=0.3591, P4=0.3613 — all 3.6×–4.2× over). mean_F_pred ∈ [0.974, 0.984] in 4/4 cells; cross-physics spread 0.63% (gate <1%) PASS. peak_vram=2.84 GB; no NaN; tau_amp ∈ [1.045, 1.117].
+- **Pre-committed reframing per PI §5 dispatch spec is now triggered**: the [D-35] rescale-preview interpretation is **falsified**. The publication-class result re-scopes the paper from "verdict at corrected anchor" to "calibration-falsification + structural-P_F discovery + Wrinkle-3 data-MSE ⊥ spectroscopic-gates decoupling". P_F is the binding gate.
+- **Notable wrinkle (Wrinkle 1)**: P1 pub-class P_F = 0.4155 is **larger** than the cost-survey post-hoc rescaled P_F = 0.2825 at the same anchor 0.979. 4× more training + corrected anchor INCREASED P_F. PI commissioned a 4-eval Wrinkle-1 diagnostic recipe (W1-A through W1-D, ~3 min total, host CPU, zero GPU-hr) to disambiguate (a) overfit / (b) sightline-selection sensitivity / (c) rescale-vs-trained intrinsic divergence in nonlinear F(τ) saturation. T4 dispatch is BLOCKED on this disambiguation; if mechanism resolves to (c) or (a), T4's 792 GPU-hr would be wasted.
+- **Dispatched immediately** (this session, in parallel): (i) `support-researcher` for Wrinkle-1 diagnostic recipe; (ii) `latex-author` for paper §3.5 + §0 abstract + §4 next-steps retraction-and-reframe. PI re-review owed on latex-author diff before merge.
+- **Task C status (eval_anchor_invariance_d34.py rerun against pub-t1 checkpoints)**: owed for §3.2 1D r_log closure but deferred AFTER Wrinkle-1 per PI sequencing call (shared eval surface; Wrinkle-1 may change seed conventions).
+- **Paper update LANDED 2026-05-10 EOD (latex-author):** [D-39] retraction-and-reframe propagated to `sec/0_abstract.tex` (full rewrite — discovery-frame replacing verdict-frame; abstract lead is the falsification + Wrinkle-3 decoupling finding), `sec/3_experiments.tex` §3.5 (new `Cosmological Evaluation: P_F Falsifies the Rescale-Preview Reading` subsection with retraction + empirical observation + diagnosis + decoupling-finding paragraph headers; new `tab:pub-t1-gates` with the four-cell pub-t1 measured row; `tab:d13-gates` extended with `pub-t1 measured` column and caption rewritten to call the falsification verdict; figure captions for `fig:p-flux-fiducial` and `fig:flux-pdf-fiducial` updated for figure-caption self-sufficiency under [D-39]; new §3.7 `Open evaluation axes` and §3.8 `Compute footprint and Tier-4 status` reflecting Wrinkle-1 BLOCK on T4), `sec/4_next_steps.tex` (full roadmap rewrite: top-of-section reorganized around the [D-39] structural-P_F finding; new §4.1 `Closing the structural P_F gap` with three intervention classes — P_F-targeted loss, FGPA tail regularizer, velocity-gradient conditioning; new §4.2 `Tier 4 and sightline-density scaling` with the conditional-on-Wrinkle-1 framing; Stage 3 contingency on a P_F-passing reconstruction; decision-log table extended with [D-35]/[D-38]/[D-39] rows). `\todo{}` placeholder for the P_F overlay figure (cost-survey-rescaled vs pub-t1 vs Sherwood reference) inserted at §3.5 per PI direction (d). Sweep verified: no leftover `PASS_T1_pub`, `expected to close`, or `anchor correction will resolve` language in §0/§1/§3/§4. The single remaining `publication-class run trains against 0.979` reference in `sec/2_method.tex` is a factual present-tense statement about the run's anchor and is left under the [D-38]/[D-39] no-touch-§2 constraint (informational, not a verdict claim). PI re-review owed before commit.
 
 ### **Session Snapshot: 2026-05-10 cont. (publication-class T1×4 dispatched + IGM_gal landed on Juno)**
 
