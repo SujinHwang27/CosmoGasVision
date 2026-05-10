@@ -320,6 +320,30 @@ graph TD
   4. Paper §3.5 reframing dispatched to latex-author (2026-05-10 §7 entry): retract rescale-as-preview, abstract changes, retire `PASS_T1_pub`-as-achieved language; frame around the falsification + Wrinkle-3 decoupling finding.
 
   **References:** [D-13], [D-19], [D-35], [D-37]; PI dispatch spec §3.1 / §3.2 / §3.3 / §3.4 / §5 (this session §7 History entry 2026-05-10 cont.).
+
+  **Wrinkle-1 disambiguation addendum (2026-05-10, PI final ruling).** The four-case W1-A/B/C/D driver returned **AMBIGUOUS** (seed sensitivity 13.76%–16.21%, between arm-b's >20% and arm-c's <10%; same-seed rescale-vs-trained gap robust at +0.1516 to +0.1827). The W1-E trajectory probe on P1 pub-t1 (P_F vs step at seed=42, trained anchor) **rules out mechanism (a) overfitting** directly:
+
+  | Step | P_F | KS | mean_F_pred |
+  |------|------|------|-------------|
+  | 5k   | 0.5584 | 0.0842 | 0.9612 |
+  | 15k  | 0.4716 | 0.0490 | 0.9642 |
+  | 25k  | 0.4132 | 0.0324 | 0.9668 |
+  | 50k  | 0.4155 | 0.0325 | 0.9666 |
+
+  P_F decreases monotonically through step 25k then **plateaus** at 0.4132–0.4155 (~0.5% change between step 25k and 50k). Overfitting would produce monotone-increasing P_F; we observe the opposite. Mechanism call: **(c)-primary rescale-vs-trained intrinsic divergence in nonlinear F(τ) saturation, with (b) seed-sightline-modulation at ~15% as a secondary effect**. The rescale operation F → r·F is linear in F but P_F depends on F(τ) = exp(−τ) saturation; rescaling fixes ⟨F⟩ without preserving the where-on-the-curve structure that the trained-at-target model converges to. Honest framing per [D-37]: this is the residually-supported hypothesis after ruling out (a) by the trajectory and bounding (b) by seed sensitivity — short of the level of evidence required for a positive "mechanism (c) is the cause" publication claim. A τ-binned residual decomposition would be the missing positive identification.
+
+  **T4 unlock (final):** **BLOCKED.** The (b)-modulation at 13–16% is below the >20% threshold for the 1-cell-pilot arm; (b) alone does not justify pilot compute and a pilot does not address (c). Successor work is loss / regularizer / architecture, not sightline-density.
+
+  **Successor research direction (ranked, per PI):**
+  1. **P_F-targeted loss term** (highest leverage). Direct address of (c): put P_F (or band-integrated proxy at k_∥∈[10^−2.5, 10^−1.5] s/km) into the training objective. Differentiable; doesn't require new inputs.
+  2. **FGPA-tail regularizer** (medium). Constrains τ-PDF tails where (c) predicts the rescale-vs-trained divergence lives. Complementary to #1.
+  3. **Velocity-gradient conditioning branch** (lowest for this wrinkle). Architectural; addresses a different failure mode (peculiar-velocity line structure), not directly the saturation-nonlinearity gap.
+
+  **Task C status (final):** authorized — dispatched this session, reframed from "validate rescale-as-preview" to "quantify the (c)-attributable gap across pub-t1 checkpoint family".
+
+  **Paper §4.1 narrow re-iteration owed** (latex-author dispatched this session): list of three intervention classes becomes ranked-with-justification per this mechanism call. §3.5 and §0 abstract stand as written.
+
+  **Artifacts:** `experiments/nerf/artifacts/eval/wrinkle1/{diagnostic.json, w1e_trajectory.json}`; `scripts/wrinkle1_diagnostic.py`.
 ---
 
 ## 4. The Data (Lineage & Governance)
