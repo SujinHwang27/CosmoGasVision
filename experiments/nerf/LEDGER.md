@@ -439,6 +439,34 @@ graph TD
   - Driver smoke + parity: `scripts/make_pf_overlay_fig.py` (figure complement) also landed this session; figure at `paper_cvpr/figures/pf_overlay_falsification.png` discharges the §3.5 `\todo{}`.
 
   **References:** [D-13], [D-19], [D-21], [D-24], [D-35], [D-37], [D-39]. PI §4.1 #1 (the design spec).
+
+- **[D-40] Saturation-aware P_F loss counterfactual — empirical FAIL (2026-05-10, PI)** —
+
+  **Spec**: P1 only, n_rays=64, microbatch=1024, 12,500 steps, seed=0, anchor 0.979, `--sat_band_weight 3.0 --rank_order_weight 0.1 --rank_order_pairs 512 --pf_loss_weight 1.0`. MLflow run `87dcf9e63564465489f770266fcec197`; Juno Job 197319 (ExitCode 0:0, 25:55 wall); checkpoint `step_010000.pt`.
+
+  **Result (eval Job 197328, seed=42, 1024 rays):**
+
+  | Metric            | Tier-1 sat-aware | [D-39] W1-A baseline | Δ            |
+  |-------------------|------------------|----------------------|--------------|
+  | pf_residual_mean  | **0.5707**       | 0.4155               | **+37.4% worse** |
+  | ks_distance       | **0.1888**       | 0.0325 (gate 0.05)   | **3.8× over** |
+  | loss_data @10k    | 0.0100           | 0.0025 (cost-survey) | 4× worse     |
+
+  Training-time `loss_pf_band` collapsed 0.99 → 6.77e-06 (5 orders); **eval P_F worsened by 37% and KS gate broke**. Signature of a degenerate optimum in the relative-residual formulation, not a generalization gap.
+
+  **Hypothesis C (most likely cause)**: the band-integrated relative-residual `loss_pf_band = mean(((P_F_pred − P_F_truth) / P_F_truth)²)` admits trivial constant-prediction solutions. When `P_F_truth` is small in any bin, the relative residual is minimized by driving `P_F_pred → 0` (constant τ output collapses P_F to ~0 everywhere). The 5-orders-of-magnitude training loss drop is the signature of the network finding this degenerate optimum. Weight tuning doesn't fix shape degeneracy; the loss formulation itself is broken at the boundary. The diagnostic confirmation (per-bin `P_F_pred` distribution vs `P_F_truth`) is a 5-min host eval; ran as part of this verdict.
+
+  **Verdict**: FAIL per pre-committed criterion (PI Tier-1 spec, this session §7 entry). The §4.1 #1 saturation-aware loss family does NOT close the P_F gap at minimal-intervention strength. Mechanism (c) from [D-39] remains positively identified but unaddressed.
+
+  **Tier-2 (P1-P4 × 50k) CANCELLED.** Cost saved ~$4-6 / ~6.6 GPU-hr / ~1h37m wall. Cost discipline: stop on falsification.
+
+  **Redirect**: promote §4.1 #2 (FGPA-tail regularizer) to next-up. Per-pixel τ-vs-Δ constraint is structurally immune to the integrated-statistic degeneracy that broke #1. §4.1 #3 (velocity-gradient conditioning) remains queued. **No interim "#1 at lower weight" retry** — Hypothesis C says the loss shape is degenerate; weight tuning doesn't fix shape degeneracy.
+
+  **Paper**: §4.1 rewrites to brief negative-result paragraph with #2 promoted to #1. Latex-author dispatched this session. Negative-result framing: "A saturation-aware P_F band loss was tested as the highest-a-priori-leverage intervention. On P1 at the smoke-survey schedule, the band-integrated relative-residual term descended to 7e-6 in training but eval P_F worsened by 37% and KS gate broke. The integrated-residual formulation admits trivial constant-prediction solutions, motivating the per-pixel FGPA-tail constraint." Cite [D-40].
+
+  **Artifacts**: `cloud_runs/sat-aware-smoke-step10k.pt` (checkpoint); `cloud_runs/eval-partial-87dcf9e6/87dcf9e63564465489f770266fcec197_partial/{flux_pdf,pf_compare}.png` (gate figures). [D-40] τ-binned diagnostic owed: confirm Hypothesis C by checking per-bin P_F_pred is constant/collapsed vs P_F_truth structure.
+
+  **References**: [D-13], [D-19], [D-37], [D-39] (Addenda 3-5). PI Tier-1 spec (this session). Per [D-37] honest-reporting: this is a negative result, recorded as such — not spun.
 ---
 
 ## 4. The Data (Lineage & Governance)
