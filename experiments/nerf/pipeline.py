@@ -96,7 +96,7 @@ def parse_args(argv=None):
                         "sensitivity test at tau_max in {5, 10, 20}; this "
                         "flag exposes the cap as a CLI override so the "
                         "sweep can run without rebuilding the image. If the "
-                        "sensitivity test exceeds 2% in the [D-13] inertial "
+                        "sensitivity test exceeds 2%% in the [D-13] inertial "
                         "range, the cap is re-pinned with the measured anchor.")
     p.add_argument("--disable_dla_mask", action="store_true",
                    help="[ablation S5/S7] Force the [D-24] saturated-absorber "
@@ -107,6 +107,39 @@ def parse_args(argv=None):
                         "The [D-21] two-pass gradient identity holds "
                         "regardless because the same mask tensor is reused "
                         "in Pass 1 and Pass 2 by construction.")
+
+    # [D-39] saturation-aware P_F loss components ----------------------------
+    # All three default to OFF (preserves cost-survey / pub-t1 byte-identical
+    # behavior). They add ADDITIVELY on top of the [D-24] log1p data loss +
+    # [D-11] mean-F soft constraint; they do NOT modify the [D-21] two-pass
+    # mean-F gradient identity. See LEDGER §3 [D-39] Addendum 4 for the
+    # mechanism-(c) saturation-regime hypothesis these flags are designed to
+    # test, and ``paper_cvpr/sec/4_next_steps.tex`` §4.1 #1 for the PI design
+    # spec these flags implement.
+    p.add_argument("--sat_band_weight", type=float, default=1.0,
+                   help="[D-39] saturation-band data-MSE up-weight. Bins with "
+                        "F_gt in [0.05, 0.30] (truth flux, computed once, "
+                        "static under training) get this multiplicative weight "
+                        "in the [D-24] log1p MSE; linear-regime bins keep "
+                        "weight 1.0. Default 1.0 = OFF (uniform weights).")
+    p.add_argument("--rank_order_weight", type=float, default=0.0,
+                   help="[D-39] saturation-band rank-order penalty weight. "
+                        "Adds a pairwise-margin Spearman surrogate over "
+                        "saturation-band bins per sightline (see "
+                        "_sat_band_rank_loss). Default 0.0 = OFF.")
+    p.add_argument("--rank_order_pairs", type=int, default=64,
+                   help="Random pairs per sightline for the rank-order term. "
+                        "Higher = lower variance estimator; 64 is the smoke "
+                        "default, 256 is the per-sightline-saturated "
+                        "publication default.")
+    p.add_argument("--pf_loss_weight", type=float, default=0.0,
+                   help="[D-39] band-integrated P_F-residual weight. "
+                        "Adds mean_sightlines ((P_F_pred - P_F_truth)/P_F_truth)^2 "
+                        "evaluated on the inertial band k_|| in "
+                        "[10^-2.5, 10^-1.5] s/km (Walther+ 2018 convention; "
+                        "see src/analysis/flux_power_torch.py). The truth-side "
+                        "PSD is cached once at startup since the GT flux is "
+                        "static. Default 0.0 = OFF.")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
@@ -143,6 +176,102 @@ def build_lr_lambda(warmup_steps: int, max_steps: int,
         return min_ratio + (1.0 - min_ratio) * cosine
 
     return lr_lambda
+
+
+# ---------------------------------------------------------------------------
+# [D-39] saturation-aware loss helpers
+# ---------------------------------------------------------------------------
+
+def _sat_band_rank_loss(
+    tau_pred,
+    tau_gt,
+    sat_mask,
+    *,
+    n_pairs,
+    generator=None,
+):
+    """Pairwise-margin rank-order penalty over saturation-band bins.
+
+    For each sightline we sample ``n_pairs`` index pairs from the bins flagged
+    in ``sat_mask`` and penalize pairs whose predicted ordering disagrees with
+    the truth ordering:
+
+        L_pair = mean_pairs( relu( -(tau_pred_i - tau_pred_j)
+                                   * sign(tau_gt_i  - tau_gt_j) ) )
+
+    This is the pairwise-margin surrogate to Spearman's $\\rho$ — it is
+    differentiable in ``tau_pred`` (the only learnable side) and has no
+    ``argsort`` / soft-rank approximation knobs. Pairs whose GT values are
+    equal contribute zero gradient (``sign = 0``) so the loss is well-defined
+    even when the band collapses.
+
+    Sightlines with fewer than 2 saturation-band bins contribute zero (their
+    rank order is structurally undefined). The reduction is a mean over the
+    valid sightlines so the loss scale is independent of how saturated the
+    microbatch happens to be.
+
+    Parameters
+    ----------
+    tau_pred, tau_gt : (n_rays, n_bins) tensor
+        Predicted and truth optical depths. ``tau_pred`` must carry autograd.
+    sat_mask : (n_rays, n_bins) bool tensor
+        True wherever a bin is in the saturation band AND not DLA-cored
+        (caller combines ``F_gt in [0.05, 0.30]`` with ``mask_no_dla``).
+    n_pairs : int
+        Random pairs per sightline.
+    generator : torch.Generator, optional
+        RNG for the pair sampling. Pass the run's generator for determinism.
+
+    Returns
+    -------
+    loss : (,) tensor
+        Scalar loss; zero (with autograd-compatible gradient zero) if no
+        sightline has >=2 saturation-band bins.
+    """
+    n_rays, n_bins = tau_pred.shape
+    device = tau_pred.device
+
+    # Per-sightline saturation-band counts; sightlines with <2 are skipped.
+    counts = sat_mask.sum(dim=1)  # (n_rays,)
+    valid = counts >= 2
+    if not bool(valid.any()):
+        # Anchor to the autograd graph so backward() is well-defined.
+        return tau_pred.sum() * 0.0
+
+    # We sample pairs from the entire (n_bins,) index range and then mask
+    # pairs where either endpoint is not in the saturation band. This avoids
+    # the variable-length per-sightline indexing that would otherwise need a
+    # Python loop. With n_pairs >> 1 and band fraction f, the expected useful
+    # pairs per sightline is n_pairs * f^2.
+    i_idx = torch.randint(
+        0, n_bins, (n_rays, n_pairs), generator=generator, device=device
+    )
+    j_idx = torch.randint(
+        0, n_bins, (n_rays, n_pairs), generator=generator, device=device
+    )
+
+    # Gather both endpoints, autograd-preserving on tau_pred.
+    tp_i = torch.gather(tau_pred, 1, i_idx)
+    tp_j = torch.gather(tau_pred, 1, j_idx)
+    tg_i = torch.gather(tau_gt, 1, i_idx)
+    tg_j = torch.gather(tau_gt, 1, j_idx)
+    in_band_i = torch.gather(sat_mask, 1, i_idx)
+    in_band_j = torch.gather(sat_mask, 1, j_idx)
+
+    pair_mask = in_band_i & in_band_j & (i_idx != j_idx)  # (n_rays, n_pairs)
+    sign_gt = torch.sign(tg_i - tg_j)  # 0 when tied
+    diff_pred = tp_i - tp_j
+
+    # Margin: positive when prediction disagrees with truth ordering.
+    margin = torch.relu(-diff_pred * sign_gt)
+
+    # Mask invalid pairs to zero (so they contribute neither magnitude nor
+    # gradient). Reduce over (rays, pairs) jointly with a denominator that
+    # counts only the valid pairs (clamped to avoid 0/0).
+    pair_weight = pair_mask.to(margin.dtype) * (sign_gt != 0).to(margin.dtype)
+    total = (margin * pair_weight).sum()
+    denom = pair_weight.sum().clamp(min=1.0)
+    return total / denom
 
 
 def load_dataset(args):
@@ -292,6 +421,66 @@ def train(args):
     n_rays_actual = coords.shape[0]
     n_bins = coords.shape[1]
 
+    # [D-39] saturation-aware loss precomputes ----------------------------
+    # All three new components key off the truth-side flux F_gt = exp(-tau_gt).
+    # Using the *truth* flux (not the moving prediction) for the saturation
+    # band keeps the per-bin pixel weight schedule static across training,
+    # which is what the PI spec calls for and what keeps the [D-21] two-pass
+    # mean-F gradient identity intact (the schedule does not depend on
+    # tau_pred). The truth-side P_F is also static, so we cache it once.
+    tau_gt_for_band = tau_gt_profile.clamp_max(args.tau_max)
+    F_gt_profile = torch.exp(-tau_gt_for_band)  # (n_rays_actual, n_bins)
+    sat_band_profile = (
+        (F_gt_profile > 0.05) & (F_gt_profile < 0.30) & mask_no_dla_profile
+    )
+    sat_band_active = (
+        args.sat_band_weight != 1.0 or args.rank_order_weight > 0.0
+    )
+    n_sat_total = int(sat_band_profile.sum().item())
+    n_mask_total = int(mask_no_dla_profile.sum().item())
+    print(
+        f"[D-39] saturation band: {n_sat_total}/{n_mask_total} non-DLA bins "
+        f"in F_gt in (0.05, 0.30) "
+        f"({100.0 * n_sat_total / max(1, n_mask_total):.3f}%).",
+        flush=True,
+    )
+
+    # Truth-side P_F band-mean cache (only when --pf_loss_weight > 0).
+    # Static across training. We compute it once with the autograd-free Torch
+    # path so the cache is on the right device and shares the FFT convention
+    # with the prediction-side P_F.
+    P_F_truth_band = None
+    if args.pf_loss_weight > 0.0:
+        from src.analysis.flux_power_torch import (
+            compute_p_flux_torch, band_mean_inertial,
+        )
+        with torch.no_grad():
+            dv_kms = float((vel_axis[1] - vel_axis[0]).item())
+            k_axis_cached, psd_truth = compute_p_flux_torch(
+                F_gt_profile, dv_kms,
+            )
+            P_F_truth_band = band_mean_inertial(psd_truth, k_axis_cached)
+        # Sanity guard: a zero P_F bin would NaN-blow the relative residual.
+        # In practice the [D-13] inertial band is well-populated, but we
+        # surface this here rather than mid-loop.
+        if not bool(torch.isfinite(P_F_truth_band).all()):
+            raise RuntimeError(
+                "[D-39] P_F truth-side cache is not finite; cannot use as "
+                "denominator. Inspect tau_gt / vel_axis."
+            )
+        if bool((P_F_truth_band <= 0.0).any()):
+            raise RuntimeError(
+                "[D-39] P_F truth-side cache has non-positive entries; "
+                "relative residual is undefined."
+            )
+        print(
+            f"[D-39] P_F truth-side cache: n_rays={P_F_truth_band.shape[0]} "
+            f"P_F_truth_band mean={P_F_truth_band.mean().item():.4e} "
+            f"min={P_F_truth_band.min().item():.4e} "
+            f"max={P_F_truth_band.max().item():.4e} s/km",
+            flush=True,
+        )
+
     # Model ---------------------------------------------------------------
     model = IGMNeRF(hidden_dim=256, num_layers=8, L=10).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
@@ -375,12 +564,23 @@ def train(args):
                     "tau_amp_prior_weight": tau_amp_prior_weight,
                     "tau_max": args.tau_max,
                     "disable_dla_mask": args.disable_dla_mask,
+                    "sat_band_weight": args.sat_band_weight,
+                    "rank_order_weight": args.rank_order_weight,
+                    "rank_order_pairs": args.rank_order_pairs,
+                    "pf_loss_weight": args.pf_loss_weight,
                     "loss_form": (
                         ("log1p_mse_capped" if args.tau_max < 1e8 else "log1p_mse_uncapped")
                         + ("_masked" if not args.disable_dla_mask else "_unmasked")
                         + " + meanF_soft"
                         + ("_masked" if not args.disable_dla_mask else "_unmasked")
                         + (" + log_tau_amp_prior" if args.use_log_prior else "")
+                        + (f" + sat_band(w={args.sat_band_weight})"
+                           if args.sat_band_weight != 1.0 else "")
+                        + (f" + rank_order(w={args.rank_order_weight},"
+                           f"p={args.rank_order_pairs})"
+                           if args.rank_order_weight > 0.0 else "")
+                        + (f" + pf_band(w={args.pf_loss_weight})"
+                           if args.pf_loss_weight > 0.0 else "")
                     ),
                 })
 
@@ -389,6 +589,14 @@ def train(args):
         print(f"Run id: {active_run_id}", flush=True)
         print(f"Model: {sum(p.numel() for p in model.parameters())} params + "
               f"log_tau_amp scalar.")
+
+        # [D-39] rank-order pair-sampling RNG. Seeded off args.seed so the
+        # sequence is deterministic per (seed, step). Lives on the training
+        # device so the randint calls match the data tensors.
+        rank_rng = None
+        if args.rank_order_weight > 0.0:
+            rank_rng = torch.Generator(device=device)
+            rank_rng.manual_seed(args.seed + 9173)
 
         # Helper: produce iterable of (start, end) microbatch slices.
         def microbatch_slices():
@@ -456,6 +664,9 @@ def train(args):
             TAU_MAX = args.tau_max
 
             data_loss_chunks = []
+            sat_band_loss_chunks = []
+            rank_order_loss_chunks = []
+            pf_loss_chunks = []
             for chunk_i, (s, e) in enumerate(microbatch_slices()):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
                 # is local to this microbatch's backward pass. Without this,
@@ -479,19 +690,93 @@ def train(args):
                 mask_mb = mask_no_dla_profile[s:e]   # True = include
                 diff = torch.log1p(tau_pred_eff) - torch.log1p(tau_gt_eff)
                 diff_sq = diff * diff
+
+                # ---- [D-39] saturation-band up-weighting ----
+                # Per-bin weight = 1.0 (linear regime) + (w - 1.0) * sat_mask
+                # so when --sat_band_weight=1.0 the schedule reduces exactly
+                # to the existing uniform-mask form (backward-compatible).
+                # The schedule depends only on truth-side flux (cached at
+                # startup), so it does NOT introduce any tau_pred dependence
+                # in the weights -> [D-21] mean-F identity is unaffected.
+                sat_mask_mb = sat_band_profile[s:e]   # (mb, n_bins) bool
+                if args.sat_band_weight != 1.0:
+                    weight_mb = mask_mb.to(diff_sq.dtype) + (
+                        args.sat_band_weight - 1.0
+                    ) * sat_mask_mb.to(diff_sq.dtype)
+                else:
+                    weight_mb = mask_mb.to(diff_sq.dtype)
                 loss_data_mb = (
-                    (diff_sq * mask_mb).sum() / mask_mb.sum().clamp(min=1)
+                    (diff_sq * weight_mb).sum() / weight_mb.sum().clamp(min=1.0)
                 )
 
-                # ---- [D-24] mean-F surrogate: same masked reduction. ----
+                # Detached, per-chunk saturation-band-only MSE for logging
+                # (always computed for diagnosis; not added to the loss
+                # unless sat_band_weight != 1.0, in which case its
+                # contribution is already inside loss_data_mb).
+                if sat_band_active:
+                    sat_w = sat_mask_mb.to(diff_sq.dtype)
+                    sat_band_loss_chunks.append(
+                        (
+                            (diff_sq.detach() * sat_w).sum()
+                            / sat_w.sum().clamp(min=1.0)
+                        )
+                    )
+
+                # ---- [D-24] mean-F surrogate: same uniform mask. ----
                 # Mask is constant per microbatch (data attribute, not a
                 # function of tau_pred), so the [D-21] gradient identity
                 # ∂L_meanF/∂θ = 2 λ_F (F_cycle - F_obs) · ∂F_cycle/∂θ
-                # still holds — F_cycle is now the masked cycle mean.
+                # still holds — F_cycle is the masked cycle mean using the
+                # ORIGINAL DLA mask (NOT the saturation-band up-weighted
+                # one). The sat-band weighting belongs to the data term
+                # only; the mean-F anchor remains the uniform Lyα <F>.
                 F_pred_mb = torch.exp(-tau_pred_mb)
                 mean_F_mb = (F_pred_mb * mask_mb).sum() / mask_mb.sum().clamp(min=1)
 
                 loss_mb = loss_data_mb + mean_F_grad_coef * mean_F_mb
+
+                # ---- [D-39] rank-order penalty in the saturation band ----
+                # Pairwise-margin Spearman surrogate; see _sat_band_rank_loss.
+                # Skip the call entirely when the weight is 0 to avoid the
+                # ~O(n_mb * n_pairs) gather overhead in the OFF default path.
+                if args.rank_order_weight > 0.0:
+                    loss_rank_mb = _sat_band_rank_loss(
+                        tau_pred_mb,
+                        tau_gt_profile[s:e],
+                        sat_mask_mb,
+                        n_pairs=args.rank_order_pairs,
+                        generator=rank_rng,
+                    )
+                    loss_mb = loss_mb + args.rank_order_weight * loss_rank_mb
+                    rank_order_loss_chunks.append(loss_rank_mb.detach())
+
+                # ---- [D-39] band-integrated P_F residual ----
+                # Path: tau_pred -> F_pred = exp(-tau_pred)
+                #       -> torch.fft.rfft on the Hann-windowed contrast
+                #       -> |.|^2 PSD -> mean over inertial-band k bins
+                #       -> ((P_F_pred - P_F_truth) / P_F_truth)^2 mean over rays.
+                # The whole path is autograd-live; the rfft node sits
+                # downstream of the renderer's tau_pred so backward through
+                # the FFT just adds to the existing tau_pred gradient. The
+                # [D-21] mean-F identity is unaffected because this term
+                # does not touch mean_F_grad_coef.
+                if args.pf_loss_weight > 0.0:
+                    from src.analysis.flux_power_torch import (
+                        compute_p_flux_torch, band_mean_inertial,
+                    )
+                    dv_kms = float((vel_axis[1] - vel_axis[0]).item())
+                    k_ax_mb, psd_pred_mb = compute_p_flux_torch(
+                        F_pred_mb, dv_kms,
+                    )
+                    P_pred_band_mb = band_mean_inertial(psd_pred_mb, k_ax_mb)
+                    P_truth_band_mb = P_F_truth_band[s:e]
+                    rel_residual = (
+                        (P_pred_band_mb - P_truth_band_mb) / P_truth_band_mb
+                    )
+                    loss_pf_mb = (rel_residual ** 2).mean()
+                    loss_mb = loss_mb + args.pf_loss_weight * loss_pf_mb
+                    pf_loss_chunks.append(loss_pf_mb.detach())
+
                 if chunk_i == 0 and args.use_log_prior:
                     loss_prior_term = (
                         tau_amp_prior_weight
@@ -518,18 +803,48 @@ def train(args):
 
             # Per-step metrics (post-accumulation) -----------------------
             loss_data = torch.stack(data_loss_chunks).mean().item()
+            # [D-39] component diagnostics: per-chunk means -> step mean.
+            # NaN-safe defaults when the component is OFF this run.
+            loss_sat_band_val = (
+                torch.stack(sat_band_loss_chunks).mean().item()
+                if sat_band_loss_chunks else 0.0
+            )
+            loss_rank_order_val = (
+                torch.stack(rank_order_loss_chunks).mean().item()
+                if rank_order_loss_chunks else 0.0
+            )
+            loss_pf_band_val = (
+                torch.stack(pf_loss_chunks).mean().item()
+                if pf_loss_chunks else 0.0
+            )
             loss_total = loss_data + loss_meanF_val + (
                 tau_amp_prior_weight * loss_prior.item() if args.use_log_prior else 0.0
+            )
+            # Add the [D-39] components' weighted contribution to the printed
+            # total. loss_data already absorbs the saturation-band weighting
+            # (in-place re-weight of the per-bin schedule); the rank-order and
+            # P_F terms enter additively with their CLI weights.
+            loss_total = (
+                loss_total
+                + args.rank_order_weight * loss_rank_order_val
+                + args.pf_loss_weight * loss_pf_band_val
             )
             grad_norm = model.out_layer.weight.grad.norm().item() \
                 if model.out_layer.weight.grad is not None else 0.0
             cur_lr = scheduler.get_last_lr()[0]
 
             if step <= 10 or step % 50 == 0 or step == args.max_steps:
+                extras = ""
+                if sat_band_active:
+                    extras += f" satMSE={loss_sat_band_val:.4f}"
+                if args.rank_order_weight > 0.0:
+                    extras += f" rank={loss_rank_order_val:.4e}"
+                if args.pf_loss_weight > 0.0:
+                    extras += f" pf={loss_pf_band_val:.4e}"
                 print(
                     f"Step {step}/{args.max_steps} | loss={loss_total:.4f} "
                     f"(data={loss_data:.4f}, meanF={loss_meanF_val:.4e}, "
-                    f"prior={loss_prior.item():.4f}) | "
+                    f"prior={loss_prior.item():.4f}){extras} | "
                     f"<F>={mean_F_pred_val:.4f} | grad={grad_norm:.4f} | "
                     f"clip={grad_norm_clip:.3f} | lr={cur_lr:.2e} | "
                     f"tau_amp={tau_amp.item():.4f}",
@@ -548,6 +863,15 @@ def train(args):
                 mlflow.log_metric("lr", cur_lr, step=step)
                 if args.use_log_prior:
                     mlflow.log_metric("loss_prior", loss_prior.item(), step=step)
+                # [D-39] component-level metrics. Only logged when the
+                # respective component is active so we don't pollute the
+                # baseline-run MLflow scalar set.
+                if sat_band_active:
+                    mlflow.log_metric("loss_sat_band", loss_sat_band_val, step=step)
+                if args.rank_order_weight > 0.0:
+                    mlflow.log_metric("loss_rank_order", loss_rank_order_val, step=step)
+                if args.pf_loss_weight > 0.0:
+                    mlflow.log_metric("loss_pf_band", loss_pf_band_val, step=step)
 
             # Checkpoint ---------------------------------------------------
             if (args.checkpoint_interval > 0

@@ -407,6 +407,38 @@ graph TD
   **Successor ranking unchanged**: (1) saturation-aware P_F loss up-weighting F ∈ [0.05, 0.30] with per-sightline τ rank-order preservation in-band, (2) FGPA-tail regularizer, (3) velocity-gradient conditioning. **Cross-physics R-uniformity strengthens #1 priority**: a physics-invariant re-weighting scheme is the cleanest counterfactual.
 
   **Artifacts**: `experiments/nerf/artifacts/eval/tau_binned/{p1,p2,p3,p4}_residual.{json,png}`, `all_residual.png`. Driver: `scripts/tau_binned_residual.py`.
+
+  **Addendum 5 — Saturation-aware P_F loss term implementation (counterfactual; not yet trained) (2026-05-10).** PI §4.1 #1 successor work landed as code; ready for a real training run.
+
+  **Code:**
+  - `experiments/nerf/pipeline.py`: 4 new CLI flags, all default-OFF (backward-compatible with cost-survey + pub-t1 reproducibility):
+    - `--sat_band_weight FLOAT` (default 1.0) — per-bin multiplicative weight on saturation-band (F_gt ∈ (0.05, 0.30)) bins in the [D-24] log1p data MSE.
+    - `--rank_order_weight FLOAT` (default 0.0) — weight on the pairwise-margin Spearman surrogate over sat-band bins.
+    - `--rank_order_pairs INT` (default 64) — random pairs per sightline (NOTE: production should use 256 or 512; 64 is too sparse for ~0.3% sat-band fraction).
+    - `--pf_loss_weight FLOAT` (default 0.0) — weight on band-integrated relative P_F residual over [D-13] inertial range.
+  - `src/analysis/flux_power_torch.py` (new): differentiable Torch mirror of `src/analysis/p_flux.py`. **NumPy-vs-Torch parity verified**: max relative diff = 1.1e-15 on a synthetic 32×1024 sightline field.
+  - Truth-side `P_F_truth_band` cached once at startup (static across training; saves O(n_steps × n_rays) FFTs).
+  - Pairwise-margin chosen over soft-Spearman: no temperature knob, gradient flows through `tp_i - tp_j` directly, handles tied GT and degenerate sightlines without ε-regularizers.
+  - The [D-21] mean-F two-pass gradient identity is preserved: per-bin weights depend only on truth flux (not tau_pred); mean-F surrogate keeps the uniform DLA mask.
+
+  **50-step gradient-flow smoke** (P1, n_rays=64, microbatch=32, sat_band_weight=3.0, rank_order_weight=0.1, pf_loss_weight=1.0; MLflow run-id `ea2eec2567704d05b860d3500ddbb6d1`):
+
+  | Step | loss_total | loss_data | loss_sat_band | loss_rank_order | loss_pf_band | grad_norm |
+  |------|------------|-----------|---------------|-----------------|---------------|-----------|
+  | 1    | 1.0205     | 0.0272    | 0.8701        | 0.0             | 0.9932        | 0.087     |
+  | 25   | ~0.5–1.0   | ~0.027    | ~0.87         | 0.0             | ~0.5–1.0      | 0.4–0.5   |
+  | 50   | 0.3044     | 0.0278    | 0.8802        | 0.0             | **0.2766**    | 0.061     |
+
+  - **No NaN in any component across 50 steps** ✅
+  - **`loss_pf_band` descending 72%** (0.9932 → 0.2766) — the new term is doing real gradient work
+  - **`loss_rank_order` stuck at 0.0** — at 64 random pairs/sightline × 0.3% sat-band fraction, only ~0.04 useful pairs per microbatch on average. Implementation is correct; production should use `--rank_order_pairs 256+`.
+  - `loss_data` byte-equivalent with weight=1.0 default verified (smoke ran with 3.0; defaults preserve cost-survey trajectory exactly per [D-21] identity)
+
+  **Open follow-ups:**
+  - Real training run on a cost-survey-equivalent schedule (n_rays=64, max_steps=50000, all 4 physics) with the saturation-aware bundle ON; compare P_F residual vs the pub-t1 baseline. **If P_F closes, the strict (c)-is-the-cause claim becomes publishable AND T4 conditionally unlocks.**
+  - Driver smoke + parity: `scripts/make_pf_overlay_fig.py` (figure complement) also landed this session; figure at `paper_cvpr/figures/pf_overlay_falsification.png` discharges the §3.5 `\todo{}`.
+
+  **References:** [D-13], [D-19], [D-21], [D-24], [D-35], [D-37], [D-39]. PI §4.1 #1 (the design spec).
 ---
 
 ## 4. The Data (Lineage & Governance)
