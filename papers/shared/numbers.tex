@@ -2,14 +2,336 @@
 % Canonical numerical chokepoint per [D-45] master-source architecture.
 %
 % Rule (per [D-45]): result-claim sentences in papers/shared/sec/*.tex
-% should cite \newcommand{}s defined here rather than bare numerals,
+% MUST cite \newcommand{}s defined here rather than bare numerals,
 % so that a single update propagates across all venue manifests.
+% This is strong convention; not CI-enforced.
 %
-% This file is currently empty. The numbers.tex bootstrap sprint
-% will populate it with macros for the [D-44] bootstrap values,
-% the τ-binned R range, the P_F failure range, etc. See
-% experiments/nerf/LEDGER.md §3 [D-45] for the full schema spec.
+% Source-of-truth order (binding, per [D-45]):
+%   LEDGER decisions/numbers  ->  THIS FILE (canonical LaTeX numerics)
+%   ->  papers/shared/sec/*.tex (canonical prose)
+%   ->  papers/<venue>/main.tex (venue manifest)
 %
-% Until populated, atoms continue to use inline numerals;
-% this file's existence is the architectural seed, not the
-% finished chokepoint.
+% ----------------------------------------------------------------------
+% SCHEMA (naming convention)
+% ----------------------------------------------------------------------
+% All macros use a hierarchical CamelCase scheme:
+%
+%   \<Statistic><Aggregator><Cell>
+%
+%   <Statistic>  = PF | KS | meanF | tauamp | Rsat | rrhoLog | meanFspread | ...
+%   <Aggregator> = Bootstrap{Mean,Std,QLo,QHi} | SeedFortyTwo | (omit if single-value)
+%   <Cell>       = Pone | Ptwo | Pthree | Pfour  (per-physics)
+%                | (omit for cross-physics or single-cell quantities)
+%                | Range / Lo / Hi for inclusive ranges
+%
+% Examples:
+%   \KSBootstrapMeanPone        = 0.0357   (P1 KS bootstrap mean, [D-44])
+%   \KSBootstrapStdPone         = 0.0024   (P1 KS bootstrap 1-sigma)
+%   \KSBootstrapQHiPtwo         = 0.0758   (P2 KS q84 upper)
+%   \PFresidPone                = 0.4155   (P1 P_F residual, seed=42 anchor)
+%   \PFresidLo / \PFresidHi     = 0.3591 / 0.4155 (cross-physics range)
+%   \meanFseedFortyTwoPone      = 0.97895  (P1 mean_F at seed=42 single-seed)
+%   \RsatPone                   = 18.87    (P1 saturation-band R)
+%
+% Where a number has both seed=42 single-seed and 5-seed bootstrap forms
+% the macro carries the aggregator explicitly. Seed=42 anchor values are
+% load-bearing for tab:pub-t1-gates (the seed=42 anchor table). [D-44]
+% bootstrap values are load-bearing for tab:headline-3gate.
+%
+% Constants (gate thresholds, observational anchors) are prefixed Gate or
+% Anchor for legibility, e.g. \GateKS, \GatePF, \AnchorMeanF.
+%
+% Derived quantities (computed from primary values, e.g. cross-physics
+% spread = 0.0064/0.9282 = 0.69%) are stored as their final rendered
+% value to avoid \fpeval fragility; comments cite the derivation.
+%
+% Numbers in tab:pub-t1-gates are pinned to the seed=42 anchor by design
+% ([D-44] explicit scope: P_F single-seed, KS/meanF reported bootstrap).
+% Macro names carry the SeedFortyTwo qualifier where this matters.
+% ----------------------------------------------------------------------
+
+% ====================================================================
+% CONSTANTS: gate thresholds and observational anchors
+% ====================================================================
+% [D-13] structure gate thresholds
+\newcommand{\GatePF}{10\%}                          % P_F inertial-range residual gate
+\newcommand{\GatePFdec}{0.10}                       % decimal form
+\newcommand{\GateKS}{0.05}                          % KS distance gate (flux PDF)
+\newcommand{\GateXi}{0.6}                           % xi_{rho,rho}(2 Mpc/h) reconstruction bar
+\newcommand{\GateRsatFloor}{1.5}                    % positive-ID floor (tau-binned R, [D-39] Add. 4)
+
+% [D-11]/[D-34] Kirkman+2007 mean-flux anchor at z=0.3
+\newcommand{\AnchorMeanF}{0.979}                    % central value
+\newcommand{\AnchorMeanFsigma}{0.005}               % 1-sigma uncertainty
+\newcommand{\AnchorMeanFLo}{0.974}                  % anchor band lower
+\newcommand{\AnchorMeanFHi}{0.984}                  % anchor band upper
+
+% Inertial range definition for P_F (decadal logs, s/km units)
+\newcommand{\PFkLoExp}{-2.5}
+\newcommand{\PFkHiExp}{-1.5}
+
+% Saturation band for tau-binned decomposition ([D-24] partition, bin 7)
+\newcommand{\SatBandLo}{0.05}
+\newcommand{\SatBandHi}{0.30}
+
+% Flux-PDF KS analysis window
+\newcommand{\PDFwinLo}{0.05}
+\newcommand{\PDFwinHi}{0.95}
+
+% ====================================================================
+% [D-44] BOOTSTRAP RESULTS (5-seed sightline-level, K=512, mean +/- sigma)
+%   Artefact: experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json
+%   Anti-degeneracy F1/F2 PASS.
+% ====================================================================
+
+% KS distance (bootstrap mean +/- sigma; q16/q84)
+\newcommand{\KSBootstrapMeanPone}{0.0357}
+\newcommand{\KSBootstrapStdPone}{0.0024}
+\newcommand{\KSBootstrapQLoPone}{0.0339}
+\newcommand{\KSBootstrapQHiPone}{0.0372}
+
+\newcommand{\KSBootstrapMeanPtwo}{0.0677}
+\newcommand{\KSBootstrapStdPtwo}{0.0110}
+\newcommand{\KSBootstrapQLoPtwo}{0.0603}
+\newcommand{\KSBootstrapQHiPtwo}{0.0758}              % >0.05, P2 KS breach at q84
+
+\newcommand{\KSBootstrapMeanPthree}{0.0353}
+\newcommand{\KSBootstrapStdPthree}{0.0062}
+\newcommand{\KSBootstrapQLoPthree}{0.0298}
+\newcommand{\KSBootstrapQHiPthree}{0.0410}
+
+\newcommand{\KSBootstrapMeanPfour}{0.0411}
+\newcommand{\KSBootstrapStdPfour}{0.0039}
+\newcommand{\KSBootstrapQLoPfour}{0.0369}
+\newcommand{\KSBootstrapQHiPfour}{0.0441}
+
+% Mean predicted flux (bootstrap; q16/q84)
+\newcommand{\meanFBootstrapMeanPone}{0.9671}
+\newcommand{\meanFBootstrapStdPone}{0.0018}
+\newcommand{\meanFBootstrapQLoPone}{0.9658}
+\newcommand{\meanFBootstrapQHiPone}{0.9690}
+
+\newcommand{\meanFBootstrapMeanPtwo}{0.9703}
+\newcommand{\meanFBootstrapStdPtwo}{0.0023}
+\newcommand{\meanFBootstrapQLoPtwo}{0.9687}
+\newcommand{\meanFBootstrapQHiPtwo}{0.9724}
+
+\newcommand{\meanFBootstrapMeanPthree}{0.9724}
+\newcommand{\meanFBootstrapStdPthree}{0.0024}
+\newcommand{\meanFBootstrapQLoPthree}{0.9709}
+\newcommand{\meanFBootstrapQHiPthree}{0.9742}        % marginal-overlap of anchor at q84
+
+\newcommand{\meanFBootstrapMeanPfour}{0.9735}
+\newcommand{\meanFBootstrapStdPfour}{0.0009}
+\newcommand{\meanFBootstrapQLoPfour}{0.9727}
+\newcommand{\meanFBootstrapQHiPfour}{0.9743}         % marginal-overlap of anchor at q84
+
+% Bootstrap-mean cross-physics spread (mean_F population range)
+\newcommand{\meanFBootstrapRangeLo}{0.9671}          % P1 bootstrap mean
+\newcommand{\meanFBootstrapRangeHi}{0.9735}          % P4 bootstrap mean
+\newcommand{\meanFBootstrapSpread}{0.66\%}           % (0.9735-0.9671)/0.9703 = 0.66%
+
+% Bootstrap-vs-seed=42 divergence ([D-44] Addendum 1 symmetric-honesty disclosure)
+\newcommand{\meanFseedDeviationPone}{-6.6\sigma}
+\newcommand{\meanFseedDeviationPtwo}{-2.2\sigma}
+\newcommand{\meanFseedDeviationPthree}{-2.4\sigma}
+\newcommand{\meanFseedDeviationPfour}{-8.9\sigma}
+\newcommand{\meanFseedDeviationRangeLo}{2}            % "2-9 sigma" range
+\newcommand{\meanFseedDeviationRangeHi}{9}
+
+% Bootstrap K (resamples per cell)
+\newcommand{\BootstrapK}{512}
+
+% ====================================================================
+% [D-39] PUB-T1 SEED=42 ANCHOR (single-seed; tab:pub-t1-gates load-bearing)
+%   Configuration: pub-t1, n_rays=64, max_steps=50,000, seed=0 (train),
+%   eval_seed=42, langle F rangle_obs = 0.979 (Kirkman+2007).
+%   MLflow runs: 31acdf9d (P1), f7fafa23 (P2), 62aeb93a (P3), fc3817b3 (P4).
+% ====================================================================
+
+% mean predicted flux (seed=42 single-seed anchor; load-bearing for tab:pub-t1-gates)
+\newcommand{\meanFseedFortyTwoPone}{0.97895}
+\newcommand{\meanFseedFortyTwoPtwo}{0.97536}
+\newcommand{\meanFseedFortyTwoPthree}{0.97819}
+\newcommand{\meanFseedFortyTwoPfour}{0.98154}
+
+% mean-flux seed=42 cross-physics range [0.974, 0.984] in pub-t1 ([D-39])
+\newcommand{\meanFseedFortyTwoRangeLo}{0.974}
+\newcommand{\meanFseedFortyTwoRangeHi}{0.984}
+\newcommand{\meanFseedFortyTwoSpread}{0.63\%}        % (0.98154-0.97536)/0.97851 = 0.63%
+
+% KS distance at seed=42 single-seed
+\newcommand{\KSseedFortyTwoPone}{0.0325}
+\newcommand{\KSseedFortyTwoPtwo}{0.0742}             % P2 breach (1.5x bar)
+\newcommand{\KSseedFortyTwoPthree}{0.0408}
+\newcommand{\KSseedFortyTwoPfour}{0.0389}
+
+% P_F inertial-range residual (single-seed, seed=42 anchor — [D-44] keeps P_F single-seed)
+\newcommand{\PFresidPone}{0.4155}
+\newcommand{\PFresidPtwo}{0.3757}
+\newcommand{\PFresidPthree}{0.3591}
+\newcommand{\PFresidPfour}{0.3613}
+
+% P_F cross-physics range and factor-over-gate
+\newcommand{\PFresidLo}{0.3591}                       % P3
+\newcommand{\PFresidHi}{0.4155}                       % P1
+\newcommand{\PFfactorOverGateLo}{3.6}                % 0.3591/0.10 ~ 3.6x
+\newcommand{\PFfactorOverGateHi}{4.2}                % 0.4155/0.10 ~ 4.2x
+\newcommand{\PFresidPercentLo}{36\%}                 % "36%-42%" framing
+\newcommand{\PFresidPercentHi}{42\%}
+\newcommand{\PFresidPonePercent}{41.55\%}            % P1 percent form for inline use
+
+% pub-t1 final log(1+tau)-MSE (decoupling finding)
+\newcommand{\dataMSEPone}{1.27\!\times\!10^{-7}}
+\newcommand{\dataMSEPtwo}{1.84\!\times\!10^{-4}}
+\newcommand{\dataMSEPthree}{4.14\!\times\!10^{-6}}
+\newcommand{\dataMSEPfour}{1.28\!\times\!10^{-5}}
+
+% pub-t1 tau_amp range and peak VRAM
+\newcommand{\tauampPubtoneRangeLo}{1.045}
+\newcommand{\tauampPubtoneRangeHi}{1.117}
+\newcommand{\peakVRAMPubtone}{2.84}                   % GB
+
+% ====================================================================
+% [D-39] Addendum 4 / [D-39] Add. 3: tau-binned residual decomposition
+%   Saturation-band concentration ratio R = (residual mass)/(pixel mass)
+%   in F in [0.05, 0.30] (bin 7).
+%   Artefact: experiments/nerf/artifacts/eval/tau_binned/all_residual.{png,json}
+% ====================================================================
+
+\newcommand{\RsatPone}{18.87}
+\newcommand{\RsatPtwo}{19.10}
+\newcommand{\RsatPthree}{20.47}
+\newcommand{\RsatPfour}{23.75}
+\newcommand{\RsatRangeLo}{18.87}
+\newcommand{\RsatRangeHi}{23.75}
+\newcommand{\RsatFactorOverFloor}{12}                % 18.87/1.5 ~ 12.5x; floor multiplier
+\newcommand{\RsatSpreadRelative}{25\%}               % cross-physics relative spread
+\newcommand{\RsatLinearBandResidual}{0.03}           % |<Delta F>| <= 0.03 in linear regime
+\newcommand{\RsatPearsonTauPone}{-0.016}             % rank collapse in saturation band, P1
+
+% ====================================================================
+% [D-39] Wrinkle-1: rescale-vs-trained falsification
+%   P_F overlay (Fig. fig:pf-overlay-falsification)
+% ====================================================================
+
+\newcommand{\PFrescaledPone}{0.2639}                  % rescaled-preview value at P1, post-fix normalization
+\newcommand{\PFrescaledPercent}{26.39\%}
+\newcommand{\PFdriftDeltaPP}{15.16}                  % pp: 41.55 - 26.39 = +15.16 pp
+\newcommand{\PFdriftRelative}{57\%}                  % (0.4155-0.2639)/0.2639 ~ 57% larger
+\newcommand{\PFhistoricalDthirtyfive}{28.25\%}       % [D-35] pre-fix historical
+\newcommand{\PFhistoricalDthirtyfiveDec}{0.2825}     % decimal form
+\newcommand{\PFconventionDriftPercent}{6.6\%}        % 28.25 -> 26.39 ~ 6.6% relative
+
+% T3 cost-survey checkpoint pre-rescale residual
+\newcommand{\PFcostsurveyPoneRaw}{31.0\%}
+\newcommand{\PFcostsurveyPoneRawDec}{0.31}
+
+% Flux PDF on cost-survey checkpoint
+\newcommand{\KScostsurveyPoneRaw}{0.553}              % broken-anchor pre-rescale
+\newcommand{\KScostsurveyPoneRescaled}{0.039}         % after rescale
+
+% ====================================================================
+% [D-33] 1D-along-ray density correlation proxy
+%   r_rho^{log} on cost-survey T3 P1 checkpoint, anchor-invariant
+% ====================================================================
+
+\newcommand{\rrhoLogProxyPone}{+0.077}
+\newcommand{\rrhoLogProxyIQRLo}{+0.010}
+\newcommand{\rrhoLogProxyIQRHi}{+0.160}
+\newcommand{\rrhoLogProxyQLoSixteen}{-0.017}
+\newcommand{\rrhoLogProxyQHiEightyfour}{+0.193}
+\newcommand{\rrhoLogProxyFracNegative}{16\%}         % fraction of sightlines with r<0
+\newcommand{\rrhoLogProxyFactorBelowBar}{8}          % ~8x below 0.6 bar
+
+% ====================================================================
+% [D-40] saturation-aware P_F band loss counterfactual (negative result)
+% ====================================================================
+
+\newcommand{\PFdfortyEval}{0.571}                     % eval P_F under sat-aware loss
+\newcommand{\PFdfortyEvalDelta}{37.4\%}              % +37.4% worse than baseline 0.4155
+\newcommand{\KSdfortyEval}{0.189}                     % broken KS gate
+
+% ====================================================================
+% Stage 2b cost-survey production-sweep cross-physics readouts
+%   Tier-2 final-state metrics; trained against broken anchor 0.877
+%   per [D-34] retraction. Absolute values uninterpretable; inter-cell
+%   spreads anchor-invariant.
+% ====================================================================
+
+\newcommand{\TtwoMeanFPone}{0.9282}
+\newcommand{\TtwoMeanFPtwo}{0.9266}
+\newcommand{\TtwoMeanFPthree}{0.9272}
+\newcommand{\TtwoMeanFPfour}{0.9302}
+\newcommand{\TtwoMeanFRangeLo}{0.9266}
+\newcommand{\TtwoMeanFRangeHi}{0.9302}
+\newcommand{\TtwoMeanFSpread}{0.39\%}
+
+\newcommand{\TtwoLossDataPone}{0.00259}
+\newcommand{\TtwoLossDataPtwo}{0.00243}
+\newcommand{\TtwoLossDataPthree}{0.00248}
+\newcommand{\TtwoLossDataPfour}{0.00280}
+\newcommand{\TtwoLossDataRangeLo}{0.00243}
+\newcommand{\TtwoLossDataRangeHi}{0.00280}
+\newcommand{\TtwoLossDataSpread}{16\%}
+
+\newcommand{\TtwoTauAmpPone}{1.0077}
+\newcommand{\TtwoTauAmpPtwo}{1.0296}
+\newcommand{\TtwoTauAmpPthree}{1.0204}
+\newcommand{\TtwoTauAmpPfour}{1.0288}
+
+\newcommand{\TtwoPeakVRAM}{11.27}                    % GB
+
+% Cost-survey micro-grid mean-flux step-200 spread
+\newcommand{\MicrogridMeanFLo}{0.9238}
+\newcommand{\MicrogridMeanFHi}{0.9302}
+\newcommand{\MicrogridMeanFSpread}{0.7\%}            % cross-physics relative
+\newcommand{\MicrogridMeanFSpreadAbs}{0.0064}        % absolute spread
+\newcommand{\MicrogridDescentRangeLo}{0.558}
+\newcommand{\MicrogridDescentRangeHi}{0.749}
+\newcommand{\MicrogridTauAmpLo}{0.9857}
+\newcommand{\MicrogridTauAmpHi}{0.9933}
+\newcommand{\MicrogridLossDataStepTwoHundredLo}{0.0115}
+\newcommand{\MicrogridLossDataStepTwoHundredHi}{0.0239}
+
+% T1 throughput anchor for tier-aware schedule
+\newcommand{\TonePerStepSec}{0.119}                  % s/step
+\newcommand{\TonePeakVRAM}{2.82}                     % GB
+
+% Per-tier peak VRAM (tab:per-tier-vram)
+\newcommand{\TonePeakVRAMcell}{2.82}
+\newcommand{\TtwoPeakVRAMcell}{11.20}
+\newcommand{\TthreePeakVRAM}{11.23}
+\newcommand{\TfourPeakVRAM}{11.77}
+\newcommand{\VRAMHeadroomPercent}{45\%}              % ">= 45% under 24 GB budget"
+
+% T3 production peak-VRAM observation
+\newcommand{\TthreePeakVRAMprod}{11.30}
+
+% ====================================================================
+% Tau_max sensitivity sweep (Sec. tau-max-sensitivity)
+% ====================================================================
+
+\newcommand{\TauMaxSensLoPercent}{0.0180\%}          % tau_max=5 vs baseline
+\newcommand{\TauMaxSensHiPercent}{0.0113\%}          % tau_max=20 vs baseline
+\newcommand{\TauMaxSensGate}{2\%}
+\newcommand{\TauMaxSensFactorUnderLo}{100}
+\newcommand{\TauMaxSensFactorUnderHi}{180}
+\newcommand{\TauMaxSensMeanF}{0.9282}                % identical across 3 runs
+
+% ====================================================================
+% Wolfe/Prochaska DLA/LLS thresholds (citation-fixed; do not edit)
+% ====================================================================
+
+\newcommand{\NHIdla}{2 \times 10^{20}}               % cm^-2, DLA boundary (Wolfe+2005)
+\newcommand{\NHIlls}{10^{17.2}}                      % cm^-2, strong-LLS (Prochaska+2010)
+\newcommand{\NHIcoreThreshold}{1.9 \times 10^{18}}   % cm^-2, our saturated-core threshold
+
+% ====================================================================
+% Compute footprint
+% ====================================================================
+
+\newcommand{\GPUHoursSpent}{62}                      % accumulated through pub-t1
+\newcommand{\GPUHoursTierFour}{792}                  % remaining T4 across 4 physics
+
+% End of canonical numerics chokepoint.
