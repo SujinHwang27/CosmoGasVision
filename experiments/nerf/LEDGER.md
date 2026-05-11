@@ -1234,3 +1234,9 @@ User directive: do everything that can be done locally so next-session is just T
 3. Dispatch the publication-class T1 + T4 runs at the corrected [D-34] anchor — this absorbs the [D-27] learning-curve sweep and the deferred T4 row of the degradation matrix.
 4. P3 cross-physics row will be filled organically by (3) when the publication-class re-train lands; no separate dispatch needed.
 5. After (3) lands, run `eval_anchor_invariance_d34.py` against the publication-class checkpoints to confirm KS gate passes (rescale evidence predicts it should at the corrected anchor + extended schedule).
+
+### **Session Snapshot: 2026-05-11 (latex-author — [D-42-meta] verb recalibration)**
+- `paper_cvpr/sec/0_abstract.tex`: replaced "headline observation is a falsification" lead with 2-of-3-gate disclosure (mean-flux 4/4 PASS, KS 3/4 PASS, P_F 0/4 FAIL); narrowed "falsification" verb to apply only to the [D-35] rescale-as-preview claim; added Hann-window dependence footnote inline; reported R on all three estimators (signed-mean / mean|·| / RMS) with the conservative RMS as the headline (≥ 4× the 1.5 floor in 4/4, not the prior >12×).
+- `paper_cvpr/sec/4_next_steps.tex` §4.1 #2 (velocity-gradient): removed "most aligned" / "addresses a different failure mode" over-confidence; rewrote as the first test of the [D-42-meta] / [D-37]-extended ground-truth-anchored anti-degeneracy discipline; acknowledged that the design may address the same saturation-band under-fitting from a different axis (the actual run decides).
+- §2 method untouched; no new figures; no FGPA-tail success claim; no Hui-Gnedin γ findings imported.
+- Propagates [D-42-meta] Convergent findings C2 + C3 to paper; Addendum 1 items 1 + 6 propagated as scope-correction footnotes in §0.

@@ -117,6 +117,54 @@ When called to draft a stage spec, deliver:
 2. The **dispatch list** with self-contained briefs for each owner agent.
 3. The **success criteria** as numeric thresholds.
 
+## [D-37]-extension discipline for design specs (added 2026-05-11 per [D-42-meta])
+
+The [D-37] honest-reporting rule applies to PI design-spec language as well as
+empirical findings. Two consecutive §4.1 #1/#2 specs (sat-aware [D-40] and
+FGPA-tail [D-41]) used "structurally immune by design" / "highest leverage" /
+"physics-invariant by design" rhetoric; both were empirically falsified by
+previously-unaudited degeneracies. The over-confident verbs primed downstream
+decisions and crowded out the hedged framing the evidence supported.
+
+**Binding rules when drafting design specs:**
+
+1. **PI design-spec assertions are hypotheses, not findings.** Use hedged verbs
+   ("candidate", "first test of", "expected on physical grounds but not yet
+   tested") until empirically verified.
+
+2. **Falsified-prior cascade.** A falsified prior of similar confidence in the
+   same track downgrades the next prior's confidence verb by one level.
+   Concretely: if §4.1 #1 (high-confidence) is falsified, §4.1 #2 cannot also
+   be presented at high-confidence — only as "highest-leverage of the remaining
+   candidates, given the §4.1 #1 falsification." If §4.1 #1 and #2 are both
+   falsified, §4.1 #3 must be hedged as "first test of [the new discipline
+   derived from the two failures]" rather than "structurally immune".
+
+3. **Anti-degeneracy audit must include a "what does this loss leave
+   unconstrained when `loss_data` is weakly informative on the diffuse-bin
+   majority?" line item.** Both [D-40] and [D-41] failures shared this
+   structural cause; any future regularizer design must answer this question
+   in advance.
+
+4. **Prior-failure ledger line in every spec.** Each design spec must include
+   a "prior similar-confidence claims falsified in this track" subsection
+   listing [D-XX] cites, so the inheriting verb level is auditable.
+
+5. **Symmetric across [D-37] anti-pattern directions.** The discipline applies
+   to both over-confident strengthening verbs (e.g., the §4.1 #1 / #2 case)
+   AND over-pessimistic self-flagellating verbs (e.g., the §0 abstract's
+   blanket "falsification" framing that under-disclosed 2-of-3 primary gate
+   closure). Honest framing in both directions.
+
+6. **Review-trail discipline (per defense-panel P4).** High-stakes decisions
+   ([D-XX] entries that gate compute, paper claims, or successor work)
+   should record their review provenance: PI-only sign-off vs defense-panel-
+   reviewed vs joint-retrospective. The [D-42-meta] retrospective applies
+   retroactively to [D-37] / [D-39] / [D-40] / [D-41] and forward, anything
+   that gates >$5 of compute or a paper-section claim requires either a
+   defense-panel review or an explicit "PI-only, deferred panel review"
+   annotation.
+
 ## References
 - Stark et al. (2015) — tomographic constraints from sparse sightlines.
 - Kerbl et al. (2023) — 3DGS adaptation considerations for non-photometric volumetric rendering.
