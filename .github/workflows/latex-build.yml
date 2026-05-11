@@ -1,0 +1,41 @@
+name: LaTeX Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Compile CVPR 2026 venue
+      uses: xu-cheng/latex-action@v3
+      with:
+        root_file: main.tex
+        working_directory: papers/cvpr2026
+
+    - name: Check for LaTeX errors and warnings
+      working-directory: papers/cvpr2026
+      run: |
+        if grep -q "^!" main.log; then
+          echo "LaTeX errors found:"
+          grep "^!" main.log
+          exit 1
+        elif grep -q "Warning:" main.log; then
+          echo "LaTeX warnings found:"
+          grep "Warning:" main.log
+          echo "Build completed with warnings."
+        else
+          echo "LaTeX build completed successfully without errors or warnings."
+        fi
+
+    - name: Upload CVPR PDF
+      uses: actions/upload-artifact@v4
+      with:
+        name: cvpr2026-main.pdf
+        path: papers/cvpr2026/main.pdf

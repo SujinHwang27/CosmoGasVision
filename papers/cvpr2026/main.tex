@@ -1,0 +1,63 @@
+% CVPR 2026 Paper Template; see https://github.com/cvpr-org/author-kit
+
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+%%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
+% \usepackage{cvpr}              % To produce the CAMERA-READY version
+\usepackage[review]{cvpr}      % To produce the REVIEW version
+% \usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
+
+% Import additional packages in the preamble file, before hyperref
+\input{preamble}
+\usepackage{graphicx}
+% Per [D-45] master-source architecture: figures live in papers/shared/figures;
+% the {../shared/} prefix lets sec/*.tex use \includegraphics{figures/<name>} unchanged.
+\graphicspath{{../shared/}}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, backgrounds}
+
+% Per [D-45]: canonical numerical chokepoint (single source of truth for result-claim numerals)
+\input{../shared/numbers}
+
+
+% It is strongly recommended to use hyperref, especially for the review version.
+% hyperref with option pagebackref eases the reviewers' job.
+% Please disable hyperref *only* if you encounter grave issues, 
+% e.g. with the file validation for the camera-ready version.
+%
+% If you comment hyperref and then uncomment it, you should delete *.aux before re-running LaTeX.
+% (Or just hit 'q' on the first LaTeX run, let it finish, and you should be clear).
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+
+%%%%%%%%% PAPER ID  - PLEASE UPDATE
+\def\paperID{*****} % *** Enter the Paper ID here
+\def\confName{CVPR}
+\def\confYear{2026}
+
+%%%%%%%%% TITLE - PLEASE UPDATE
+\title{CosmoGasVision: 3D Intergalactic Medium Reconstruction via Implicit Neural Representations}
+
+%%%%%%%%% AUTHORS - PLEASE UPDATE
+\author{Anonymous CVPR submission}
+
+\begin{document}
+\maketitle
+
+\input{../shared/sec/0_abstract}
+\input{../shared/sec/1_intro}
+\input{../shared/sec/5_related_work}
+\input{../shared/sec/2_method}
+\input{../shared/sec/3_experiments}
+\input{../shared/sec/4_next_steps}
+
+{
+    \small
+    \bibliographystyle{ieeenat_fullname}
+    \bibliography{../shared/main}
+}
+
+% WARNING: do not forget to delete the supplementary pages from your submission 
+% \input{../shared/sec/X_suppl}
+
+\end{document}

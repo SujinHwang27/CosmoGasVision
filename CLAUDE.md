@@ -21,6 +21,18 @@ The **3DGS track** (`experiments/3dgs_baseline/`) is **DEPRECATED repository-wid
 - `experiments/<name>/pipeline.py` — execution entry per track.
 - `experiments/<name>/LEDGER.md` — command center (Pulse / Logic / Data / History).
 - `experiments/<name>/artifacts/` — DVC-tracked outputs.
+- `papers/shared/` — venue-independent paper atoms: `sec/*.tex`, `main.bib`, `numbers.tex`, `figures/`. Per [D-45] master-source architecture.
+- `papers/shared/sec_extended/` — supplementary reservoir for content cut from a venue's main but reusable by a longer-format venue. Each parked atom tagged with originating D-XX.
+- `papers/<venue>/` — venue manifests: `main.tex` selects which shared atoms to include + venue-specific preamble, style file, bib style, author block. First instance: `papers/cvpr2026/`.
+
+## Master-source architecture for paper authoring ([D-45], 2026-05-11)
+Multi-venue paper authoring is structured as one decision-log + one set of atoms + N venue manifests, not as N independent paper directories. **Source-of-truth order** (resolve conflicts up-chain, never down):
+1. `experiments/<name>/LEDGER.md` — canonical decisions, numbers, provenance, sprint history.
+2. `papers/shared/numbers.tex` — canonical numerical macros (`\newcommand`s for every quantitative claim). Result-claim sentences in atoms should cite these macros rather than inline numerals; a single update propagates across all venue manifests. Strong convention, not CI-enforced.
+3. `papers/shared/sec/*.tex` — canonical publication-ready prose (one atom per section). The latex-author is the translator from LEDGER hedged-sprint-language to publication-ready prose; LEDGER prose is NOT lifted verbatim.
+4. `papers/<venue>/main.tex` — human-curated manifest selecting which shared atoms to `\input`, with venue-specific format adapters. Manifests are authored, not generated.
+
+When a new venue is added: write `papers/<venue>/main.tex` + `preamble_<venue>.tex` + `authors_<venue>.tex` + venue style files; do not duplicate atoms. When a number changes: update LEDGER + `numbers.tex` only.
 
 ## Astrophysical conventions
 - Coordinates: comoving kpc/h within a 60,000 kpc/h (60 Mpc/h) box; normalize to unit cube `[0, 1]` for MLP input.

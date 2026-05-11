@@ -53,4 +53,19 @@ mlflow.db
 /.docs
 /.overleaf_mcp
 /docs
-/paper_cvpr
+
+# Per [D-45] master-source architecture: paper source (.tex, .bib, .sty, figures<10MB)
+# is git-tracked; build artifacts are not. Old /paper_cvpr DVC tracking retired
+# at HEAD ff4b951+.
+papers/**/main.aux
+papers/**/main.bbl
+papers/**/main.blg
+papers/**/main.brf
+papers/**/main.fdb_latexmk
+papers/**/main.fls
+papers/**/main.log
+papers/**/main.out
+papers/**/main.pdf
+papers/**/main.synctex.gz
+papers/**/main.toc
+papers/**/_minted-main/

@@ -880,6 +880,45 @@ graph TD
 
   **Review-trail.** PI design-spec drafted 2026-05-11 under [D-37]-extension discipline. Implementation hand-off to `support-researcher` per §6. PI to evaluate falsification rules §3.1-3.3 on the resulting JSON before any paper edits land.
 
+---
+
+- **[D-45] Master-source architecture for multi-venue paper authoring (2026-05-11, PI + user)** —
+
+  **User directive** (2026-05-11, post HEAD `ff4b951`): "We will author papers for various conferences later on, not only cvpr. We need master source(s) of truth that different format of papers branch from. That could be LEDGER + master paper or LEDGER alone. Think about it with PI."
+
+  **PI evaluation** (read-only architecture audit, summary in §7 dispatch entry this date). Four candidate architectures evaluated against 9 considerations (drift integrity, prose reuse cost, format-adapter burden, numerical consistency, DVC/git workflow, supplementary parking, LEDGER role, bibliography, author/affiliation drift): (A) LEDGER-only, (B) LEDGER + master paper, (B') LEDGER + modular paper atoms + venue manifests + shared `numbers.tex`, (B'') LEDGER + monograph + strict-subset cuts. Recommendation (moderate confidence): **(B') adopted** — the current repo already favors it (sec/*.tex atomized, main.tex thin manifest, main.bib single file), and (B') dominates on drift prevention + prose reuse + format-adapter burden while preserving "LEDGER ≠ paper" separation.
+
+  **User-pruned variant** (against the PI base recommendation): (a) skip DVC tracking on paper source — `.tex`/`.bib`/figures<10 MB are git-friendly, only large binaries need DVC; (b) `numbers.tex` is a strong **convention**, not a CI-enforced rule (binding rules without enforcement rot fast); (c) atom-reuse expectation set at ~60% weighted average across CVPR/MNRAS/NeurIPS/TMLR rather than the >80% PI assumed; (d) per-venue cost ~2-3 hours regardless of architecture (style files, blinding, page-tightening — modular atoms reduce prose work, not format work).
+
+  **Source-of-truth order (binding)**: `LEDGER (decisions/numbers/provenance) → papers/shared/numbers.tex (canonical LaTeX numerics) → papers/shared/sec/*.tex (canonical prose) → papers/<venue>/main.tex (venue manifest)`. Resolve conflicts up-chain, never down.
+
+  **Migration executed at HEAD `<this commit>`**:
+  - `paper_cvpr/sec/` → `papers/shared/sec/`
+  - `paper_cvpr/main.bib` → `papers/shared/main.bib`
+  - `paper_cvpr/figures/` → `papers/shared/figures/`
+  - `paper_cvpr/main.tex` → `papers/cvpr2026/main.tex` (with updated `\input`, `\bibliography`, `\graphicspath` paths)
+  - `paper_cvpr/{preamble.tex, cvpr.sty, ieeenat_fullname.bst, rebuttal.tex, README.md}` → `papers/cvpr2026/`
+  - `paper_cvpr/.github/workflows/latex-build.yml` → `.github/workflows/latex-build.yml` (with `working_directory: papers/cvpr2026`)
+  - New empty `papers/shared/sec_extended/` reservoir
+  - New empty `papers/shared/numbers.tex` chokepoint (populated by the numbers.tex bootstrap sprint, not yet run)
+  - `paper_cvpr.dvc` removed; `/paper_cvpr` removed from `.gitignore`; new `papers/**/main.{aux,log,pdf,...}` entries added
+  - **Verification**: `papers/cvpr2026/main.tex` compiles to 18 pages, 1,555,508 bytes — byte-identical to the pre-migration `paper_cvpr/main.pdf`.
+
+  **Deferred to next sprint**:
+  - **Step 2 — numbers.tex bootstrap**: grep result-claim numerals from `papers/shared/sec/*.tex`, design the `\newcommand` schema (primary / derived / constants), populate `numbers.tex`, replace inline numerals. Budget: ~4 hours (not the 1 hour PI initially projected).
+  - **Step 3 — re-apply CVPR 16→8-pp cut** as `papers/cvpr2026/main.tex` manifest selections + `papers/shared/sec_extended/` moves (atom-preserving, reversible). The cut-plan from the prior PI dispatch (per-element KEEP / SUPPLEMENT / DELETE-CONDENSE table) remains valid — re-expressed as manifest edits, not deletions from a single tree.
+
+  **Inscribed rules** (binding for future agents):
+  1. SoT order above.
+  2. No bare numerals in result-claim sentences in `papers/shared/sec/*.tex` — cite `\newcommand`s from `numbers.tex`. Convention, not CI.
+  3. LEDGER stays decision-log. Latex-author is the translator from LEDGER hedged-sprint-language to publication prose.
+  4. Venue manifests are authored, not generated.
+  5. `papers/shared/sec_extended/` is the suppl reservoir; cut content tagged with provenance D-XX.
+
+  **References**: PI architectural audit dispatched 2026-05-11 (this date), `papers/shared/numbers.tex` (seed file), `papers/cvpr2026/main.tex` (first venue manifest), `CLAUDE.md` source-layout + master-source-architecture sections updated this commit.
+
+  **Review-trail**: PI delivered architectural recommendation with moderate confidence. User pruned 4 modifications + authorized "Go" on the 4-step migration plan. Steps 1 + 4 executed this commit; Steps 2 + 3 deferred per honest-budget reassessment.
+
   **Addendum 1 — Bootstrap results & rule evaluation (2026-05-11, PI).** Artefact `experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json` landed (driver `scripts/d44_bootstrap_KS_meanF.py`, 5.8 min wall, K=512 resamples per cell, seeds {42–46}). Anti-degeneracy F1/F2 PASS (sightline-level bootstrap; pred and truth indices from independent PCG64 streams; `indices_identical=False`).
 
   **Results (mean ± σ; q16 / q84):**
