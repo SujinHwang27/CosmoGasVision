@@ -1,0 +1,38 @@
+{
+  "P1": {
+    "sat_pixel_share": 0.0040416717529296875,
+    "R_signed_perpixel": 0.7330947596512862,
+    "R_meanabs_perpixel": 0.7333856902481893,
+    "R_rms_perpixel": 0.7471923911363915,
+    "R_signed_share": 18.86501586317457,
+    "R_meanabs_share": 15.792264502603842,
+    "R_rms_share": 7.568512560650016
+  },
+  "P2": {
+    "sat_pixel_share": 0.004857540130615234,
+    "R_signed_perpixel": 0.7381064368246281,
+    "R_meanabs_perpixel": 0.7402491718862442,
+    "R_rms_perpixel": 0.754939614583099,
+    "R_signed_share": 18.906425884987023,
+    "R_meanabs_share": 15.164633207392688,
+    "R_rms_share": 6.622103950733499
+  },
+  "P3": {
+    "sat_pixel_share": 0.004311561584472656,
+    "R_signed_perpixel": 0.7390723414253085,
+    "R_meanabs_perpixel": 0.7392233708018624,
+    "R_rms_perpixel": 0.7522265662699866,
+    "R_signed_share": 20.253678896731838,
+    "R_meanabs_share": 16.348321206312868,
+    "R_rms_share": 7.688679546875037
+  },
+  "P4": {
+    "sat_pixel_share": 0.002811908721923828,
+    "R_signed_perpixel": 0.7577291387641599,
+    "R_meanabs_perpixel": 0.7577291387641599,
+    "R_rms_perpixel": 0.7665627915155402,
+    "R_signed_share": 23.508595353202065,
+    "R_meanabs_share": 20.710117512151218,
+    "R_rms_share": 9.18799803356607
+  }
+}

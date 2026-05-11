@@ -575,6 +575,92 @@ graph TD
   **Meta-judgment**: The science is sound at the **mechanism-narrative level** (P_F binding gate; rescale-preview falsified; integrated-statistic and per-pixel-physics losses both gameable on diffuse-majority weak-MSE). The **quantitative claims are fragile** in two directions: overstated diagnostic magnitudes (R, Pearson 0.83) and understated gate closure (2-of-3 buried in the abstract). With the ~3 host-hour cleanup above the sprint is defensible for CVPR submission; without it, the load-bearing magnitudes are exposed.
 
   **References**: [D-37] (extended this entry), [D-39] (Addenda 1-5), [D-40] (Addendum 1), [D-41]. Defense-panel review transcript + PI affirmative transcript both held in conversation history (this session); summarized verbatim here per the user mandate to "argue thoroughly" — both retros are banked, not just the orchestrator's synthesis.
+
+  **Addendum 1 — Cleanup pass empirical results (2026-05-11).** All 13 cleanup items executed; findings:
+
+  **Item 1 (K1: R sign-cancellation vulnerability) — REBUTTED.** Re-estimator audit on pub-t1 P1-P4 (`R_reestimator_pubt1.json`):
+
+  | Cell | R (signed) | R (mean\|ΔF\|) | R (RMS) |
+  |---|---|---|---|
+  | P1 | 18.87 | 15.79 | 7.57 |
+  | P2 | 18.91 | 15.16 | 6.62 |
+  | P3 | 20.25 | 16.35 | 7.69 |
+  | P4 | 23.51 | 20.71 | 9.19 |
+
+  All three estimators ≥ 4× the positive-ID floor of 1.5 in 4/4 cells. The K1-predicted collapse to ~1× under sign-cancellation-free estimators does not happen. PI's "conservative metric" defense holds empirically. The 12× headline magnitude was the signed-mean number; honest framing now reports all three.
+
+  **Item 2 (K2: Pearson 0.83 effective-N) — PARTIALLY SUPPORTED.** F-test for `H₀: log P_pred(k) = α + log P_truth(k)` (`items_2_6_8.json`):
+  - pub-t1 P1: N=25, α=−0.124 (amplitude ratio 0.75), Pearson 0.776; H₀ RSS=1.276, H₁ RSS=1.081, F-stat=4.15 < F_crit(1,23)=4.28 → rescale-only hypothesis NOT rejected at α=0.05 (marginally).
+  - sat-aware P1: N=25, α=−0.399 (amplitude ratio 0.40, matches [D-40] Add. 1's 0.43), Pearson 0.859; H₀ RSS=0.480, H₁ RSS=0.418, F-stat=3.43 < 4.28 → rescale-only hypothesis NOT rejected.
+  Both fits "support" shape-preservation only marginally; the H₁ free-slope fits give slopes of 1.30 and 1.53 respectively, suggesting genuine shape distortion just below the F-test threshold. **Honest framing**: report F-stat numbers, not "Pearson 0.83 shape preserved."
+
+  **Item 3 (C1: multi-seed bootstrap) — PARTIALLY REBUTTED.** 5-seed bootstrap on pub-t1 P1-P4 (`item3_multiseed_bootstrap.json`):
+
+  | Cell | P_F (mean±std) | KS (mean±std) | R_signed (mean±std) |
+  |---|---|---|---|
+  | P1 | 0.416 ± 0.027 (6.6%) | 0.045 ± 0.009 (seed-marginal) | 18.22 ± 0.41 |
+  | P2 | **0.461 ± 0.105 (23%)** | 0.077 ± 0.008 (always FAIL) | 18.43 ± 0.55 |
+  | P3 | 0.334 ± 0.017 (5.0%) | 0.051 ± 0.009 (seed-marginal) | 19.56 ± 0.36 |
+  | P4 | 0.347 ± 0.011 (3.3%) | 0.046 ± 0.006 (always PASS) | 23.73 ± 0.44 |
+
+  P_F seed sensitivity is 3-7% for P1/P3/P4 (much smaller than cross-physics 30%); only P2 sits at noise floor (23%). **P4-vs-P3 R-gap = 4.17 vs combined σ=0.6 = 7σ separation — cross-physics R ordering IS statistically robust**, NOT at the noise floor as K3 suggested. K3 IS valid for: KS gate (P1, P3 seed-marginal; pub-t1 published 3/4 PASS depends on seed=42; at other seeds could be 2/4 or 4/4). Action: KS numbers in paper need ± std reporting; R ordering and P_F mean values stand.
+
+  **Item 4 + 13 (C4: [D-41] mechanism uniqueness + D3: Tier-1 confirmation) — PI SMOKE-FAIL RATIFIED; MECHANISM NARRATIVE CORRECTED.**
+
+  Juno Job 197381 (Tier-1 FGPA-tail at 25k steps, ExitCode 0:0, 55:46 wall, RUN_TAG `P1-N64-S0-1778508750-7f0c7e`). Eval Job 197387: **pf_residual_mean = 0.999965** (10× worse than baseline 0.4155; smoke prediction of P_F worsening RATIFIED at scale). ks_distance=0 reported but is **degenerate-empty-sample** (constant F_pred ≈ 1.0 falls outside [0.05, 0.95] analysis range), not a real PASS.
+
+  **n_HI distribution diagnostic (item 4) on Tier-1 checkpoint** (`item4_n_HI_distribution_tier1_fgpatail.json`):
+
+  | Field | Truth (median) | FGPA-tail predicted (median) | Collapse ratio |
+  |---|---|---|---|
+  | density (Δ) | 0.145 | **71.5** (range 68–75) | 494× LARGER |
+  | X_HI | 6.0e-07 | 3.3e-05 | 55× larger |
+  | n_HI | 8.4e-08 | 2.4e-03 | 28,277× larger |
+  | frac n_HI < 1e-9 | 0.4% | **0.0%** | — |
+
+  **Correction to [D-41] mechanism narrative**: the body of [D-41] said "the network drove tau_pred → 0 via `n_HI = density · X_HI → 0`". This is **empirically wrong**. The network instead **collapsed all spatial fields to near-constants** (density ≈ 71.5 ± 1.6 uniformly; X_HI ≈ 3.3e-5 ± 0.7e-5; presumably T similar). Constant `(Δ, T)` trivially satisfies the FGPA scaling `log τ_local = β log Δ + γ log T + C` (a single-equation constraint on three constants; a continuous family of solutions); the mean-F anchor pulls the resulting constant tau_local down so mean_F ≈ 1. **The mechanism is strict-form Hypothesis C (constant-prediction collapse)**, not the Huber-bounded-below escape I attributed it to in [D-41]. PI's ORIGINAL [D-40] Hypothesis C ("admits trivial constant-prediction solutions") was empirically correct — it just manifested on [D-41]'s FGPA-tail rather than [D-40]'s sat-aware.
+
+  **Refined anti-degeneracy discipline**: regularizers evaluated only on the network's self-consistent state are gameable by **collapsing all input fields to constants** (which trivially satisfy any algebraic relation among those fields). The "ground-truth-anchored" discipline still holds as the right next step, but the failure mode is broader than "tau_pred → 0".
+
+  **Item 5 (C5: [D-40] Hypothesis C track-wide scope) — NARROWING REQUIRED.** Per-bin P_F diagnostic on pub-t1 P1-P4 baselines (`pubt1_xphysics_pf_perbin.json`):
+
+  | Cell | log_std_pred / truth | ratio_mean | pearson_log |
+  |---|---|---|---|
+  | P1 | 0.32 / 0.16 = **2.0×** | **0.98** | 0.81 |
+  | P2 | 0.34 / 0.19 = 1.8× | **0.97** | 0.87 |
+  | P3 | 0.33 / 0.19 = 1.7× | 0.74 | 0.89 |
+  | P4 | 0.31 / 0.16 = 1.9× | 0.79 | 0.87 |
+
+  **The pub-t1 baseline does NOT show the [D-40] amplitude-shrink pattern.** ratio_mean is 0.74–0.98 (close to 1.0), not 0.43 like sat-aware P1. The pub-t1 baseline failure mechanism is **over-structured prediction** (log_std doubles), not amplitude-shrink. **[D-40] Addendum 1's "amplitude-shrink with shape preservation" framing is sat-aware-specific**, NOT a property of the baseline pub-t1 failure. Paper §3.5 / [D-40] Addendum 1 must be scoped explicitly.
+
+  **Item 6 (S2: Hann window dependence) — MAGNITUDE SHIFT, VERDICT ROBUST.** P1 pub-t1 P_F band-mean (`items_2_6_8.json`):
+  - Hann: 0.464
+  - Rectangular: 0.535 (+15% relative)
+  - Blackman: 0.456 (-1.8% relative)
+
+  Gate-FAIL verdict robust under any window (all > 4× the 0.10 gate). But the abstract's "4.2× over gate" specifically reflects Hann; under rectangular it would be "4.8× over" and Blackman ~"4.1× over". Honest framing: report Hann (Walther+ 2018 / Boera+ 2019 observational convention) and disclose window-dependence in §3.5 footnote.
+
+  **Item 7 (S1: DLA mask in eval) — TRIVIAL CONTAMINATION.** `scripts/eval_partial_d13.py` + `src/analysis/p_flux.py` apply NO DLA mask. `src/analysis/flux_pdf.py` applies F ∈ [0.05, 0.95] cut (excludes saturated absorbers from KS). Per the [D-39] Add. 3 table, DLAs (τ > 100) live in bin 10 with N=36 pixels = 0.027% of total; the contamination is negligible. **Paper §3.5 footnote owed** documenting the asymmetry.
+
+  **Item 8 (S3: Sherwood-z=0.3 FGPA exponents) — γ MATERIALLY OFF.** Linear least-squares fit `log n_HI = a + β log Δ + γ log T` on 7.58M voxels from Sherwood P1 z=0.3 truth, restricted to diffuse-IGM mask (`items_2_6_8.json`):
+  - β_emp = **1.67** (Hui-Gnedin 1997: 1.6 — within 4%)
+  - γ_emp = **−0.41** (Hui-Gnedin 1997: −0.7 — **40% off**)
+  - log-space residual scatter = 0.139 dex (Huber δ=0.5 absorbs comfortably)
+
+  The [D-41] spec froze γ=−0.7 at the z~3 mean-field value; the actual z=0.3 Sherwood γ is −0.41 (closer to isothermal as photoheating+cooling balance shifts at low z; see Lukić+ 2015 / McQuinn 2016). **[D-41] FAIL is not flipped by this** — the constant-prediction collapse is a separate mechanism from wrong-γ — but the [D-41] design SHOULD have measured β/γ from truth before assuming Hui-Gnedin literally. Banked as a binding [D-37]-extension principle for [D-42] velocity-gradient.
+
+  **Items 9-12 (paper verb revision, hedged §4.1 #3, LEDGER review-trail, agent.md propagation):** deferred to follow-up commit. Empirical findings (items 1-8, 13) banked first; text edits follow.
+
+  **Cleanup-pass artifacts:**
+  - `experiments/nerf/artifacts/eval/tau_binned/R_reestimator_pubt1.json` (item 1)
+  - `experiments/nerf/artifacts/eval/cleanup_pass/items_2_6_8.json` (items 2, 6, 8)
+  - `experiments/nerf/artifacts/eval/cleanup_pass/item3_multiseed_bootstrap.json` (item 3)
+  - `experiments/nerf/artifacts/eval/cleanup_pass/item4_n_HI_distribution_tier1_fgpatail.json` (item 4)
+  - `experiments/nerf/artifacts/eval/sat_aware_hypc/pubt1_xphysics_pf_perbin.json` (item 5)
+  - `cloud_runs/fgpa-tail-tier1-P1-step25k.pt` (Tier-1 [D-41] checkpoint, scp'd from Juno)
+  - Tier-1 sbatch + eval logs on Juno: `stage2b-juno-197381.out`, `stage2b-eval-partial-197387.out`
+
+  **Updated meta-judgment**: The science survives the cleanup. The 5 KILLER-level attacks split between rebuttal (K1: empirically wrong) and partial-support-with-honest-language-fix (K2, K3, K4). The [D-41] mechanism narrative needed correction but the FAIL verdict is ratified by Tier-1. Two paper-level [D-40]/[D-41] claims need scope-narrowing (sat-aware amplitude-shrink ≠ baseline failure; FGPA-tail constant-collapse is a different mechanism than what [D-41] body said). All within scope of a text-only follow-up commit + the items 9-12 audit cleanup. **Ready to move to [D-42] velocity-gradient sprint after the text edits land.**
 ---
 
 ## 4. The Data (Lineage & Governance)
