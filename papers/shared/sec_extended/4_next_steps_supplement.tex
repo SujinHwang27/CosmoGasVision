@@ -1,0 +1,36 @@
+\section{Supplementary: Method Decision Log and Stage 3 Pipeline Contract}
+\label{sec:suppl:nextsteps}
+
+\subsection{Stage 3: Feedback identification from reconstructed $\rho$}
+\label{sec:suppl:nextsteps:stage3}
+Stage 3 trains a four-way classifier on 3D crops of the reconstructed $\rho/\bar\rho$ field over $\{\text{P1}, \text{P2}, \text{P3}, \text{P4}\}$, with target accuracy $> 85\%$. The data-pipeline contract is fixed: input is a $(C{=}1, D, H, W)$ cube of reconstructed overdensity at native simulation resolution, label is the originating \texttt{physics\_id}. The architectural choice (3D CNN vs.\ 3D ViT, crop dimensions, augmentation policy) is deferred to a Stage 3 design pass and is gated on a $P_F$-passing reconstruction; the structural-$P_F$ gap of [D-39] is upstream of the feedback-discrimination claim.
+
+\subsection{Method decision log}
+\label{sec:suppl:nextsteps:decisions}
+The methodology of \S\ref{sec:method} and the evaluation contract of \S\ref{sec:experiments} are the consolidated form of a longer decision sequence. Tab.~\ref{tab:decision-log} summarizes the scientific entries; full traceability lives in the project's experiment LEDGER.
+
+\begin{table}[t]
+    \centering
+    \renewcommand{\arraystretch}{1.15}
+    \setlength{\tabcolsep}{4pt}
+    \begin{tabular}{l|p{0.74\columnwidth}}
+    ID & Decision \\
+    \hline
+    {[D-01]} & Tepper-Garc\'ia 4th-order Voigt; small-$|x|$ Taylor branch added 2026-05-04 \\
+    {[D-02]} & Bounded-activation physics layers for $\rho$, $T$, $X_{HI}$, $v_{\text{pec}}$ \\
+    {[D-06]} & RSD-convolved integrator (Stage 2a$\to$2b lift); first-half = redshift-space target \\
+    {[D-11]/[D-34]} & Mean-flux soft anchor $\langle F\rangle_{\text{obs}} = \AnchorMeanF \pm \AnchorMeanFsigma$ at $z=0.3$ (Kirkman+ 2007); cost-survey runs trained against retracted value $0.877$, kept under anchor-invariance \\
+    {[D-13]} & Stage 2b gates: $P_F(k_\parallel)$, Pearson $\xi_{\hat\rho,\rho}(2\,h^{-1}\,\text{Mpc})$, flux-PDF KS on $F\in[\PDFwinLo,\PDFwinHi]$ \\
+    {[D-14]} & Production schedule (per-tier max\_steps, microbatch, accum) \\
+    {[D-19]} & Smoke-pass criteria: gradient finite, descent $\leq 0.85$, mean\_F within $5\%$ \\
+    {[D-21]} & Two-pass surrogate gradient for the masked mean-flux constraint \\
+    {[D-23]} & Tier-aware microbatch / step schedule with linear VRAM model \\
+    {[D-24]} & log1p+cap+mask Ly$\alpha$ forest loss; $\tau_{\max}=10$ LOCKED 2026-05-04 \\
+    {[D-35]} & Cost-survey post-hoc rescale read as anchor-preview, retained under [D-39] only as upper-bound optimism \\
+    {[D-38]} & log-space supervision is the methods contribution; cap and mask retained as defense-in-depth \\
+    {[D-39]} & \texttt{pub-t1} corrected-anchor full-schedule bundle falsifies the rescale-preview; $P_F$ is the structurally binding gate; Tier 4 conditional on Wrinkle-1 \\
+    {[D-40]} & Saturation-aware $P_F$ band loss tested on $P_1$ (12.5k-step counterfactual): eval $|\Delta P_F/P_F|=\PFdfortyEval$ ($+37\%$ vs.\ baseline), KS $=\KSdfortyEval$ (gate broken); integrated-residual formulation admits constant-prediction degeneracy. \#4.1 ranking re-pivoted to per-pixel FGPA-tail prior. \\
+    \end{tabular}
+    \caption{Methodological decision log. One-line summary per scientific entry; LEDGER \S3 carries full derivations, sources, and verification status. [D-39] supersedes the verdict-frame implicit in earlier decision entries: the corrected-anchor full-schedule run is recorded as a calibration-vs-structure falsification, not a thresholded PASS.}
+    \label{tab:decision-log}
+\end{table}

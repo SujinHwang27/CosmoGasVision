@@ -1,0 +1,47 @@
+\section{Methodology}
+\label{sec:method}
+
+\begin{figure*}[t]
+    \centering
+    \includegraphics[width=\textwidth]{figures/method_pipeline}
+    \caption{The IGM-NeRF tomography pipeline. An 8-layer / 256-unit MLP (494{,}084 trainable parameters) maps comoving 3D coordinates inside a 60 Mpc/h Sherwood box (normalized to $[0,1]^3$) through Fourier positional encoding ($L=10$) to four bounded astrophysical fields ($\rho/\bar\rho$, $T$, $X_{HI}$, $v_{\text{pec}}$); a differentiable RSD-convolved Voigt integrator with learnable amplitude $\mathcal{A}$ projects these fields to 1D optical depth $\tau(v)$, supervised against Sherwood ground truth under the [D-24] log1p+cap+mask loss with the [D-11]/[D-34] mean-flux anchor at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$~\cite{kirkman2007}.}
+    \label{fig:pipeline}
+\end{figure*}
+
+The core of \emph{CosmoGasVision} is an MLP $F_{\theta}: \mathbf{x} \to (\rho, T, X_{HI}, v_{\text{pec}})$, where $\mathbf{x} \in \mathbb{R}^3$ are comoving coordinates inside a 60 Mpc/h Sherwood box, normalized to the unit cube $[0, 1]^3$. The end-to-end pipeline --- coordinate normalization, Fourier positional encoding, bounded-output MLP, RSD-convolved Voigt projection, and log1p+cap+mask supervision with the mean-flux anchor --- is shown in Fig.~\ref{fig:pipeline}.
+
+\subsection{Neural Field Architecture}
+We adopt an 8-layer MLP with 256 hidden units per layer (494{,}084 trainable parameters). To resolve the small-scale filamentary structures of the Cosmic Web, we employ Fourier positional encoding~\cite{mildenhall2020nerf} $\gamma(\mathbf{x}) = (\sin(2^k\pi\mathbf{x}), \cos(2^k\pi\mathbf{x}))_{k=0}^{L-1}$ with $L=10$, sized to the $\sim\!100\times$ overdensity peaks of massive filaments.
+
+\subsection{Bounded Physics Layer}
+Final-layer activations enforce physical scales: $\rho/\bar\rho$ via unscaled Softplus, $T$ via $\texttt{Softplus}\cdot 10^4 + 10^3$ K, $X_{HI}$ via Sigmoid in $[0,1]$, $v_{\text{pec}}$ via $\texttt{Tanh}\cdot 500$ km/s.
+
+\subsection{Differentiable Physics Integrator}
+The reconstruction is supervised by comparing rendered $\tau_{\text{rendered}}(v)$ against the simulation ground-truth $\tau_{GT}(v)$. The optical depth is a redshift-space-distortion convolution that sums every source-bin's normalized line profile over every observed-velocity bin:
+\begin{equation}
+\tau(v_{\text{obs}}) = \mathcal{A} \sum_{\text{src}} n_{HI}^{\text{src}} \cdot \frac{H(a_{\text{src}}, x_{\text{src,obs}})}{b_{\text{src}}\sqrt{\pi}}
+\end{equation}
+where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\text{src}}) / b_{\text{src}}$, $b_{\text{src}}$ is the thermal Doppler parameter, and $\mathcal{A}$ is a learnable scalar amplitude absorbing $\sigma_0$, $ds$, and $\bar{n}_H$. The Voigt-Hjerting kernel uses the Tepper-Garc\'ia~\cite{tepper2006voigt} analytic approximation:
+\begin{equation}
+H(a, x) \approx e^{-x^2} - \frac{a}{\sqrt{\pi} x^2} \big[ e^{-2x^2} (4x^4 + 7x^2 + 4 + 1.5x^{-2}) - 1.5x^{-2} - 1 \big]
+\end{equation}
+allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$.
+
+\subsection{Lyman-alpha Forest Loss: Saturated-Absorber Mask, Cap, and Log-Space Supervision}
+\label{sec:method:loss}
+A naive per-bin MSE on raw $\tau$ is dominated by the rare saturated absorbers in the sightlines: damped Lyman-alpha systems (DLAs)~\cite{wolfe2005} and strong Lyman-limit systems~\cite{prochaska2010} produce line-center optical depths $\tau_{\text{peak}} \sim 10^7$ in the Sherwood Physics-2/3/4 sightlines, four to five orders of magnitude above the diffuse forest. This saturation is forward-model-physical, not a label artifact, but it carries no usable structure information for tomography because $F = e^{-\tau}$ is numerically zero in those bins. We therefore use \textbf{log-space supervision} (the methods contribution of this work) plus two \textbf{defense-in-depth} safeguards --- a saturated-absorber detection mask (bins with $\tau_{GT}>10^5$ are flagged as saturated cores and expanded to the connected component of $\tau_{GT}>10$) and a forest cap ($\tau^{\text{eff}}=\min(\tau,\tau_{\max})$ with $\tau_{\max}=10$, calibrated against the gate of Sec.~\ref{sec:experiments} and locked by a sensitivity sweep, see suppl.). The data loss on the surviving bins is
+\begin{equation}
+\mathcal{L}_{\text{data}} = \big\langle \big( \log(1 + \tau_{\text{pred}}^{\text{eff}}) - \log(1 + \tau_{GT}^{\text{eff}}) \big)^2 \big\rangle_{\text{non-saturated}}
+\label{eq:data-loss}
+\end{equation}
+where the average is taken over rays and over the unmasked velocity bins. The choice of $\log(1+\tau)$ as the supervision space is defended on physical grounds: Lyman-alpha-forest opacity is approximately log-normally distributed in $\tau$ across the cool diffuse IGM~\cite{bi_davidsen1997, hui_gnedin1997} as a consequence of the Fluctuating Gunn-Peterson Approximation $\tau \propto \rho^{1.6} T^{-0.7}$ acting on a near-log-normal density PDF. The mask and cap are not part of this novelty claim; the supplementary records the Bolton--Haehnelt derivation of the $\tau_{\text{core}}=10^5$ threshold and a four-cell ablation showing they are not load-bearing for convergence on the tested configuration (retained as defense-in-depth against initialization-stress regimes; see [D-38]).
+
+\subsection{Mean-Flux Anchor and Gradient Linearization}
+The forward model is invariant under $\rho \to k\rho,\ \mathcal{A} \to \mathcal{A}/k$, so the data loss alone cannot fix the absolute overdensity amplitude. We break the degeneracy with the observational mean-flux constraint at $z = 0.3$:
+\begin{equation}
+\mathcal{L}_{\text{meanF}} = \lambda_F \big( \langle e^{-\tau_{\text{pred}}}\rangle - \langle F\rangle_{\text{obs}} \big)^2
+\end{equation}
+at the verified value $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ from Kirkman et al.~\cite{kirkman2007} ($D_A(z) = 0.016(1+z)^{1.01}$ evaluated at $z=0.3$), with $\lambda_F = 1.0$. The cost-survey runs of Sec.~\ref{sec:experiments} were trained against an earlier broken anchor $0.877$ (a $z\!\sim\!2$ value mislabeled as $z=0.3$); the [D-34] retraction explains why those runs are kept (anchor-invariance of the [D-13] structure gates). The mean-flux constraint is implemented as a two-pass surrogate (cycle-mean computed under \texttt{torch.no\_grad()}; per-microbatch backward through a linearization $\mathcal{L}_{\text{mb}}=\mathcal{L}_{\text{data,mb}}+c\langle F\rangle_{\text{mb}}$ with $c=2\lambda_F(F_{\text{cycle}}-\langle F\rangle_{\text{obs}})$ held constant for the cycle); derivation in supplementary.
+
+\subsection{Training Configuration}
+We optimize with AdamW ($\beta=(0.9,0.999)$, weight decay $10^{-6}$, gradient L2 clip $1.0$) on a single \texttt{ml.g5.xlarge} (NVIDIA A10G, 24 GB) per tier under a tier-aware schedule (T1 $n_{\text{rays}}{=}64$ $/\,50$k steps, T2 $256/25$k, T3 $1024/12.5$k, T4 $16{,}384/12.5$k deferred), with per-tier linear-warmup-then-cosine LR $0\!\to\!5\!\times\!10^{-4}\!\to\!5\!\times\!10^{-6}$. The peak-VRAM budget follows the linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB, validated cross-tier (see supplementary).
