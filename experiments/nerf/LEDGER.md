@@ -243,6 +243,8 @@ graph TD
 
   **Propagated to**: `CLAUDE.md` (operational paragraph in "Reporting findings" section); `.claude/agents/latex-author.md` (targeted reminder under voice/honesty section). Subagents pick up the rule via CLAUDE.md auto-injection + the LEDGER read-first protocol; no session restart needed.
 
+  **Extension (2026-05-11, [D-42-meta] retrospective):** [D-37] previously covered only **empirical findings**. The [D-40]/[D-41] failures revealed a parallel anti-pattern in **design-spec language**: PI specs for both #1 (sat-aware) and #2 (FGPA-tail) carried "structurally immune by design" / "highest leverage" / "physics-invariant" verbs; both were empirically falsified. The over-confident verbs primed subsequent decisions and crowded out the hedged framing the evidence supported. **Extension**: PI design-spec assertions are **hypotheses, not findings**, and must be stated with hedged verbs until empirically tested. A falsified prior of similar confidence in the same track downgrades the next prior's confidence verb by one level. Concretely for [D-42] (velocity-gradient): the §4.1 #3 promotion language reads "first test of the new ground-truth-anchored discipline," NOT "highest-leverage / structurally immune." Propagated to `.claude/agents/project-architect.md`: every design spec must label its load-bearing claims as "hypothesis" until tested, and must include a "prior similar-confidence claims falsified in this track" line item. Symmetry note: the extension covers BOTH directions of [D-37] anti-pattern — over-confident strengthening verbs AND over-pessimistic self-flagellating verbs (the §0 abstract's blanket "falsification" framing under-disclosed the 2-of-3 primary gate closure; per [D-42-meta] retrospective).
+
 - **[D-38] Empirical Component-Necessity Finding for the [D-24] Loss Bundle (2026-05-10, PI)** — S5/S7 four-cell ablation (Juno Job 197072) completed cleanly at 2026-05-10T04:12:18Z; bundle wallclock 11h48m, ExitCode 0, 0 errors in stderr. Configuration: T2-P1 seed=1, 25k steps, broken anchor 0.877 (apples-to-apples with the published P1-T2 baseline). All four cells converged to indistinguishable final states on `loss / data / meanF / ⟨F⟩` (four-decimal identity); only `tau_amp` differs by ≤0.5%, in the calibration-degeneracy direction [D-10]/[D-11]/[D-34] mark uninterpretable.
 
   **Empirical-evidence table:**
@@ -516,6 +518,63 @@ graph TD
   **Artifacts**: `cloud_runs/fgpa_tail_smoke.log` (50-step trace); MLflow run `21fb45cb3cd54793911824950591d44c`. Implementation: `experiments/nerf/pipeline.py` + `src/models/nerf.py` (new `return_tau_local` kwarg) + `scripts/submit_juno_stage2b.sh` (env-var passthrough + `fgpa-tail-{smoke,pub}` JUNO_BATCH cases; never dispatched).
 
   **References**: [D-37], [D-39] (Addenda 3-5), [D-40] (Addendum 1). PI [D-41] design spec + verdict (this session). Per [D-37] honest-reporting: smoke-level negative result, recorded as such — not spun.
+
+- **[D-42-meta] End-of-sprint retrospective: [D-39]/[D-40]/[D-41] arc audit (2026-05-11, PI + defense-panel)** —
+
+  **Mandate** (verbatim user): *"at the end of the sprint, look back with PI and Defense Panel through the repository's history, LEDGER and paper. Objectively reevaluate if they are scientifically sound so far. Argue thoroughly."*
+
+  Defense-panel (adversarial) and PI (affirmative) ran in parallel; orchestrator synthesizes.
+
+  **Convergent findings (both PI + defense-panel agree; action required):**
+
+  | # | Issue | Source | Resolution |
+  |---|---|---|---|
+  | C1 | **Single eval seed everywhere** — every R / P_F / KS / Pearson number in [D-39]/[D-40]/[D-41] is at `eval_seed=42`. Wrinkle-1 itself measured 13.76–16.21% seed sensitivity. Cross-physics R spread (~25%) is at the seed-noise floor; "P4 has highest R because strongest feedback" is borderline noise on N=4 single-seed points. | Panel K3; PI #6 conceded | Bootstrap 3–5 seeds for cross-physics R + pub-t1 P_F/KS + W1-E trajectory; publish CIs. Either confirm or narrow ordering claims. |
+  | C2 | **Abstract "falsification" verb is over-calibrated** against actual 2-of-3 primary gate closure (mean-flux 4/4 PASS + KS 3/4 PASS + P_F 0/4 FAIL). Per [D-37], honest framing should disclose the closure alongside the failure; "falsification" reserved specifically for the rescale-as-preview claim that genuinely is falsified. | Panel S4; PI #9 conceded | Revise `paper_cvpr/sec/0_abstract.tex` to disclose 2-of-3 closure; keep falsification framing only for the [D-35] retraction. |
+  | C3 | **PI "structurally immune by design" bias** — two #1/#2 specs at similar confidence both falsified by previously-unaudited mechanisms. The over-confident language primed subsequent decisions. | Panel K10/K11; PI #10-11 conceded "NOT SOUND, the bias is real" | [D-37] extended (above) to cover design-spec language. §4.1 #3 (velocity-gradient) carries hedged verbs only. |
+  | C4 | **[D-41] mechanism uniqueness not verified** — `n_HI → 0` is consistent with the empirical trace but alternatives (log1p compression artifact, LR-schedule interaction) not refuted at 50 steps. | Panel K4; PI #8 conceded | 5-min host diagnostic: `density · X_HI` distribution histogram on the [D-41] step_010000 checkpoint at smoke-equivalent state. If `n_HI` distribution is concentrated near 0, mechanism locks; otherwise alternatives stay open. |
+  | C5 | **[D-40] Hypothesis C track-wide scope** — amplitude-shrink finding is from P1-only `diag_pf_per_bin.py` analysis. Generalized as "the [D-40] mechanism" without P2/P3/P4 replication. | Panel implicit; PI #7 conceded "over-generalizes" | Run `diag_pf_per_bin.py` on P2/P3/P4 [D-39] pub-t1 checkpoints (~15 min host). Upgrade to track-wide or narrow [D-40] Addendum 1 to P1-scoped. |
+
+  **Genuine disagreements (PI vs Panel; orchestrator ruling):**
+
+  | # | Issue | Panel position | PI position | Orchestrator ruling |
+  |---|---|---|---|---|
+  | D1 | **R = `\|⟨ΔF⟩\|·count` sign-cancellation vulnerability** | KILLER: linear-regime bins (1.3M pixels each) have small `\|⟨signed⟩\|` from over/under-prediction cancellation; saturation-band bin 7 is sign-locked (model under-predicts τ → ΔF > 0 uniformly there). R magnitude 12× the floor is partly an estimator artifact. | "Sign-cancellation would weaken R, not inflate it" — metric is conservative. | **Partial concession to Panel**. PI is right that bin 7 ⟨ΔF⟩ is sign-locked (so cancellation can only reduce its contribution), but Panel is right that linear-regime bins admit cancellation. Re-compute with `mean(\|ΔF\|)` and `RMS(ΔF)` per bin; publish all three; let the magnitude speak for itself. Resolves to evidence-based answer, not interpretation. |
+  | D2 | **Pearson(log P_pred, log P_truth) = 0.83 on N=20 k-bins** | KILLER: log P_F(k) has long autocorrelation in k → effective N ~ 5–8; CI on r could span [0, 0.99]; "shape preserved" is statistically unsupported. | "Fisher z CI [0.61, 0.93] still excludes random null at high confidence." | **Concession to Panel.** PI's Fisher z assumes independence which is violated. The cleaner test is fitting `H₀: log P_pred(k) = α + log P_truth(k)` (single-parameter rescale) and reporting residual scatter. If residual is small relative to log P_truth's k-variation, "shape preserved" stands. If not, [D-40] Addendum 1's "amplitude-shrink with shape preservation" narrowing is over-claimed and the strict constant-collapse reading of Hypothesis C may be back in play. |
+  | D3 | **[D-41] 50-step smoke promoted to paper-level retirement** | KILLER: smoke can observe a tau-collapse trajectory but is insufficient to confirm the basin is global. Tier-1 (12.5k–25k steps) at ~$1.50 needed for paper-level "structurally retired" language. | "`mean_F_pred = 1.0000` with `loss_fgpa` descending 20× is structurally diagnostic, not 'needs more steps'." | **Partial concession to Panel**. PI is right that the basin is found by step 50, and any escape requires the optimizer to climb out of `mean_F=1.0` (rare given the schedule's LR decay). Panel is right that paper-level retirement language is built on operations-level evidence. **Resolution: user authorized item 13 ($1.50 Tier-1). Dispatching to settle empirically.** If Tier-1 confirms the collapse, [D-41] paper language stands; if Tier-1 escapes the basin, language softens to "smoke-level FAIL; Tier-1 partial recovery." |
+
+  **Out-of-disagreement findings (PI silent, Panel raised; cheap to test):**
+
+  - **S1** DLA mask symmetry between training MSE / mean-flux / eval P_F — repo audit (10 min); if asymmetric, residual DLA contamination in eval P_F could partly inflate the saturation-band concentration. Probably defensible, but undocumented in paper.
+  - **S2** Hann window choice — Walther+2018/Boera+2019 convention for observational data, but Sherwood is periodic so rectangular window is optimal (Borde+2014). Inertial-range P_F is ~5–10% window-dependent. Re-run [D-39] P1 P_F under Hann / Hamming / rectangular; report all three. The gate-FAIL verdict survives any window (P_F is 4× over), but abstract magnitude language ("4.2× over") is window-dependent.
+  - **S3** Hui-Gnedin β=1.6, γ=−0.7 are z~3 mean-field values; z=0.3 thermal-state distribution is wider and γ may approach 1 (isothermal). The [D-41] regularizer froze z~3 exponents without measuring the Sherwood-z=0.3 specific (β, γ). Trivial to fit from cached truth (density, temp) sightline data; never run.
+  - **W1-E "rules out overfitting"** rests on N=4 trajectory points at one seed. The "plateau" 0.4132 → 0.4155 is 0.5% — deep in 15% seed-noise floor. Re-run trajectory at 2–3 additional seeds (~30 min host).
+
+  **Cleanup pass (~3 host-hours + $1.50 Juno) — ordered list:**
+
+  1. R re-estimator audit (`mean|ΔF|`, `RMS ΔF`, var) per τ-bin — `tau_binned_residual.py` extension (D1)
+  2. F-test on `log P_pred(k) = α + log P_truth(k)` rescale hypothesis — `diag_pf_per_bin.py` extension (D2)
+  3. Multi-seed bootstrap (3–5 seeds) on cross-physics R + pub-t1 P_F/KS + W1-E trajectory — eval drivers extension (C1)
+  4. `n_HI = density · X_HI` distribution on [D-41] step_010000 — single-shot host script (C4)
+  5. Track-wide Hypothesis C diagnostic on P2/P3/P4 pub-t1 — `diag_pf_per_bin.py` cross-physics (C5)
+  6. Hann window comparison on [D-39] P1 P_F — `p_flux.py` apodization sweep (S2)
+  7. DLA-mask audit in `eval_partial_d13.py` + `p_flux.py` — repo grep (S1)
+  8. Sherwood-z=0.3 (β, γ) fit from truth (density, temp) at FGPA-valid mask — single-shot host script (S3)
+  9. Abstract verb revision: disclose 2-of-3 closure (C2)
+  10. §4.1 #3 hedged-confidence verbs ("first test of the discipline") (C3)
+  11. LEDGER review-trail field for high-stakes decisions (Panel P4)
+  12. (this entry) propagated to `.claude/agents/project-architect.md` (C3)
+  13. **[D-41] Tier-1 confirmation on Juno** (D3) — user authorized; FGPA-tail at 12,500 steps, P1, seed=0, same weights as smoke. ~50 min wallclock, ~$1.50. Settles D3 empirically.
+
+  **Binding lessons for [D-42] (velocity-gradient conditioning design):**
+
+  1. Every design spec must include a "what does the loss leave **unconstrained** when `loss_data` is weakly informative on the diffuse-bin majority?" line item.
+  2. Every empirical claim in the paper needs ≥3 eval-seed bootstrap, or an explicit "single-seed measurement" caveat. The one-seed-per-cell pattern was efficient mid-sprint but is below CVPR statistical-claim threshold.
+  3. PI design-spec language is hypothesis until tested ([D-37] extension above). A track with two falsified priors at confidence-level X downgrades the next prior to confidence-level X−1.
+
+  **Meta-judgment**: The science is sound at the **mechanism-narrative level** (P_F binding gate; rescale-preview falsified; integrated-statistic and per-pixel-physics losses both gameable on diffuse-majority weak-MSE). The **quantitative claims are fragile** in two directions: overstated diagnostic magnitudes (R, Pearson 0.83) and understated gate closure (2-of-3 buried in the abstract). With the ~3 host-hour cleanup above the sprint is defensible for CVPR submission; without it, the load-bearing magnitudes are exposed.
+
+  **References**: [D-37] (extended this entry), [D-39] (Addenda 1-5), [D-40] (Addendum 1), [D-41]. Defense-panel review transcript + PI affirmative transcript both held in conversation history (this session); summarized verbatim here per the user mandate to "argue thoroughly" — both retros are banked, not just the orchestrator's synthesis.
 ---
 
 ## 4. The Data (Lineage & Governance)
