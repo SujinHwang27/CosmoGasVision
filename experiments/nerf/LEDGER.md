@@ -663,6 +663,108 @@ graph TD
   **Updated meta-judgment**: The science survives the cleanup. The 5 KILLER-level attacks split between rebuttal (K1: empirically wrong) and partial-support-with-honest-language-fix (K2, K3, K4). The [D-41] mechanism narrative needed correction but the FAIL verdict is ratified by Tier-1. Two paper-level [D-40]/[D-41] claims need scope-narrowing (sat-aware amplitude-shrink ≠ baseline failure; FGPA-tail constant-collapse is a different mechanism than what [D-41] body said). All within scope of a text-only follow-up commit + the items 9-12 audit cleanup. **Ready to move to [D-42] velocity-gradient sprint after the text edits land.**
 ---
 
+- **[D-42] Velocity-gradient conditioning — design spec (2026-05-11, PI; review-trail: PI-only, deferred panel review pending smoke result)** —
+
+  **Problem.** The §4.1 ladder of `paper_cvpr/sec/4_next_steps.tex` enumerates three candidate interventions against the [D-39] $P_F$ binding-gate failure (mechanism (c) = saturation-band under-fitting, positively identified track-wide at $R \in [18.87, 23.75]$). [D-40] and [D-41] retire candidates #1 (integrated-statistic) and #2 (per-pixel FGPA-tail on network-predicted state); both falsified by a single structural cause — regularizers evaluated only on the network's self-consistent state are gameable when `loss_data` (log1p+cap+mask MSE) is weakly informative on the diffuse-bin majority. [D-42-meta] Addendum 1 item 4 + 13 corrected the [D-41] mechanism narrative to strict-Hypothesis-C constant-prediction collapse (density → 71.5±1.6 uniform; X_HI → 3.3e-5 uniform), broader than the "tau_pred → 0" reading in the [D-41] body. This entry specifies the third counterfactual — velocity-gradient conditioning — and is **the first test of the [D-37]-extension / [D-42-meta] anti-degeneracy discipline** (binding rules 1–6 in `.claude/agents/project-architect.md`).
+
+  **Mechanism hypothesis (one sentence, hedged).** Conditioning the density head on a finite-difference estimate of the **observation-derived** peculiar-velocity gradient $\partial v_{\text{pec}}/\partial \chi$ along each sightline (from the Sherwood `v_pec` field at training time, NOT from the network's `vpec` output) is **the cleanest known candidate** for breaking the self-consistent-state degeneracy that broke [D-40] and [D-41], because the conditioning input is held fixed against truth and is not minimized by any constant-field collapse the network may pursue. **No claim of mechanism-(c) closure is made in advance of a run.**
+
+  **Confidence verb (per [D-37]-extension binding rule 2, falsified-prior cascade).** Two prior priors of similar a-priori confidence ([D-40], [D-41]) failed at the same structural cause; this is the first test of the discipline. Verbs in this spec are constrained to *"may", "is the cleanest known candidate", "first test of", "expected on physical grounds but not yet tested"*. The terms "should resolve", "is expected to fix", "structurally immune by design", and "physics-invariant by design" are **prohibited** in this spec per the [D-42-meta] retrospective.
+
+  **Prior-failure ledger line (per [D-37]-extension binding rule 4).** Falsified §4.1 priors in this track at similar a-priori confidence:
+  - **[D-40]** (sat-aware $P_F$ band loss) — eval $P_F$ worsened by 37.4%; degeneracy: amplitude-shrink with shape preservation under the integrated relative-residual loss form (Addendum 1 narrowed: sat-aware-specific, not the pub-t1 baseline mechanism).
+  - **[D-41]** (per-pixel FGPA-tail on network-predicted state) — smoke-level FAIL ratified by Tier-1; degeneracy: constant-prediction collapse of *all* spatial fields to satisfy a single algebraic FGPA constraint (Addendum 1 item 4).
+  - **Binding lesson inherited by [D-42]**: any regularizer evaluated only on the network's predicted state is gameable by collapsing all input fields to constants. The next discipline regularizes against **ground-truth-anchored** quantities. The velocity-gradient input passes this test by construction (input is fixed truth, not predicted); whether the resulting *loss landscape* leaves no other degeneracy is an open empirical question, which the smoke gates below are designed to surface.
+
+  **Anti-degeneracy audit (per [D-37]-extension binding rule 3).**
+
+  *Question (binding format)*: "What does this loss leave UNCONSTRAINED when `loss_data` is weakly informative on the diffuse-bin majority?"
+
+  | Field | Constrained by | Falsifiable degeneracy that would re-emerge | Block in the proposed design |
+  |---|---|---|---|
+  | $\rho$ | data MSE (weak on diffuse); mean-F anchor (single scalar) | constant $\rho$ across sightline (the [D-41] collapse mode) | The conditioning concatenates $\partial v_{\text{pec}}/\partial \chi$ into the *input* of the density head, NOT into a regularizer term. Constant $\rho$ output is still possible if the head ignores the velocity-gradient feature; the design intent is that the velocity-gradient input *correlates with* $\rho$ (RSD compression in collapsing structures), so a head that ignores it pays a data-MSE cost. **Falsifiable**: smoke shows density spread > 10× truth median = 1.45 across rays. |
+  | $X_{HI}$ | data MSE; sigmoid bound | constant $X_{HI}$ across sightline | Same logic as $\rho$: $X_{HI}$ correlates with $\rho$ via the FGPA scaling (which the truth obeys); a $X_{HI}$ head ignoring conditioning pays data-MSE. **Falsifiable**: smoke shows X_HI spread > 100× truth median 6e-7 across rays. |
+  | $T$ | data MSE (very weak — log1p suppresses $T$ sensitivity); softplus bound | constant $T$ across sightline | NOT directly blocked. This is the residual degeneracy the velocity-gradient input does not constrain. **Accepted risk**: if $T$ collapses to constant but $\rho$ and $X_{HI}$ do not, $P_F$ may still improve (Lyα opacity is more sensitive to $\rho$ and $X_{HI}$ than to $T$ at fixed $n_{HI}$). If $T$ collapses AND $P_F$ does not improve, [D-42] FAILS and the residual degeneracy is named for the next round. |
+  | $v_{\text{pec}}$ | data MSE (line-center shifting); tanh bound | constant $v_{\text{pec}}$ across sightline | The conditioning input is the truth $\partial v_{\text{pec}}/\partial \chi$, NOT the network's output. The network's $v_{\text{pec}}$ head can collapse to constant without affecting the conditioning signal; this is acceptable since the Voigt kernel uses the network's $v_{\text{pec}}$ at *every* source bin (`src/models/nerf.py`), so a constant $v_{\text{pec}}$ output erases line-shape structure and pays a data-MSE cost. |
+
+  *Residual degeneracy named explicitly*: a constant-$T$, structured-$\rho$, structured-$X_{HI}$ solution is reachable. Whether it minimizes the loss to a level competitive with the [D-39] baseline is empirically open. If smoke shows this signature, [D-42] FAILS and the next discipline is "ground-truth-anchored regularizer term, not just ground-truth-anchored input" — currently un-spec'd.
+
+  **Math contract.**
+
+  *Input shape and source.* `∂v_pec/∂χ` is computed from the **Sherwood-truth** `v_pec[ray, bin]` field (already loaded by `SherwoodLoader`) via centered finite differences along the line-of-sight (bin) axis:
+
+  $$
+  g_i \;=\; \frac{v_{\text{pec}}^{\text{truth}}[i+1] - v_{\text{pec}}^{\text{truth}}[i-1]}{2\,\Delta\chi},
+  $$
+
+  with $\Delta\chi$ the comoving-coordinate bin spacing (km/s/(comoving Mpc/h) in this convention; constant per ray). Periodic boundary conditions match the Sherwood box convention. Computed once per ray at load time; **detached** (no grad to network), stored as a sidecar `v_pec_grad_truth` array shape `(num_los, nbins)`.
+
+  *Where it enters.* As an **input concatenation** at the density head (NOT an auxiliary head, NOT a regularizer term in the loss). The MLP forward extends from `x: (..., 3)` to `(x, g): (..., 4)` where `g` is the per-source-bin velocity-gradient feature sampled at the same coordinate. The PositionalEncoding consumes only the spatial 3-vector; the 1D gradient feature is concatenated *after* encoding, into the layer-1 input. This keeps the encoded coordinate basis unchanged and adds 1 dimension to `in_dim`.
+
+  *Normalization.* `g` is z-scored across the full Sherwood truth dataset per redshift (z=0.3 fiducial); units after z-scoring are dimensionless and roughly $\mathcal{N}(0, 1)$. The z-score statistics are computed once at fit time and cached alongside the per-physics ray dataset (no leakage from eval rays into train normalization — split by seed before stat computation).
+
+  *Loss form.* **Unchanged from [D-39] pub-t1 baseline.** The data loss, mean-F anchor, log_prior on `tau_amp` all stay as in the [D-39] pub-t1 spec. **No new regularizer term is added**; the entire intervention is on the conditioning input. This is the load-bearing design choice — [D-40] and [D-41] failed on new regularizer terms; [D-42] tests whether the bare *input* signal is sufficient to break the saturation-band under-fitting, with the loss form already established as working (3/4 KS PASS, 4/4 mean-F PASS).
+
+  *Per-bin vs. anchored against population statistic*. Per-bin (each Voigt source bin sees its own $g$). No population-statistic anchoring.
+
+  *Masking*. The DLA / saturated-absorber mask from [D-24] is applied to the data MSE as before; `g` itself is not masked (it is an input feature, not a loss term).
+
+  **Smoke gates (50-step on P1, per [D-37] / [D-41] precedent).**
+
+  1. **No NaN** (gradients, parameters, all logged metrics).
+  2. **`loss_total` descends** monotonically across the 50-step window (final/initial < 0.85, the [D-19] criterion).
+  3. **mean_F preserved**: `|mean_F_pred(step 50) − 0.979| < 0.05` (no anchor drift > 5%).
+  4. **tau_amp stable**: `tau_amp(step 50) ∈ [0.5, 2.0]` (no collapse to 0 or runaway).
+  5. **NEW gate — density spread (binding lesson from [D-41] Addendum 1 item 4)**: at step 50, `max(ρ_pred) − min(ρ_pred)` across the n_rays × nbins prediction grid > **1.45** (10× the Sherwood truth median Δ = 0.145). The [D-41] Tier-1 collapse pattern showed density ≈ 71.5 ± 1.6 (a 7-unit window centered far from truth median); this gate blocks any spread less than 1.45 absolute units, which is a *floor* well above the [D-41] failure range. The gate is intentionally generous — true Sherwood density spread is 10⁵× across diffuse-vs-collapsed; failing at 1.45 is unambiguous collapse, not a marginal call.
+  6. **NEW gate — X_HI spread (binding lesson from [D-41] Addendum 1 item 4)**: at step 50, `max(X_HI_pred) − min(X_HI_pred)` > **6e-5** (100× the truth median 6e-7). [D-41] collapsed to X_HI ≈ 3.3e-5 uniform; gate is set 1.8× above that collapse value as the spread floor, again intentionally generous.
+
+  Pass condition: ALL six gates PASS. Any single gate FAIL stops Tier-1 dispatch (per [D-37] / [D-41] cost discipline).
+
+  **Tier-1 conditional ladder.** Tier-1 dispatch (P1, n_rays=64, microbatch=32, 12,500 steps, seed=0, anchor 0.979, Juno a30) **only** if smoke is unambiguously PASS on all six gates. Cost ceiling: ~$1.50 / ~50 min wallclock per [D-40] / [D-41] precedent. **Tier-1 budget projection if all 4 physics need confirmation** (P1, P2, P3, P4 each at $1.50): ~$6.00 total Juno spend. **Decision rule**: P1 Tier-1 first; if it PASSES the [D-13] gates, P2/P3/P4 Tier-1 dispatch in parallel (~$4.50 incremental). If P1 Tier-1 FAILS the [D-13] gates, P2/P3/P4 are skipped and [D-42] is retired per the falsification criteria below — cost saved ~$4.50.
+
+  **Falsification criteria (pre-committed, per [D-37] symmetric-disclosure rule).**
+
+  [D-42] is declared FAIL if **any one** of the following obtains on the P1 Tier-1 checkpoint at step 12,500 (`pf_residual_mean = mean(|ΔP_F/P_F|)` over the [D-13] inertial range $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km, Hann window, normalized $\delta_F$):
+
+  1. **`pf_residual_mean > 0.35`** — i.e., no material improvement over the [D-39] pub-t1 P1 baseline of 0.4155. Threshold 0.35 = 15% relative improvement margin against the [D-39] baseline; chosen so the test is not over-precise (single-seed eval; per [D-42-meta] C1 seed sensitivity 3–7% on P1) and not under-precise (failing at 0.40 would be statistical noise; passing at 0.35 is a clean signal).
+  2. **`ks_distance > 0.05`** — flux-PDF KS gate broken (the [D-39] pub-t1 P1 baseline PASSED at 0.0325; if [D-42] breaks this, it has hurt the model on a gate that was working).
+  3. **`pearson_log(P_F_pred, P_F_truth) < 0.70` AND `ratio_mean ∉ [0.85, 1.15]`** — the [D-40] amplitude-shrink failure signature (shape preserved, amplitude wrong). If the model has converged to a globally-rescaled $P_F$ rather than fixing the saturation band, the structural mechanism is unaddressed; per [D-42-meta] Item 2 honest framing, report all three numbers (Pearson, F-test on the rescale hypothesis, ratio_mean) — not just the Pearson.
+  4. **Constant-prediction-collapse re-emergence test (binding from [D-41] Addendum 1)**: on the Tier-1 checkpoint, run `item4_n_HI_distribution` (the [D-42-meta] item-4 diagnostic) — the predicted `density`, `X_HI`, `n_HI` distributions must not show the [D-41] collapse pattern (median collapsing to a single value within 5% of all-ray-median). If `median(density)` is within ±5% of all-ray-uniform AND `median(X_HI)` is within ±5% of all-ray-uniform, the collapse re-emerged in a new form and [D-42] FAILS.
+  5. **`xi_rho_rhohat(r = 2 h⁻¹ Mpc) < 0.4`** — diagnostic check against the [D-13] (b) gate; not a smoke-level gate but a Tier-1 sanity bar. If the 3D Pearson cross-correlation has degraded relative to the baseline (the baseline does NOT have this number measured yet, so this gate is informational at this stage — but a value below 0.4 would indicate $\rho$ structure has been damaged by the conditioning, even if $P_F$ improves).
+
+  [D-42] is declared **PASS** if all five fall on the favorable side. [D-42] is declared **PARTIAL PASS** if (1) PASSES (`pf_residual < 0.35`) and (2)–(5) all hold, in which case the §4.1 #2 framing in the paper upgrades from "first test of the discipline" to "first successful test of the discipline" with explicit single-seed caveat per [D-42-meta] C1 (multi-seed Tier-1 bootstrap, ~$6 incremental, follows as a confirmation step).
+
+  **Stop conditions (smoke-level, per [D-37] symmetric-disclosure).**
+
+  Stop short of Tier-1 if **any** of the following are observed during the 50-step smoke:
+
+  - **New degeneracy class not in the anti-degeneracy audit**: e.g., the network's `vpec` output collapses to constant while the gradient feature is consumed, but $\rho$ also collapses on a slower trajectory than [D-41]'s 50-step pattern (would require step-by-step diagnostic during smoke). If the smoke trace shows a degeneracy signature not anticipated in the audit table above, **refactor the spec and re-spec before re-running**; do not push to Tier-1 hoping the trajectory recovers.
+  - **`loss_total` rises in the second half of the smoke**: indicates the conditioning input is destabilizing the optimizer rather than helping; refactor before Tier-1.
+  - **`g` magnitude check fails**: at load time, the z-scored `g` distribution must have std ∈ [0.9, 1.1] across all rays per physics. If a normalization bug means `g` arrives at the network as zeros or as outliers > 10σ, the smoke result is uninterpretable; stop and fix the loader before re-running.
+
+  **Hand-off to core-implementer (named milestones; not dispatched in this entry).**
+
+  Files that change (estimated):
+  - `src/data/loader.py` — add `v_pec_grad_truth` computation in `SherwoodLoader` preprocessing path; emit as a sidecar tensor alongside existing fields. Z-score normalization computed at fit time, cached per physics + per redshift. *Owner: data-engineer.*
+  - `src/models/nerf.py` — extend `IGMNeRF.forward` to accept an optional `g: (..., 1)` tensor concatenated with the encoded `x` at the layer-1 input; `in_dim` becomes `3 + 2*3*L + 1` when `g` is provided. Backward-compatibility flag `use_velocity_gradient_conditioning` (default `False`) preserves the [D-39] baseline forward signature. *Owner: core-implementer.*
+  - `experiments/nerf/pipeline.py` — new CLI flag `--use_velocity_gradient_conditioning` (default off), passes the `v_pec_grad_truth` sidecar through to the model forward. *Owner: core-implementer.*
+  - `scripts/submit_juno_stage2b.sh` — new `JUNO_BATCH` cases `vel-grad-cond-smoke` and `vel-grad-cond-pub` mirroring the [D-40] / [D-41] dispatch patterns. *Owner: infrastructure-manager.*
+  - `scripts/diag_velocity_gradient_smoke.py` (new) — runs the 6 smoke gates at step 50 and emits a PASS/FAIL JSON sidecar; same format as `scripts/diag_pf_per_bin.py` (cross-physics structure). *Owner: support-researcher.*
+
+  Named coding milestones (sequenced):
+
+  1. **Loader hook** lands `v_pec_grad_truth` sidecar; unit test confirms periodic-BC finite difference matches a reference NumPy implementation to 1e-12; z-score stats stable across 3 random seeds.
+  2. **Model hook** lands with `use_velocity_gradient_conditioning=False` default; existing [D-39] pub-t1 P1 forward output is bitwise-identical (regression test); flag-on path passes a shape-check smoke.
+  3. **Pipeline flag** lands; 5-step memory smoke on P1, n_rays=64 confirms peak VRAM does not exceed the [D-39] 2.84 GB anchor by more than 5%.
+  4. **50-step smoke** on P1 with all six gates evaluated; output JSON to `experiments/nerf/artifacts/eval/d42_smoke/{run_id}_gates.json`. **PI sign-off required** before Tier-1.
+  5. **(Conditional) Tier-1 P1 dispatch** on Juno, eval at step 12500, falsification criteria 1–5 evaluated; output to `experiments/nerf/artifacts/eval/d42_tier1/P1_gates.json`.
+  6. **(Conditional) Tier-1 P2/P3/P4 parallel dispatch** if P1 Tier-1 passes.
+
+  **References.** [D-13] (gate set), [D-19] (smoke discipline), [D-24] (loss form preserved), [D-37] (honest-reporting; design-spec extension), [D-39] (baseline + mechanism (c) positive ID), [D-40] (sat-aware FAIL + Addendum 1 amplitude-shrink narrowing), [D-41] (FGPA-tail FAIL + Addendum 1 constant-prediction collapse correction), [D-42-meta] (retrospective + design-spec discipline + Cleanup-Pass items C1 multi-seed, C4 n_HI distribution diagnostic, S3 z=0.3 FGPA exponents — none of which block this spec but all of which inform the falsification criteria above). Paper §4.1 #2 framing (`paper_cvpr/sec/4_next_steps.tex`) is **downstream**; this spec is the LEDGER source of truth.
+
+  **Review-trail (per [D-42-meta] retrospective binding rule 6)**: PI-only sign-off on this spec; deferred panel review scheduled for after the 50-step smoke result lands (panel reviews the smoke gates against the audit table above and either ratifies Tier-1 dispatch or names a residual degeneracy). This gates ~$1.50–$6.00 of Juno compute, so falls inside the rule-6 "any compute > $5 or paper-section claim" envelope; the smoke result is the trigger for the deferred review, not the PI sign-off itself.
+---
+
 ## 4. The Data (Lineage & Governance)
 
 **Box Size**: 60,000 kpc/h (60 Mpc/h) — *Optimal balance of pixel resolution (30kpc) vs representing filaments.*
