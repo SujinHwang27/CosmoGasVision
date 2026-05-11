@@ -34,7 +34,7 @@ A naive per-bin MSE on raw $\tau$ is dominated by rare saturated absorbers: damp
 \mathcal{L}_{\text{data}} = \big\langle \big( \log(1 + \tau_{\text{pred}}^{\text{eff}}) - \log(1 + \tau_{GT}^{\text{eff}}) \big)^2 \big\rangle_{\text{non-saturated}}
 \label{eq:data-loss}
 \end{equation}
-averaged over rays and unmasked velocity bins. The $\log(1+\tau)$ supervision space is defended on physical grounds: Lyman-alpha-forest opacity is approximately log-normally distributed in $\tau$ across the cool diffuse IGM~\cite{bi_davidsen1997, hui_gnedin1997}, a consequence of the Fluctuating Gunn-Peterson Approximation $\tau \propto \rho^{1.6} T^{-0.7}$ acting on a near-log-normal density PDF. The mask and cap are not part of the novelty claim; the supplementary records the Bolton--Haehnelt derivation of the $\tau_{\text{core}}=10^5$ threshold and a four-cell ablation showing they are not load-bearing for convergence on the tested configuration (retained as defense-in-depth against initialization-stress regimes; see [D-38]).
+averaged over rays and unmasked velocity bins. The $\log(1+\tau)$ supervision space is physically motivated: Lyman-alpha-forest opacity is approximately log-normally distributed in $\tau$~\cite{bi_davidsen1997, hui_gnedin1997}, from FGPA $\tau \propto \rho^{1.6} T^{-0.7}$ on a near-log-normal density PDF. The mask and cap are defense-in-depth, not part of the novelty claim (see suppl., [D-38]).
 
 \subsection{Mean-Flux Anchor and Gradient Linearization}
 The forward model is invariant under $\rho \to k\rho,\ \mathcal{A} \to \mathcal{A}/k$, so the data loss alone cannot fix the absolute overdensity amplitude. We break the degeneracy with the observational mean-flux constraint at $z = 0.3$:
