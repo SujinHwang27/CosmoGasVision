@@ -878,6 +878,31 @@ graph TD
   **References.** [D-13] (gate set), [D-37] (honest-reporting), [D-42-meta] Item 3 / C1 (precedent), [D-43] (cut-sequence step 2), `experiments/nerf/artifacts/eval/cleanup_pass/item3_multiseed_bootstrap.json`, `scripts/eval_partial_d13.py`, `src/analysis/{p_flux,flux_pdf}.py`, `paper_cvpr/sec/3_experiments.tex` (Tab.`tab:headline-3gate`).
 
   **Review-trail.** PI design-spec drafted 2026-05-11 under [D-37]-extension discipline. Implementation hand-off to `support-researcher` per §6. PI to evaluate falsification rules §3.1-3.3 on the resulting JSON before any paper edits land.
+
+  **Addendum 1 — Bootstrap results & rule evaluation (2026-05-11, PI).** Artefact `experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json` landed (driver `scripts/d44_bootstrap_KS_meanF.py`, 5.8 min wall, K=512 resamples per cell, seeds {42–46}). Anti-degeneracy F1/F2 PASS (sightline-level bootstrap; pred and truth indices from independent PCG64 streams; `indices_identical=False`).
+
+  **Results (mean ± σ; q16 / q84):**
+
+  | Cell | KS | KS q16/q84 | meanF | meanF q16/q84 |
+  |---|---|---|---|---|
+  | P1 | 0.0357 ± 0.0024 | 0.0339 / 0.0372 | 0.9671 ± 0.0018 | 0.9658 / 0.9690 |
+  | P2 | 0.0677 ± 0.0110 | 0.0603 / 0.0758 | 0.9703 ± 0.0023 | 0.9687 / 0.9724 |
+  | P3 | 0.0353 ± 0.0062 | 0.0298 / 0.0410 | 0.9724 ± 0.0024 | 0.9709 / 0.9742 |
+  | P4 | 0.0411 ± 0.0039 | 0.0369 / 0.0441 | 0.9735 ± 0.0009 | 0.9727 / 0.9743 |
+
+  **Rule 1 (KS-widen → §0 retraction): does NOT trigger.** Only P2 has q84 > 0.05 (0.0758); threshold required ≥2/4. "3/4 KS-close" claim survives bootstrap; P2 fails *bootstrap-robustly* at 1.5× over the gate.
+
+  **Rule 2 (meanF CI excludes [0.974, 0.984]): TRIGGERS on 2/4 cells (P1, P2).** P1 CI [0.9658, 0.9690] and P2 CI [0.9687, 0.9724] both sit entirely below the Kirkman+2007 anchor; P3 and P4 marginal — q84 = 0.9742 and 0.9743 respectively, **inclusive overlap rule adopted forward**: q84 ≥ 0.974 counts as overlap, mirroring the anchor band's inclusive convention. §0/§3 "mean-flux closes 4/4" softens to "2/4 at the population level; 4/4 at seed=42 single-seed".
+
+  **Rule 3 (confirmation-narrowing): TRIGGERS for meanF in 4/4 cells** (σ_rel 0.09–0.25%, all < 0.3%); **does NOT trigger for KS** (σ_rel 6.7–17.6%, all > 5%). Verb upgrade ("may close" → "closes") applied **only** to P3 and P4 meanF (cells where the CI also overlaps the anchor); upgrade explicitly withheld for P1/P2 meanF (Rule 2 trigger) and for KS in all cells.
+
+  **Separate finding — bootstrap-vs-seed=42 meanF divergence.** Bootstrap means lie **2–9σ below** the seed=42 anchor across all 4 cells (P1: −6.6σ, P2: −2.2σ, P3: −2.4σ, P4: −8.9σ); the seed=42 sightline draw samples the high-⟨F⟩ tail of the seed distribution. KS values are not similarly biased. This is **not a bootstrap bug** — it's a property of the seed=42 sample. Must be disclosed in §3.5 per [D-37]-rule 5 (symmetric honesty: if the bootstrap would have *upgraded* the claim, it should be reported; here it *softens* the claim and must equally be reported).
+
+  **Counter-factual (per [D-37]-rule 6).** Had σ_rel(KS) < 5% with q84 < 0.05 in 4/4 cells, KS verb would have upgraded to "closes robustly"; had the bootstrap meanF mean tracked the seed=42 value to within 1σ, no §0/§3 softening would have been authorized.
+
+  **New pre-committed rule (forward).** The q84-vs-anchor inclusive-overlap convention is binding for all future bootstrap-vs-observational-anchor adjudications in this track (prevents fence-sitting on the third decimal).
+
+  **Paper edits dispatched.** latex-author hand-off block records verbatim wording for §0, §3, Tab.`tab:headline-3gate`, and §3.5 verb upgrades. PI re-review on the latex-author diff before commit.
 ---
 
 ## 4. The Data (Lineage & Governance)
