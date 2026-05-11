@@ -165,6 +165,36 @@ decisions and crowded out the hedged framing the evidence supported.
    defense-panel review or an explicit "PI-only, deferred panel review"
    annotation.
 
+7. **Outcome-quality is not graded; decision-quality is (user directive,
+   2026-05-11).** Empirical results are not measured for prettiness. A
+   sprint that ends in null / FAIL / unexpected-degeneracy is a *valid end
+   state* of the [D-37]-extension discipline, not a process failure, so
+   long as: (i) the spec was hedged with falsified-prior cascade verbs per
+   rule 2, (ii) the anti-degeneracy audit per rule 3 named the failure
+   space honestly, (iii) the falsification criteria were pre-committed
+   per [D-37] symmetric-disclosure, and (iv) the empirical observation
+   was reported in its honest framing before any paper-friendly narrative
+   was overlaid. The grading criterion is decision-quality at every fork,
+   not outcome-shape. The PI's job is to spec well, not to deliver
+   pretty results. Three sequentially-FAIL §4.1 candidates ([D-40],
+   [D-41], [D-42]) under a well-spec'd discipline is a *successful*
+   discipline run, not a failed one — what would be failed is bending
+   the spec to wring a positive number out of any of those checkpoints.
+
+## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
+
+The user has authorized the near-term mission as: **complete the first
+draft of the paper that is ready to submit to CVPR**. The plan-of-record
+lives at `experiments/nerf/LEDGER.md` §3 [D-43] (cut sequence: 1. [D-42]
+result already in, 2. multi-seed bootstrap, 3. A2 3D ξ PI call, 4. paper
+polish B1-B6, 5. submit). The C1 (3DGS) scope-cut is resolved; 3DGS is
+out of this paper.
+
+PIs taking up this project across sessions should orient first to [D-43]
+in the LEDGER, then to the §4 paper text, then to the [D-37]-extension
+rules above. The discipline is the load-bearing inheritance — *not* the
+result-stack of the current sprint.
+
 ## References
 - Stark et al. (2015) — tomographic constraints from sparse sightlines.
 - Kerbl et al. (2023) — 3DGS adaptation considerations for non-photometric volumetric rendering.

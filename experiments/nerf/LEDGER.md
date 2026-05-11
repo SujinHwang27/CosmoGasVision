@@ -56,8 +56,8 @@ graph TD
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 1** | Preprocessing & Data Pipeline | ✅ **DONE** | Data Integrity Pass | Sec 2.1 (Method) |
 | **Stage 2a** | Differentiable Integrator (RSD-convolved Voigt) | ✅ **DONE (re-validated)** | Grad. Flow @ production scale (P1, z=0.3) | Sec 2.3 (Method) |
-| **Stage 2b** | Full MLP Optimization | 🟥 **PASS_T1_pub FAIL — [D-39] RESOLVED-as-FALSIFICATION** — Cost-survey 12/12 PASS [D-19] safety; T1 publication-class (P1–P4 @ corrected anchor 0.979, 50k steps, seed=0) completed ExitCode 0:0 but **fails the [D-13] gate on P_F in all 4 cells (3.6×–4.2× over)** and on KS in P2 (1.5× over). mean_flux gate and cross-physics spread (0.63%) PASS. The corrected-anchor full-schedule result **falsifies the [D-35] rescale-preview interpretation**; the P_F gap is structural, not calibration. **T4 (792 GPU-hr) BLOCKED** pending Wrinkle-1 diagnostic ([D-39] §"Decision"). | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13], [D-39]. | Sec 4.1 (Next) |
-| **Stage 3** | Physics Model Classification | ⏳ **PENDING** | Acc > 85% | Sec 4.3 (Next) |
+| **Stage 2b** | Full MLP Optimization | 🟧 **PASS_T1_pub: 2-of-3 [D-13] gates close, P_F binding gate FAILS** — mean_flux 4/4 PASS @ $\langle F_{\text{pred}}\rangle \in [0.974, 0.984]$ (cross-physics spread 0.63%); KS 3/4 PASS (P2 1.5× over the 0.05 bar); P_F 0/4 PASS ($\|\Delta P_F/P_F\|$ 36–42%, 3.6×–4.2× over the 10% bar in all 4 cells). [D-39] positively identifies saturation-regime under-fitting as the residually-supported mechanism cross-physics ($R \in [18.87, 23.75]$, $4/4$ cells $>12\times$ floor). Three counterfactual interventions tested cross-physics under the [D-37]-extension / [D-42-meta] anti-degeneracy discipline: **[D-40] sat-aware $P_F$ band loss FAIL** (eval $P_F$ worsened $+37.4\%$; constant-prediction collapse on integrated-statistic loss); **[D-41] FGPA-tail per-pixel regularizer FAIL** at smoke + Tier-1 (constant-prediction collapse on self-consistent state — density flat $\approx71.5$, X_HI flat $\approx3.3e-5$); **[D-42] velocity-gradient conditioning IN FLIGHT** (HEAD `721d0c8`; first test of the ground-truth-anchored discipline; M1-M4 code banked + 50-step P1 host smoke running). **T4 (792 GPU-hr) BLOCKED** pending [D-42] result; per §4.2, density-axis Tier-4 dispatch would not be expected to close $P_F$ on a cross-physics-invariant saturation deficit alone. | $\|\Delta P_F/P_F\| < 10\%$ over $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km AND $\xi_{\hat\rho,\rho}(r=2\,h^{-1}\,\text{Mpc}) > 0.6$ AND KS$(F\text{-PDF}) < 0.05$ at fiducial P1, $z=0.3$, $n_{\text{rays}}=1024$; degradation curve monotone over the $4 \times 4$ matrix. See [D-13], [D-39], [D-40], [D-41], [D-42], [D-43]. | Sec 4.1 (Next) |
+| **Stage 3** | Feedback classification on reconstructed $\rho$ | ⏸ **DEFERRED — gated on $P_F$-passing reconstruction** | Acc > 85% on $\{P_1, P_2, P_3, P_4\}$ 3D-$\rho$ crops | Sec 4.3 (Next) |
 
 ### ✅ Completed Milestones
 - **2026-03-26**: Validated the analytic **Tepper-García (2006)** Voigt approximation.
@@ -66,6 +66,8 @@ graph TD
 - **2026-03-27**: Verified gradient flow on the host Edge environment via cross-WSL sync.
 - **2026-05-01**: **Stage 2a re-validation** at production architecture (8 layers, $L=10$) following project-architect review. Fixed coordinate normalization bug ([D-08]); lifted integrator simplifications to full RSD convolution ([D-06]); switched to per-bin $\tau(v)$ MSE ([D-07]); paper-vs-code drift retired ([D-09]). Smoke run: 10 rays × 256 bins (subsampled), gradient flow confirmed end-to-end.
 - **2026-05-07**: **Stage 2b Batch 2 (Juno T2 × {P1,P2,P3,P4}) complete**, all 4 cells PASSED [D-19] safety rails; cross-physics consistency well inside [D-13] tolerances (`mean_flux_pred` spread 0.39%, `loss_data` spread 16%, `peak_vram_gb` identical to 4 decimals at 11.27 GB confirming [D-23] linear-VRAM model is physics-invariant); first production sweep on the Juno HPC dispatch path under [D-25]; runs imported to local MLflow tagged `compute=juno`; LEDGER §6 has the run-id table.
+- **2026-05-11**: **Three-counterfactual sprint ([D-39] → [D-40] → [D-41]) closed via [D-42-meta] retrospective + 13-item cleanup pass.** [D-39] PASS_T1_pub FAIL with positive cross-physics ID of saturation-band under-fitting ($R \in [18.87, 23.75]$, $4/4$ cells). [D-40] sat-aware $P_F$ band loss FAIL (amplitude-shrink). [D-41] FGPA-tail per-pixel regularizer FAIL at smoke + Tier-1 (constant-prediction collapse — density flat $\approx 71.5$, $X_{HI}$ flat $\approx 3.3e-5$). [D-42-meta] retrospective (PI + defense-panel, user-mandated): 4 KILLER attacks (K1 rebutted, K2 partial, K3 partial, K4 settled by Tier-1); 13-item cleanup pass; [D-37] extended to design-spec language; `project-architect.md` inscribes 6 binding rules. Paper §0/§4.1 verbs recalibrated.
+- **2026-05-11**: **[D-42] velocity-gradient sprint executed end-to-end on the [D-37]-extension discipline.** PI design spec banked (HEAD `784678f`); M1-M4 code landed (HEAD `721d0c8`) with 6/6 unit tests PASS and 5-step memory smoke PASS. 50-step P1 host smoke (real Sherwood data) ran clean to ExitCode 0 (run_id `63e6990b...`). **Smoke gates 1-4 + 6 PASS; gate 5 (density spread > 1.45) FAILS catastrophically at observed 0.0071 (200× below floor).** New degeneracy class IDed: partial-collapse signature where density head outputs $\approx 0$ uniformly while X_HI head retains structure (range 5e-11 to 3.3e-2). Distinct from [D-41]'s full-collapse and [D-40]'s amplitude-shrink. Per the spec's pre-committed stop condition, **[D-42] retired at smoke** — no Tier-1 Juno dispatch. The [D-37]-extension discipline worked as designed: gate 5 was a [D-41]-derived anti-collapse backstop, and it caught a previously-unaudited collapse class on the very first test. See [D-42] entry in §3 + [D-43] CVPR submission plan-of-record.
 
 ---
 
@@ -763,6 +765,85 @@ graph TD
   **References.** [D-13] (gate set), [D-19] (smoke discipline), [D-24] (loss form preserved), [D-37] (honest-reporting; design-spec extension), [D-39] (baseline + mechanism (c) positive ID), [D-40] (sat-aware FAIL + Addendum 1 amplitude-shrink narrowing), [D-41] (FGPA-tail FAIL + Addendum 1 constant-prediction collapse correction), [D-42-meta] (retrospective + design-spec discipline + Cleanup-Pass items C1 multi-seed, C4 n_HI distribution diagnostic, S3 z=0.3 FGPA exponents — none of which block this spec but all of which inform the falsification criteria above). Paper §4.1 #2 framing (`paper_cvpr/sec/4_next_steps.tex`) is **downstream**; this spec is the LEDGER source of truth.
 
   **Review-trail (per [D-42-meta] retrospective binding rule 6)**: PI-only sign-off on this spec; deferred panel review scheduled for after the 50-step smoke result lands (panel reviews the smoke gates against the audit table above and either ratifies Tier-1 dispatch or names a residual degeneracy). This gates ~$1.50–$6.00 of Juno compute, so falls inside the rule-6 "any compute > $5 or paper-section claim" envelope; the smoke result is the trigger for the deferred review, not the PI sign-off itself.
+
+- **[D-42] Addendum 1: velocity-gradient conditioning — smoke-level FAIL via density-head collapse (2026-05-11)** —
+
+  50-step P1 host smoke (real Sherwood data, `--use_velocity_gradient_conditioning`, MLflow run_id `63e6990b085b46258a52530989b2edfc`, checkpoint `cloud_runs/d42_smoke_P1/step_000050.pt`) completed ExitCode 0. Six-gate readout against the spec thresholds:
+
+  | Gate | Threshold | Observed | Result |
+  |---|---|---|---|
+  | 1. No NaN | — | all finite | PASS |
+  | 2. `loss_total` descends | ratio < 0.85 | 0.0318 → 0.0111 (ratio 0.349) | PASS |
+  | 3. mean_F preserved | $\|\text{mean\_F} - 0.979\| < 0.05$ | 1.0000 / drift 0.021 | PASS |
+  | 4. tau_amp stable | $\in [0.5, 2.0]$ | 0.9924 | PASS |
+  | 5. **density spread** | > 1.45 | **0.0071** | **FAIL** (200× below floor) |
+  | 6. X_HI spread | > 6e-5 | 0.0332 | PASS (550× above floor) |
+
+  **Verdict**: 5/6 PASS but gate 5 fails catastrophically. Per the spec's pre-committed stop condition, [D-42] is retired at smoke; no Tier-1 Juno dispatch. The $1.50 P1 Tier-1 dollar saved by the [D-37]-extension discipline (had we pushed through hoping for recovery and instead spent it on a deeper-but-same-shape failure, the cost would be $1.50 of compute + the multi-day delay of a failed Tier-1 evaluation chain).
+
+  **Mechanism — new degeneracy class, distinct from [D-40] and [D-41]:**
+  - **Density head**: predicted $\rho \in [0.0000, 0.0071]$, median $\approx 0.0003$, mean $\approx$ flat-near-zero. Truth median is $0.145$ ($\sim 500\times$ the predicted median); the network has collapsed the density output to a tiny band near zero rather than learning structure. This is a partial degeneracy not anticipated in the spec's audit table, which assumed a *constant* (non-zero) density collapse like [D-41].
+  - **X_HI head**: predicted $X_{HI} \in [4.8e-11, 3.3e-2]$, median $\approx 4.4e-3$. Range matches the truth dynamic range ($[7.6e-11, 2.3e-4]$, median $6.0e-7$) in *spread* but the median is $\sim 7300\times$ above truth — the head IS learning spatial structure, just with the wrong absolute level. So the velocity-gradient conditioning input is being consumed by *some* head (X_HI), but the *density* head specifically fails to leverage it.
+  - **mean_F = 1.0000 explained**: when $\rho \approx 0$ everywhere, $n_H = \rho \cdot \bar{n}_H \approx 0$, so $n_{HI} = X_{HI} \cdot n_H \approx 0$, so $\tau \approx 0$, so $F = e^{-\tau} \approx 1$. The "passing" mean-F gate was the *signal* of density collapse, not a healthy fit. Gate 3 passed because the threshold of 0.05 is wide; a tighter threshold (e.g., < 0.001 anchor drift to detect saturation-at-unity) would have caught it. **Banked as a [D-44]-spec-level lesson: future smoke gates should test mean_F deviation from BOTH 0.979 AND 1.000 (the trivial-collapse value).**
+
+  **What the [D-37]-extension discipline caught (and what it didn't):**
+  - CAUGHT: gate 5 (density spread > 1.45) was set as a [D-41]-derived anti-collapse backstop. It successfully detected a *different* collapse shape (near-zero rather than constant-at-71.5) because the FLOOR threshold is collapse-agnostic — any spread less than 1.45 is unambiguous collapse regardless of the constant value the collapse is near.
+  - NOT CAUGHT in the audit pre-spec: the *partial* nature of the collapse. The audit anticipated a "constant-$T$, structured-$\rho$/X_HI" residual degeneracy; the empirical outcome is "constant-low-$\rho$, structured-X_HI, structured-$v_{\text{pec}}$ output (per gates 3/4)". The asymmetry between which heads collapse is a new finding.
+
+  **PI verdict, per [D-37]-extension symmetric-disclosure**: [D-42] is the third sequential §4.1 candidate retired at empirical-FAIL ([D-40], [D-41], [D-42]). The [D-37]-extension confidence-verb discipline (rule 2, falsified-prior cascade) is empirically supported by this outcome: the spec did not promise closure; it framed [D-42] as "first test of the discipline", and the discipline worked. The discipline's failure mode is the absence of audit coverage for *partial* (asymmetric-head) degeneracies; rule 3 (anti-degeneracy audit) is extended in spirit to require "if multiple output heads, what does each head's loss leave unconstrained?" Banked as discipline-level lesson for future specs.
+
+  **Status of paper §4.1 #2 framing**: unchanged. The paper text already hedged §4.1 #2 to "first test of the ground-truth-anchored discipline ... not a high-confidence pick"; the FAIL outcome confirms the hedge was warranted. No retraction required; the §4.1 #2 entry should be updated to "tested, empirically falsified at smoke" rather than "proposed" in the next paper-polish pass.
+
+  **References.** [D-37]-extension binding rules 1–6 (`.claude/agents/project-architect.md`), [D-41] Addendum 1 (the spec's source for gates 5/6), [D-40] Addendum 1 (the amplitude-shrink narrowing precedent), paper `sec/4_next_steps.tex` §4.1 #2 (downstream — needs update in the polish pass).
+
+  **Artifacts**: `cloud_runs/d42_smoke_P1/{step_000050.pt, smoke_stdout.log}`; `experiments/nerf/artifacts/eval/d42_smoke/d42_smoke_P1_gates.json` (header-only — empty because of MLflow loss-history wiring gap; the six-gate values above are the authoritative readout). MLflow run `63e6990b085b46258a52530989b2edfc`.
+---
+
+- **[D-43] CVPR submission plan-of-record (2026-05-11)** —
+
+  Consolidating the post-three-counterfactual-sprint state and the work remaining to ship CosmoGasVision for CVPR. Banked here because the integrated roadmap was not previously written in one place — components were scattered across §4 of the paper, the §1 Pulse table, [D-23] (compute deferral), [D-39] (Wrinkle-1), and the [D-42-meta] cleanup-pass items. This entry is the consolidated path-of-record; PI-only sign-off on the cut sequence below, with the user authorizing the C1 (3DGS) scope-cut decision.
+
+  **Sprint state at this entry's writing.** [D-39] PASS_T1_pub binding-gate FAIL with positive cross-physics ID of mechanism (c) saturation under-fitting. Three counterfactual interventions ([D-40] sat-aware band loss, [D-41] FGPA-tail per-pixel regularizer, [D-42] velocity-gradient conditioning) tested cross-physics under the [D-37]-extension discipline and all empirically retired (see [D-40], [D-41], [D-42] entries). Paper §0 and §4.1 verbs already recalibrated per [D-42-meta] items 9–12. The paper claim ceiling is "residually-supported mechanism" not "closed-loop cause".
+
+  **Cut sequence (PI-blessed; this is the path of record).**
+
+  1. **[D-42] smoke result → §4.1 #2 final framing**: DONE this entry. Paper text needs a one-line update from "proposed" to "tested, empirically falsified at smoke" in the polish pass (B1 below).
+
+  2. **Multi-seed bootstrap on pub-t1 cross-physics for the remaining gates ([D-42-meta] C1 extension)**: KS, $\xi_{\hat\rho,\rho}$ (or its 1D proxy until A2 lands), and mean_F currently single-seed on the four `pub-t1` checkpoints. Per [D-37]-extension rule 5 (symmetric honesty), if $P_F$ gets a CI band, the other gates should too. Host-side cost: cheap — bootstrap of existing checkpoints + 1–2 extra seeds for the published configurations. Juno cost projected at $\sim$\$6 incremental (one or two reseed-eval cycles, not full-schedule retraining).
+
+  3. **A2 — 3D $\xi_{\hat\rho,\rho}(r)$ on the actual `pub-t1` checkpoints**: §3 footnote in the [D-13] table currently admits the gate-(b) measurement is a 1D-along-ray proxy; the 3D measurement was "deferred per [D-23]" pending the $\sim$40 GB `SherwoodIGM\_gal` extraction. Per the §4.1 #2 paper text and the [D-23] Juno scratch-tier note, the dataset has since landed; the gate evaluator is ready. **PI call required**: extract on Juno (one-time Juno spend, no GPU; HDF5 → mesh CIC), or paper-level decision to retain the 1D proxy with explicit disclosure. The honest framing is the latter is acceptable only if the paper text discloses *both* the deferral AND the [D-23]-era reasoning for it; the cleanest scientific path is to run the extraction.
+
+  4. **Paper polish — B1, B2, B3, B4 in one cycle with `latex-author`.**
+     - **B1**: §0 Abstract trim. Currently one ~150-word block in the .tex; CVPR rubric prefers cleaner beats. The verbs are recalibrated; the rewrite is structural.
+     - **B2**: §1 Introduction expansion. 12 lines is concise but the [D-37]-extension rule-5 symmetric-disclosure paragraph (§0 already discloses 2-of-3 gate closure; §1 should mirror) is missing.
+     - **B3**: §5 Related Work expansion. 12 lines is too thin for CVPR. Missing: physics-informed neural network literature (Karniadakis, PINNs), broader implicit-neural-representation literature beyond NeRF/InstantNGP, sparse-view inverse rendering in medical imaging beyond MedNeRF.
+     - **B4**: Headline results table. A consolidated 4-physics × 3-gate table with multi-seed CIs is what reviewers will look for; currently scattered across separate figures (`tau_max_sensitivity.png`, `pf_overlay_falsification.png`, etc.).
+     - **B5** (sub-item of B4): Update §4.1 #2 entry to reflect the [D-42] smoke FAIL outcome of this entry.
+     - **B6** (sub-item of B3): Update §5 decision-log table to add [D-41], [D-42], [D-43] rows.
+
+  5. **Submit**.
+
+  **Resolved PI calls (no further work needed):**
+  - **C1 — 3DGS as a CVPR baseline**: OUT OF SCOPE for this paper per user directive (2026-05-11). The paper frames baselines as TARDIS / Wiener (classical voxel grids) per §0, §1, §5; this is already the load-bearing framing. The `experiments/3dgs_baseline/` track remains in the repository as a parallel research thread but is not in the CVPR submission. No further 3DGS work is on the CVPR critical path.
+
+  **Open PI calls (need user decision before the polish cycle):**
+  - **C2 — Tier 4 ($n_{\text{rays}} = 16{,}384$, $\sim$792 GPU-hr) reopen**: currently blocked per §4.2 on the Wrinkle-1 diagnostic, which has since landed via [D-39]. With three counterfactual interventions retired, the question is whether Tier 4 should be dispatched to test sightline-density-axis closure of the binding $P_F$ gate. **Recommendation**: KEEP DEFERRED. The §4.2 text already argues that a saturation-deficit which is *physics-invariant cross-physics at fixed $n_{\text{rays}} = 64$* is not a function the dense-sightline axis is positioned to address. Reopening would cost the full Juno budget and is unlikely to close $P_F$ on this evidence. The honest framing in the paper is to retain the explicit deferral.
+  - **C3 — Multi-redshift scope expansion**: currently $z = 0.3$ only. Other Sherwood redshifts available locally ($z = 0.1$, $2.2$, $2.4$). Adding $z = 0.1$ would test the low-$z$ robustness claim. **Recommendation**: OUT OF SCOPE for the CVPR submission unless reviewers demand it; the single-redshift scope is defensible per the cost-survey compute-footprint argument of §3.
+  - **C4 — TARDIS / Wiener numerical reproduction**: §0 and §5 cite TARDIS as the classical baseline but the paper does not currently re-implement TARDIS for a direct numerical comparison row. CVPR reviewers may demand it. **Recommendation**: argue the comparison is qualitative; cite the published TARDIS results on different data; flag as honest-disclosure limitation. Spawning a TARDIS Stage-2-equivalent sub-experiment is a multi-week scope blow-up that the CVPR window cannot absorb.
+
+  **CVPR submission logistics (not in scope of this LEDGER entry; flagged for completeness):**
+  - Deadline / target conference window: user-owned; not in repo.
+  - Code release prep: DVC remote is already configured; reproducibility on a fresh clone should be verified before submission.
+  - Final DVC bundle: `paper_cvpr.dvc` pushed at HEAD `42c1bf5`; should be re-pushed after the polish cycle.
+
+  **Critical-path falsification rules for this entry** (per [D-37] / [D-42-meta] rule 6):
+  - If the multi-seed bootstrap (cut-sequence step 2) widens the $P_F$ CI to overlap the $10\%$ gate, the [D-39] mechanism-(c) positive-ID would need re-evaluation against the wider CI. This is unlikely given the $R \in [18.87, 23.75]$ headline numbers but is the pre-committed check.
+  - If A2 (3D $\xi$) lands and the 3D measurement disagrees with the 1D proxy by $> 20\%$ relative, the paper text needs to retract the 1D-proxy framing in §3 and re-derive the gate-(b) reading.
+  - If B-cycle paper polish surfaces a methodology issue not previously caught (e.g., latex-author finds a math inconsistency between §2 and §3), the path-of-record returns to PI for re-spec before submission.
+
+  **References.** [D-13] (gate set), [D-23] (compute deferral), [D-37] (honest-reporting), [D-39] (Wrinkle-1 + cross-physics positive ID), [D-40], [D-41], [D-42], [D-42-meta] (retrospective + cleanup pass), `paper_cvpr/sec/0_abstract.tex`, `paper_cvpr/sec/3_experiments.tex` (deferred 3D $\xi$ footnote), `paper_cvpr/sec/4_next_steps.tex` §4.1/§4.2/§4.3.
+
+  **Review-trail (per [D-42-meta] rule 6)**: PI sign-off on the cut sequence; user authorization on the C1 scope-cut (3DGS out of CVPR). Open C2/C3/C4 calls flagged for user decision. The [D-43] critical-path falsification rules above are pre-committed before the next sprint begins.
 ---
 
 ## 4. The Data (Lineage & Governance)

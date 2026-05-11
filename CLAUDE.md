@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-CosmoGasVision: 3D IGM gas density reconstruction from Lyman-alpha sightlines (Sherwood Simulation Suite, Bolton+ 2017). Two tracks — **NeRF** (primary, continuous MLP IGM field) and **3DGS** (baseline, explicit Gaussians).
+> **At the start of every session, dispatch the `project-architect` (PI) agent for orientation before any other work.** The PI reads `experiments/nerf/LEDGER.md` §1 Pulse + §3 [D-43] CVPR submission plan-of-record, the [D-37]-extension binding rules in `.claude/agents/project-architect.md`, and reports the current state + next-step authorization gate. Skipping this step risks acting on stale context (sprint state changes per-session; the LEDGER is the only source of truth that survives compaction).
+
+CosmoGasVision: 3D IGM gas density reconstruction from Lyman-alpha sightlines (Sherwood Simulation Suite, Bolton+ 2017). Active paper track is **NeRF** — a continuous MLP IGM field with a differentiable Voigt integrator, baselined against classical TARDIS / Wiener voxel methods. Near-term mission (2026-05-11 onwards): **complete the first-draft CVPR paper ready to submit**; plan-of-record at `experiments/nerf/LEDGER.md` §3 [D-43].
+
+The **3DGS track** (`experiments/3dgs_baseline/`) is **DEPRECATED for the CVPR submission per user directive 2026-05-11** and is no longer load-bearing. It remains as a parallel research thread in-repo but does not appear in the paper, has no critical-path work assigned, and should not be cited as a baseline or comparison. Paper baselines are TARDIS (Horowitz+2019) and Wiener filtering (Stark+2015).
 
 **Before starting work, read the active branch's LEDGER first**: `experiments/<branch_basename>/LEDGER.md`. It is the single source of truth for stage status, decisions (D-XX), data lineage, and next steps.
 
@@ -12,7 +16,7 @@ CosmoGasVision: 3D IGM gas density reconstruction from Lyman-alpha sightlines (S
 
 ## Source layout
 - `src/data/` — loaders, validation, all sim-data I/O.
-- `src/models/` — neural architectures (`nerf.py`; future `gaussian_field.py`).
+- `src/models/` — neural architectures. `nerf.py` is the active CVPR-track model. (`gaussian_field.py` is reserved for the deprecated 3DGS track and is not on the critical path.)
 - `src/rendering/` — differentiable integrators, projection (planned).
 - `experiments/<name>/pipeline.py` — execution entry per track.
 - `experiments/<name>/LEDGER.md` — command center (Pulse / Logic / Data / History).
