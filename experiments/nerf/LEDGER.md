@@ -846,6 +846,40 @@ graph TD
   **Review-trail (per [D-42-meta] rule 6)**: PI sign-off on the cut sequence; user authorization on the C1 scope-cut (3DGS out of CVPR). Open C2/C3/C4 calls flagged for user decision. The [D-43] critical-path falsification rules above are pre-committed before the next sprint begins.
 ---
 
+- **[D-44] Multi-seed bootstrap on `pub-t1` for KS / mean_F gates (host-side, A3 sprint; design spec 2026-05-11)** —
+
+  **Plan-of-record reference**: [D-43] cut-sequence step 2. **Precedent**: [D-42-meta] Item 3 / C1 (5-seed bootstrap on $P_F$, `mean ± std`, file `experiments/nerf/artifacts/eval/cleanup_pass/item3_multiseed_bootstrap.json`). **Discipline**: [D-37]-extension rules 2 (pre-committed falsification), 4 (anti-degeneracy audit), 5 (symmetric honesty), 6 (hedged verbs).
+
+  **1. Bootstrap scheme.** Choice (a): seed-resample at the eval-driver level, matching [D-42-meta] C1's precedent. **K = 5 eval seeds** drawn from `{42, 43, 44, 45, 46}` applied to the four existing `pub-t1` checkpoints (`31acdf9d…`, `f7fafa23…`, `62aeb93a…`, `fc3817b3…`). No retraining. CI convention is **mean ± 1σ (≈ 68%)** to match the C1 precedent so the resulting table is internally comparable. Choice (b) — retrain — is **rejected for A3** because (i) C1 already showed seed sensitivity is dominated by eval-time sampling at $n_{\rm rays}=64/1024$ scale, not training-seed variance; (ii) retraining costs the full Juno pub-t1 budget and is reserved for Juno-fallback escalation; (iii) existing $P_F$ CIs in [D-42-meta] are eval-seed-only, so retrain-derived CIs would not be symmetric.
+
+  **2. Gate scope.** **In scope**: KS distance and $\langle F_{\rm pred}\rangle$ across $P_1$–$P_4$. **Out of scope for A3**: $\xi_{\hat\rho,\rho}$ — measured only at $P_1$ (cost-survey T3 checkpoint, anchor-invariant value $r_\rho^{\log}=+0.077$), is itself a 1D-along-ray proxy under A2 retain-path; a CI on +0.077 cannot flip the call. Re-opened only if A2 lands a 3D measurement during the same sprint window.
+
+  **3. Pre-committed falsification rules (per [D-37]-ext rule 2).**
+  1. **KS-widen → §0 retraction**: if any cell's KS bootstrap CI upper bound $>0.05$ in $\geq 2/4$ cells, the §0 / §3.5 "3/4 KS-close" claim is rewritten to "2/4 (3/4 at seed=42)" with explicit CI disclosure; headline tally row in `tab:headline-3gate` re-tallied if needed.
+  2. **mean_F CI excludes $[0.97, 0.99]$**: if any cell's $\langle F_{\rm pred}\rangle$ bootstrap CI fails to overlap the $0.979 \pm 0.005$ Kirkman+2007 anchor window, the §3 "mean-flux closes 4/4, $0.63\%$ spread" claim softens to "$N/4$ cells under the Kirkman anchor band" and spread is rewritten with the CI included.
+  3. **Confirmation-narrowing rule (symmetric-honesty)**: if a gate's CI is narrower than the single-seed value would suggest ($\sigma < 5\%$ relative on KS, $<0.3\%$ on mean_F — conservatively half the C1 $P_F$ P1 band), the single-seed value is confirmed at $>2\sigma$ and the §3 verb is *permitted* to upgrade from "may close" to "closes" — but no further (no upgrades to "decisively closes" / "robustly closes"). Pre-committed to prevent asymmetric reporting.
+
+  **4. Anti-degeneracy audit (per [D-37]-ext rule 4).**
+  - **F1 — Pixel-correlated noise inflates effective N**: KS-distance bootstrap treats per-pixel $F$ samples as i.i.d., but neighboring velocity bins within a sightline are RSD-convolution-correlated (Voigt kernel width $\sim$3–5 bins). Naïve pixel resample under-estimates $\sigma_{\rm KS}$, could mislead rule 3 into a confirmation upgrade. **Mitigation**: bootstrap at the **sightline level** (resample whole sightlines with replacement, then re-compute KS on pooled-pixel set). Document explicitly in artefact JSON's `bootstrap_unit` field.
+  - **F2 — Shared eval-pipeline state across seeds**: KS is a *two-sample* distance, so both sides must be resampled. **Mitigation**: bootstrap must redraw prediction-side and truth-side sightline indices jointly per seed; JSON must record both seeds and confirm they varied per replicate.
+
+  **5. Stop conditions.**
+  - **Retire host-side cleanly** if 5-seed bootstrap on $P_1$ alone (smoke equivalent: K=5 replicas on one cell, ~minutes) shows either (i) CI $\sigma_{\rm KS} > 0.02$ (single-seed KS=0.0325 has $\sim\!60\%$ relative uncertainty; host-side coarse), or (ii) failure-mode F1 audit reveals the bootstrap unit was at pixel level and re-running at sightline level is non-trivial in the existing eval driver. Either case is logged honestly and the gate band is reported as "single-seed; CI deferred" — **not** suppressed.
+  - **Escalate to Juno** if host-side bootstrap shows a $P_2$-like wide band ($\sigma > 10\%$ relative) on a cell that was a published PASS — at that point a 1–2 reseed-eval cycle on Juno (~\$6, no GPU training, eval-only on existing checkpoints) is dispatched to tighten the band. Only path to Juno on A3.
+  - **Retire and re-spec** if both stop conditions trigger.
+
+  **6. Hand-off list.**
+  - **Owner**: `support-researcher`. Surface: `scripts/eval_partial_d13.py` driver + `src/analysis/{p_flux,flux_pdf}.py`. Work = wrapping in seed loop + bootstrap aggregator. Escalate to `core-implementer` only if RNG plumbing requires changes the researcher cannot make in-place.
+  - **Artifacts**: `experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json` schema mirroring `item3_multiseed_bootstrap.json`: `{cell, K, seeds_pred, seeds_truth, bootstrap_unit: "sightline", KS_mean, KS_std, KS_q16, KS_q84, meanF_mean, meanF_std, meanF_q16, meanF_q84}`. Optional plot `plot_ks_meanf_bands.png` gated on F1/F2 audit passing.
+  - **Paper-side updates owned by PI/latex-author after artefact lands**: Tab.`tab:headline-3gate` in `paper_cvpr/sec/3_experiments.tex` §3.5 — three `---` CI cells become `mean ± σ`; caption drops "cross-seed CIs deferred" sentence + adds bootstrap-method disclosure. **Do not touch**: `tab:pub-t1-gates` (single-seed by design, seed=42 anchor); §0/§1 verbs (latex-author owns, conditional on PI sign-off after falsification-rule evaluation).
+
+  **7. Confidence-verb constraint (per [D-37]-ext rule 6).** Spec uses hedged verbs throughout: bootstrap *may* narrow or widen the bands; *expected to* show eval-seed sensitivity comparable to the C1 $P_F$ result (3–7% on $P_1/P_3/P_4$, $\sim 23\%$ on $P_2$); *if* the bands widen as in rule 1 the §0 claim *softens*. No verbs promise "will close" / "will tighten" / "will confirm". Conditional-on-C1 expectation: mean_F most likely to confirm at $>2\sigma$ (single-seed cross-physics spread $0.63\%$ well inside Kirkman $\pm0.005$); KS most likely to widen on $P_2$ (single-seed 0.0742 already breaches). Neither outcome is asserted.
+
+  **References.** [D-13] (gate set), [D-37] (honest-reporting), [D-42-meta] Item 3 / C1 (precedent), [D-43] (cut-sequence step 2), `experiments/nerf/artifacts/eval/cleanup_pass/item3_multiseed_bootstrap.json`, `scripts/eval_partial_d13.py`, `src/analysis/{p_flux,flux_pdf}.py`, `paper_cvpr/sec/3_experiments.tex` (Tab.`tab:headline-3gate`).
+
+  **Review-trail.** PI design-spec drafted 2026-05-11 under [D-37]-extension discipline. Implementation hand-off to `support-researcher` per §6. PI to evaluate falsification rules §3.1-3.3 on the resulting JSON before any paper edits land.
+---
+
 ## 4. The Data (Lineage & Governance)
 
 **Box Size**: 60,000 kpc/h (60 Mpc/h) — *Optimal balance of pixel resolution (30kpc) vs representing filaments.*
