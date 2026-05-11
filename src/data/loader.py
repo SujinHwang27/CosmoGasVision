@@ -1,9 +1,21 @@
 import os
 import warnings
 import numpy as np
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 import torch  # kept for downstream import-compatibility
 from scipy.ndimage import label as _scipy_label
+
+# ---------------------------------------------------------------------------
+# [D-42] milestone 1: velocity-gradient ground-truth sidecar
+# ---------------------------------------------------------------------------
+# Cache of (mean, std) of the centered-finite-difference of `v_pec` along the
+# LOS axis, keyed by (physics_id, redshift_rounded_3dp). Computed ONCE per
+# (physics, redshift) pair so the same normalization is used regardless of
+# whether the caller is a smoke run, a pub run, or a downstream diagnostic.
+# In-memory dict (matches the project's convention — no joblib pickles or
+# .npy sidecars elsewhere in this loader; pipeline.py instantiates a fresh
+# SherwoodLoader per run so this dict is per-process).
+_VPEC_GRAD_STATS_CACHE: Dict[Tuple[int, float], Dict[str, float]] = {}
 
 # Header byte layout matches Sherwood/src/utils.py:
 #   7 doubles (z, Om, OL, Ob, h100, box, Xh) + 2 int32 (nbins, num_los)
@@ -83,6 +95,13 @@ class SherwoodLoader:
             'mask_no_dla'    : (num_los, nbins) bool, True on bins to *include*
                                in loss/mean-flux reductions (per [D-24])
             'dla_threshold_log_nhi' : float (echoed from the argument)
+            'v_pec_grad_truth' : (num_los, nbins) float32, [D-42] sidecar —
+                               centered finite-difference of `v_pec` along
+                               the LOS axis with periodic BCs, z-scored across
+                               the full (physics_id, redshift) dataset.
+            'v_pec_grad_stats' : dict {'mean': float, 'std': float, 'dchi_mpc_h': float}
+                               — raw-units mean/std used for the z-score (cached
+                               across calls with matching (physics_id, redshift)).
         """
         if physics_id not in self.physics_models:
             raise ValueError(f"Invalid physics_id {physics_id}. Must be 1-4.")
@@ -182,8 +201,47 @@ class SherwoodLoader:
         if not np.isnan(tau_h1_real).all():
             tau_h1_real = np.nan_to_num(tau_h1_real, nan=0.0)
 
+        # ----------------------------------------------------- velocity-gradient sidecar
+        # [D-42] milestone 1: centered finite-difference of v_pec along the
+        # LOS axis with periodic BCs, z-scored once per (physics_id, redshift)
+        # across the FULL dataset (no train/eval split — the spec calls for
+        # stable global normalization so smoke and pub runs see identical
+        # inputs).
+        #
+        # Δχ recovery: header['box_kpc_h'] is the cosmological box size in
+        # comoving kpc/h. Convert to Mpc/h (/1000), divide by nbins to get
+        # the per-bin comoving spacing.
+        dchi_mpc_h = float(header['box_kpc_h']) / 1000.0 / float(nbins)
+        v_pec_grad_raw = self.compute_vpec_grad(v_pec, dchi_mpc_h)
+
+        cache_key = (int(physics_id), round(float(redshift), 3))
+        cached = _VPEC_GRAD_STATS_CACHE.get(cache_key)
+        if cached is None:
+            g_mean = float(v_pec_grad_raw.mean())
+            g_std = float(v_pec_grad_raw.std())
+            if not np.isfinite(g_std) or g_std <= 0.0:
+                # Degenerate dataset (e.g. zero v_pec everywhere): bail to a
+                # safe default rather than divide-by-zero. Documented choice:
+                # std → 1.0 leaves the z-scored field equal to the raw field
+                # with mean subtracted, which is the closest non-divergent
+                # behavior. Warn so this doesn't pass silently.
+                warnings.warn(
+                    f"v_pec_grad has non-positive std ({g_std}) for "
+                    f"physics={physics_id} z={redshift}; using std=1.0 fallback.",
+                    stacklevel=2,
+                )
+                g_std = 1.0
+            _VPEC_GRAD_STATS_CACHE[cache_key] = {
+                'mean': g_mean,
+                'std': g_std,
+                'dchi_mpc_h': dchi_mpc_h,
+            }
+        g_mean = _VPEC_GRAD_STATS_CACHE[cache_key]['mean']
+        g_std = _VPEC_GRAD_STATS_CACHE[cache_key]['std']
+        v_pec_grad_truth = ((v_pec_grad_raw - g_mean) / g_std).astype(np.float32, copy=False)
+
         # ----------------------------------------------------- sanity checks
-        self._validate_data(density, h1_frac, temp, tau_h1)
+        self._validate_data(density, h1_frac, temp, tau_h1, v_pec_grad_truth)
 
         # ------------------------------------------------------ DLA masking
         mask_no_dla = self._detect_dla_mask(tau_h1)
@@ -204,9 +262,46 @@ class SherwoodLoader:
             'tau_h1_real': tau_h1_real,
             'mask_no_dla': mask_no_dla,
             'dla_threshold_log_nhi': float(dla_threshold_log_nhi),
+            'v_pec_grad_truth': v_pec_grad_truth,
+            'v_pec_grad_stats': dict(_VPEC_GRAD_STATS_CACHE[cache_key]),
         }
 
     # ------------------------------------------------------------- internals
+    @staticmethod
+    def compute_vpec_grad(v_pec: np.ndarray, dchi: float) -> np.ndarray:
+        """
+        Centered finite-difference of `v_pec` along the LOS (last) axis with
+        periodic boundary conditions, per [D-42] milestone 1.
+
+            g[..., i] = (v_pec[..., i+1] - v_pec[..., i-1]) / (2 * dchi)
+
+        Implemented via `torch.roll` (avoids np-pad-and-slice complexity);
+        the spec mandates "matches a reference NumPy implementation to 1e-12".
+        Operates in float32 to match the project's training dtype, but the
+        roll-and-subtract is dtype-agnostic.
+
+        Parameters
+        ----------
+        v_pec : np.ndarray, shape (..., nbins)
+            Peculiar velocity field in km/s.
+        dchi : float
+            Comoving bin spacing in Mpc/h (= box_kpc_h / 1000 / nbins). The
+            constant is recovered from the on-disk header — NOT hard-coded.
+
+        Returns
+        -------
+        g : np.ndarray, same shape as v_pec, dtype float32
+            Centered-difference gradient in km/s per (comoving Mpc/h),
+            detached from any grad graph (input was numpy).
+        """
+        v_pec_t = torch.from_numpy(np.asarray(v_pec, dtype=np.float32))
+        # Periodic boundary: roll along the last axis
+        g_t = (
+            torch.roll(v_pec_t, shifts=-1, dims=-1)
+            - torch.roll(v_pec_t, shifts=+1, dims=-1)
+        ) / (2.0 * float(dchi))
+        return g_t.detach().cpu().numpy().astype(np.float32, copy=False)
+
     @staticmethod
     def _detect_dla_mask(
         tau: np.ndarray,
@@ -278,7 +373,14 @@ class SherwoodLoader:
             mask_no_dla = mask_no_dla[0]
         return mask_no_dla
 
-    def _validate_data(self, density: np.ndarray, h1_frac: np.ndarray, temp: np.ndarray, tau: np.ndarray):
+    def _validate_data(
+        self,
+        density: np.ndarray,
+        h1_frac: np.ndarray,
+        temp: np.ndarray,
+        tau: np.ndarray,
+        v_pec_grad_truth: Optional[np.ndarray] = None,
+    ):
         """
         Validates astrophysical data ranges.
         """
@@ -286,6 +388,27 @@ class SherwoodLoader:
         assert (h1_frac >= 0).all() and (h1_frac <= 1.0001).all(), f"Invalid H1 fraction: {h1_frac.min()} - {h1_frac.max()}"
         assert (temp > 0).all(), f"Non-positive temperature found: {temp.min()}"
         assert (tau >= 0).all(), f"Negative optical depth found: {tau.min()}"
+        if v_pec_grad_truth is not None:
+            # [D-42] milestone 1 — sidecar validation contract.
+            assert v_pec_grad_truth.ndim == 2, (
+                f"v_pec_grad_truth must be 2D (num_los, nbins); got shape "
+                f"{v_pec_grad_truth.shape}"
+            )
+            assert density.shape == v_pec_grad_truth.shape, (
+                f"v_pec_grad_truth shape {v_pec_grad_truth.shape} does not match "
+                f"density shape {density.shape}"
+            )
+            assert np.isfinite(v_pec_grad_truth).all(), (
+                "v_pec_grad_truth contains non-finite values (NaN or inf)"
+            )
+            g_mean = float(v_pec_grad_truth.mean())
+            g_std = float(v_pec_grad_truth.std())
+            assert -0.05 <= g_mean <= 0.05, (
+                f"v_pec_grad_truth post-zscore mean {g_mean:.6f} outside [-0.05, 0.05]"
+            )
+            assert 0.9 <= g_std <= 1.1, (
+                f"v_pec_grad_truth post-zscore std {g_std:.6f} outside [0.9, 1.1]"
+            )
         print("Data sanity check passed.")
 
     def get_world_coordinates(self, data: Dict) -> np.ndarray:

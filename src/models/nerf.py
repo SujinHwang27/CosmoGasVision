@@ -1,4 +1,5 @@
 import math
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -24,50 +25,70 @@ class IGMNeRF(nn.Module):
     """
     Continuous MLP mapping 3D position -> density, temp, h1_frac, vpec.
     """
-    def __init__(self, hidden_dim=256, num_layers=8, L=10):
+    def __init__(self, hidden_dim=256, num_layers=8, L=10,
+                 use_velocity_gradient_conditioning: bool = False):
         super().__init__()
+        # use_velocity_gradient_conditioning toggles the [D-42] sidecar feature
+        # (Sherwood-truth dv_pec/dchi, z-scored, detached) concatenated onto the
+        # encoded coordinate before layer 1 — see LEDGER §3 [D-42] Math contract.
         self.encoding = PositionalEncoding(L)
-        in_dim = 3 + 2 * 3 * L
-        
+        self.use_velocity_gradient_conditioning = use_velocity_gradient_conditioning
+        encoded_dim = 3 + 2 * 3 * L
+        g_dim = 1 if use_velocity_gradient_conditioning else 0
+        in_dim = encoded_dim + g_dim
+        # Skip-connection re-injects the SAME concatenated (encoded, g) vector
+        # so that g remains visible at layer 5; this keeps the conditioning
+        # signal accessible after the residual fan-in.
+        skip_dim = in_dim
+
         self.layers1 = nn.ModuleList()
         for i in range(4):
             dim = in_dim if i == 0 else hidden_dim
             self.layers1.append(nn.Linear(dim, hidden_dim))
-            
+
         self.layers2 = nn.ModuleList()
         for i in range(num_layers - 4):
-            dim = hidden_dim + in_dim if i == 0 else hidden_dim
+            dim = hidden_dim + skip_dim if i == 0 else hidden_dim
             self.layers2.append(nn.Linear(dim, hidden_dim))
 
         self.relu = nn.ReLU()
-        
+
         # Output layer input dimension depends on whether we have layers after the skip connection
-        out_in_dim = hidden_dim if (num_layers - 4) > 0 else (hidden_dim + in_dim)
+        out_in_dim = hidden_dim if (num_layers - 4) > 0 else (hidden_dim + skip_dim)
         self.out_layer = nn.Linear(out_in_dim, 4)
-        
+
         self.softplus = nn.Softplus()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x, g: Optional[torch.Tensor] = None):
         encoded = self.encoding(x)
-        h = encoded
-        
+        if g is not None:
+            # [D-42]: concatenate the z-scored velocity-gradient feature as a
+            # raw scalar onto the encoded coordinate (no positional encoding —
+            # g is already ~ N(0, 1)). Constructor must have been built with
+            # use_velocity_gradient_conditioning=True so layer_1 has the +1
+            # in_features.
+            h_in = torch.cat([encoded, g], dim=-1)
+        else:
+            h_in = encoded
+        h = h_in
+
         for layer in self.layers1:
             h = self.relu(layer(h))
-            
-        # NeRF residual/skip connection
-        h = torch.cat([h, encoded], dim=-1)
-        
+
+        # NeRF residual/skip connection re-injects the (encoded[, g]) vector.
+        h = torch.cat([h, h_in], dim=-1)
+
         for layer in self.layers2:
             h = self.relu(layer(h))
-            
+
         out = self.out_layer(h)
         # Bounding fields to physical ranges
         density = self.softplus(out[..., 0])  # rho/rho_bar >= 0
         temp = self.softplus(out[..., 1]) * 10**4 + 10**3 # T ~ 10^3 to 10^6 K
         h1_frac = self.sigmoid(out[..., 2])   # 0 to 1
         vpec = torch.tanh(out[..., 3]) * 500  # Peculiar velocity +/- 500 km/s
-        
+
         return torch.stack([density, temp, h1_frac, vpec], dim=-1)
 
 def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
@@ -98,7 +119,7 @@ def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
     return torch.clamp(H, min=0.0)
 
-def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3, return_tau_local=False):
+def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3, return_tau_local=False, g=None):
     """
     Differentiable Lyman-alpha optical depth rendering with windowed RSD convolution.
 
@@ -134,7 +155,10 @@ def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=
         tau: (n_rays, n_obs) — full tau(v) profile per ray, suitable for per-bin
             MSE against the simulation ground-truth tauH1.
     """
-    fields = mlp(ray_points)              # (n_rays, n_bins, 4)
+    # [D-42] When `g` is provided, the MLP forward concatenates it onto the
+    # encoded coordinate before layer 1. Default-OFF path (g=None) is
+    # bit-identical to the pre-[D-42] forward.
+    fields = mlp(ray_points, g=g)         # (n_rays, n_bins, 4)
     density = fields[..., 0]              # rho / <rho>
     temp = fields[..., 1]                 # K
     h1_frac = fields[..., 2]              # X_HI in [0, 1]

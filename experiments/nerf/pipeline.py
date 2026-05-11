@@ -164,6 +164,15 @@ def parse_args(argv=None):
     p.add_argument("--fgpa_huber_delta", type=float, default=0.5,
                    help="[D-41] Huber loss delta in log-units. Default 0.5.")
 
+    # [D-42] velocity-gradient conditioning ---------------------------------
+    p.add_argument("--use_velocity_gradient_conditioning",
+                   action="store_true",
+                   help="[D-42] velocity-gradient conditioning. Concatenates "
+                        "Sherwood-truth dv_pec/dchi (z-scored, detached) as a "
+                        "1D input feature to the density head. Disabled by "
+                        "default. See experiments/nerf/LEDGER.md [D-42] for "
+                        "the spec.")
+
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
@@ -300,13 +309,17 @@ def _sat_band_rank_loss(
 def load_dataset(args):
     """Load sightlines or fall back to dummy data for smoke runs.
 
-    Returns ``(coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max)``
-    as float32/bool tensors. The first axis of ``coords``, ``tau_gt_profile``,
-    and ``mask_no_dla_profile`` has been truncated to ``args.n_rays``. Coords
-    are already normalized to the unit cube.
+    Returns ``(coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max,
+    v_pec_grad_truth)`` as float32/bool tensors. The first axis of ``coords``,
+    ``tau_gt_profile``, ``mask_no_dla_profile``, and (when [D-42] is enabled)
+    ``v_pec_grad_truth`` has been truncated to ``args.n_rays``. Coords are
+    already normalized to the unit cube.
 
     The ``mask_no_dla_profile`` (bool, ``True`` = include in loss/mean-flux
     reductions) is the [D-24] DLA exclusion mask emitted by the loader.
+
+    ``v_pec_grad_truth`` is returned when ``--use_velocity_gradient_conditioning``
+    is set (z-scored, shape ``(n_rays, n_bins)``, float32). Otherwise ``None``.
     """
     if not os.path.exists(args.data_root):
         print(f"Warning: Data root {args.data_root} missing. Using dummy data.")
@@ -319,7 +332,16 @@ def load_dataset(args):
         tau_gt_profile = torch.rand(args.n_rays, nbins_dummy, generator=gen)
         # Synthetic data has no DLAs by construction; include every bin.
         mask_no_dla_profile = torch.ones_like(tau_gt_profile, dtype=torch.bool)
-        return coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max
+        # [D-42] dummy-data fallback: synthesize a z-scored N(0,1) grad
+        # tensor of the right shape so the smoke path works on machines
+        # without Sherwood. Deterministic per --seed.
+        v_pec_grad_truth = None
+        if args.use_velocity_gradient_conditioning:
+            v_pec_grad_truth = torch.randn(
+                args.n_rays, nbins_dummy, generator=gen, dtype=torch.float32,
+            )
+        return (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
+                box_max, v_pec_grad_truth)
 
     loader = SherwoodLoader(args.data_root)
     sightlines = loader.load_sightlines(args.physics, 0.3)
@@ -337,6 +359,24 @@ def load_dataset(args):
         sightlines['mask_no_dla'][:n_rays], dtype=torch.bool,
     )
 
+    # [D-42]: velocity-gradient sidecar. Loader already z-scored and validated
+    # the tensor (post-zscore std in [0.9, 1.1] per _validate_data). The
+    # gradient is truth-derived and detached; .requires_grad stays False.
+    v_pec_grad_truth = None
+    if args.use_velocity_gradient_conditioning:
+        v_pec_grad_truth = torch.tensor(
+            sightlines['v_pec_grad_truth'][:n_rays], dtype=torch.float32,
+        )
+        g_stats = sightlines['v_pec_grad_stats']
+        print(
+            f"[D-42] v_pec_grad_truth: shape={tuple(v_pec_grad_truth.shape)} "
+            f"mean={float(v_pec_grad_truth.mean()):+.4f} "
+            f"std={float(v_pec_grad_truth.std()):.4f} "
+            f"(loader cache: mean={g_stats['mean']:+.4f} std={g_stats['std']:.4f} "
+            f"dchi_mpc_h={g_stats['dchi_mpc_h']:.6f}).",
+            flush=True,
+        )
+
     n_dla_bins = int((~mask_no_dla_profile).sum().item())
     n_total_bins = int(mask_no_dla_profile.numel())
     print(f"Normalized coord range: [{coords.min().item():.4f}, "
@@ -344,7 +384,8 @@ def load_dataset(args):
     print(f"Run scope: {n_rays} rays x {coords.shape[1]} bins (full grid).")
     print(f"[D-24] DLA mask: {n_dla_bins}/{n_total_bins} bins excluded "
           f"({100.0 * n_dla_bins / max(1, n_total_bins):.3f}%).")
-    return coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max
+    return (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
+            box_max, v_pec_grad_truth)
 
 
 def save_checkpoint(path, *, model, optimizer, scheduler, log_tau_amp,
@@ -426,12 +467,17 @@ def train(args):
     print(f"Using device: {device}", flush=True)
 
     # Dataset --------------------------------------------------------------
-    coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max = load_dataset(args)
+    (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
+     box_max, v_pec_grad_profile) = load_dataset(args)
     coords = coords.to(device)
     vel_axis = vel_axis.to(device)
     tau_gt_profile = tau_gt_profile.to(device)
     # [D-24] mask: bool, True = include in loss + mean-flux reductions.
     mask_no_dla_profile = mask_no_dla_profile.to(device)
+    # [D-42]: velocity-gradient feature is detached truth-side data, used as
+    # MLP input only. No autograd link back to it.
+    if v_pec_grad_profile is not None:
+        v_pec_grad_profile = v_pec_grad_profile.to(device)
     if args.disable_dla_mask:
         mask_no_dla_profile = torch.ones_like(mask_no_dla_profile, dtype=torch.bool)
         print(
@@ -571,7 +617,10 @@ def train(args):
         )
 
     # Model ---------------------------------------------------------------
-    model = IGMNeRF(hidden_dim=256, num_layers=8, L=10).to(device)
+    model = IGMNeRF(
+        hidden_dim=256, num_layers=8, L=10,
+        use_velocity_gradient_conditioning=args.use_velocity_gradient_conditioning,
+    ).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
     sigma_log = 0.5
     tau_amp_prior_weight = 1e-3
@@ -630,6 +679,12 @@ def train(args):
                 "n_rays": str(args.n_rays),
                 "seed": str(args.seed),
                 "ablation_matrix": "stage2b-4x4",
+                # [D-42] tag — "on" when the velocity-gradient feature is
+                # concatenated to the MLP input, "off" otherwise. Read by
+                # downstream eval scripts to slice the run table.
+                "velocity_gradient_conditioning": (
+                    "on" if args.use_velocity_gradient_conditioning else "off"
+                ),
             })
             if resume_run_id is None:
                 mlflow.log_params({
@@ -657,6 +712,9 @@ def train(args):
                     "rank_order_weight": args.rank_order_weight,
                     "rank_order_pairs": args.rank_order_pairs,
                     "pf_loss_weight": args.pf_loss_weight,
+                    "use_velocity_gradient_conditioning": (
+                        args.use_velocity_gradient_conditioning
+                    ),
                     "loss_form": (
                         ("log1p_mse_capped" if args.tau_max < 1e8 else "log1p_mse_uncapped")
                         + ("_masked" if not args.disable_dla_mask else "_unmasked")
@@ -721,8 +779,16 @@ def train(args):
                 weighted_F_sum = 0.0
                 total_F_count = 0
                 for s, e in microbatch_slices():
+                    # [D-42]: slice the per-(ray, bin) gradient feature in lockstep
+                    # with `coords`. Loader-side data is 1:1 aligned with the
+                    # source-bin grid (same n_bins, same ray ordering) so direct
+                    # index slicing is correct — no interpolation needed.
+                    g_mb = None
+                    if v_pec_grad_profile is not None:
+                        g_mb = v_pec_grad_profile[s:e].unsqueeze(-1)  # (mb, n_bins, 1)
                     tau_pred_mb = volume_render_physics(
                         model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp,
+                        g=g_mb,
                     )
                     mask_mb = mask_no_dla_profile[s:e]
                     F_pred_mb = torch.exp(-tau_pred_mb)
@@ -765,17 +831,23 @@ def train(args):
                 # freed the shared exp node. log_tau_amp.grad still
                 # accumulates correctly (sum over chunks).
                 tau_amp_chunk = torch.exp(log_tau_amp)
+                # [D-42]: per-microbatch slice of the velocity-gradient feature
+                # (direct ray index on the same source-bin grid; no resampling).
+                g_mb = None
+                if v_pec_grad_profile is not None:
+                    g_mb = v_pec_grad_profile[s:e].unsqueeze(-1)  # (mb, n_bins, 1)
                 # [D-41] expose per-source-bin (tau_local, density, temp)
                 # only when the FGPA-tail regularizer is active. Default-OFF
                 # path is byte-equivalent: same renderer, same return type.
                 if args.fgpa_tail_weight > 0.0:
                     tau_pred_mb, fgpa_fields_mb = volume_render_physics(
                         model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
-                        return_tau_local=True,
+                        return_tau_local=True, g=g_mb,
                     )
                 else:
                     tau_pred_mb = volume_render_physics(
                         model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
+                        g=g_mb,
                     )
                     fgpa_fields_mb = None
                 # ---- [D-24] data loss: log1p MSE, capped at TAU_MAX, masked. ----
