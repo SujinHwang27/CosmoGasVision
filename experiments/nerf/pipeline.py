@@ -141,6 +141,29 @@ def parse_args(argv=None):
                         "PSD is cached once at startup since the GT flux is "
                         "static. Default 0.0 = OFF.")
 
+    # [D-41] FGPA-tail regularizer: per-voxel physics prior on the
+    # photoionized diffuse-IGM regime. tau_local = tau_amp * n_HI * dv /
+    # (b * sqrt(pi)) should obey Hui-Gnedin 1997 scaling tau ~ Delta^beta T^gamma
+    # at FGPA-valid voxels (tau_truth_local < fgpa_valid_tau_max). The truth-
+    # anchored offset C is computed once at startup. Structurally immune to
+    # the [D-40] amplitude-shrink degeneracy because C is frozen and the
+    # residual is per-voxel.
+    p.add_argument("--fgpa_tail_weight", type=float, default=0.0,
+                   help="[D-41] FGPA-tail regularizer weight. Penalizes voxel-wise "
+                        "deviation of log(tau_local) from beta*log(Delta) + gamma*log(T) + C "
+                        "at FGPA-valid source bins. Huber loss in log-units. "
+                        "Default 0.0 = OFF.")
+    p.add_argument("--fgpa_beta", type=float, default=1.6,
+                   help="[D-41] FGPA exponent on Delta. Hui-Gnedin 1997 default 1.6.")
+    p.add_argument("--fgpa_gamma", type=float, default=-0.7,
+                   help="[D-41] FGPA exponent on T. Hui-Gnedin 1997 default -0.7.")
+    p.add_argument("--fgpa_valid_tau_max", type=float, default=0.5,
+                   help="[D-41] FGPA-valid mask threshold: regularizer applies "
+                        "only at source bins where tau_truth_local < this. "
+                        "Default 0.5 (diffuse-IGM regime).")
+    p.add_argument("--fgpa_huber_delta", type=float, default=0.5,
+                   help="[D-41] Huber loss delta in log-units. Default 0.5.")
+
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
@@ -481,6 +504,72 @@ def train(args):
             flush=True,
         )
 
+    # [D-41] FGPA-tail regularizer truth-anchor cache. We compute the truth-
+    # side tau_local from the loader's per-bin (density, h1_frac, temp) fields,
+    # build the FGPA-valid mask (tau_truth_local < fgpa_valid_tau_max), and
+    # fit the offset C = mean(log(tau_truth_local) - beta*log(Delta) - gamma*log(T))
+    # over the mask. C is FROZEN — this is what makes the regularizer immune
+    # to the [D-40] amplitude-shrink degeneracy: a uniform pred-side shrink
+    # cannot move C and therefore gets caught voxel-wise.
+    fgpa_C = None
+    fgpa_valid_mask = None
+    fgpa_truth_density = None
+    fgpa_truth_temp = None
+    if args.fgpa_tail_weight > 0.0:
+        # Re-load sightlines to get truth source-space (density, h1_frac, temp).
+        # Cheap (~seconds); one-time startup cost. Dummy-data fallback path
+        # is not supported (Sherwood-only).
+        _fgpa_loader = SherwoodLoader(args.data_root)
+        _fgpa_sl = _fgpa_loader.load_sightlines(args.physics, 0.3)
+        _n_rays_fgpa = args.n_rays
+        density_truth = torch.tensor(_fgpa_sl['density'][:_n_rays_fgpa], dtype=torch.float32, device=device)
+        h1_frac_truth = torch.tensor(_fgpa_sl['h1_frac'][:_n_rays_fgpa], dtype=torch.float32, device=device)
+        temp_truth = torch.tensor(_fgpa_sl['temp'][:_n_rays_fgpa], dtype=torch.float32, device=device)
+        with torch.no_grad():
+            n_hi_truth = density_truth * h1_frac_truth                    # (n_rays, n_src)
+            b_truth = 12.85 * torch.sqrt(temp_truth / 10000.0)            # km/s
+            sqrt_pi_t = torch.sqrt(torch.tensor(torch.pi, device=device, dtype=torch.float32))
+            dv_kms_t = float((vel_axis[1] - vel_axis[0]).item())
+            # tau_amp_init = exp(log_tau_amp_init=0) = 1.0; same convention as
+            # the renderer at step 0. The amp will drift; the --use_log_prior
+            # guard keeps it near 1.0 to prevent the Huber tau_amp -> 0 escape.
+            tau_truth_local = 1.0 * n_hi_truth * dv_kms_t / (b_truth * sqrt_pi_t)
+            # FGPA-valid mask + numeric guards. log(0) is -inf; mask out zero
+            # density / h1_frac / temp bins (rare but possible at extreme voids).
+            finite_mask = (
+                (tau_truth_local > 0)
+                & (density_truth > 0)
+                & (temp_truth > 0)
+            )
+            fgpa_valid_mask = finite_mask & (tau_truth_local < args.fgpa_valid_tau_max)
+            log_tau_t = torch.log(tau_truth_local.clamp_min(1e-30))
+            log_d_t = torch.log(density_truth.clamp_min(1e-30))
+            log_T_t = torch.log(temp_truth.clamp_min(1e-30))
+            fgpa_residual_unanchored = (
+                log_tau_t - args.fgpa_beta * log_d_t - args.fgpa_gamma * log_T_t
+            )
+            n_valid = int(fgpa_valid_mask.sum().item())
+            if n_valid == 0:
+                raise RuntimeError(
+                    "[D-41] FGPA-valid mask is empty; no source bins satisfy "
+                    f"tau_truth_local < {args.fgpa_valid_tau_max}. Check anchor "
+                    "or raise --fgpa_valid_tau_max."
+                )
+            fgpa_C = fgpa_residual_unanchored[fgpa_valid_mask].mean().item()
+            # Persist truth-side density/temp at source-bin grid for the loss
+            # term (the network's own density/temp at predict time will be
+            # different; the C anchor only uses truth-side values).
+            fgpa_truth_density = density_truth   # (n_rays, n_src)
+            fgpa_truth_temp = temp_truth
+        n_total_src = int(fgpa_valid_mask.numel())
+        print(
+            f"[D-41] FGPA-valid mask: {n_valid}/{n_total_src} source bins "
+            f"({100.0 * n_valid / max(1, n_total_src):.3f}%); "
+            f"C={fgpa_C:.4f} log-units (beta={args.fgpa_beta}, gamma={args.fgpa_gamma}, "
+            f"tau_max={args.fgpa_valid_tau_max}).",
+            flush=True,
+        )
+
     # Model ---------------------------------------------------------------
     model = IGMNeRF(hidden_dim=256, num_layers=8, L=10).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
@@ -667,6 +756,7 @@ def train(args):
             sat_band_loss_chunks = []
             rank_order_loss_chunks = []
             pf_loss_chunks = []
+            fgpa_loss_chunks = []
             for chunk_i, (s, e) in enumerate(microbatch_slices()):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
                 # is local to this microbatch's backward pass. Without this,
@@ -675,9 +765,19 @@ def train(args):
                 # freed the shared exp node. log_tau_amp.grad still
                 # accumulates correctly (sum over chunks).
                 tau_amp_chunk = torch.exp(log_tau_amp)
-                tau_pred_mb = volume_render_physics(
-                    model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
-                )
+                # [D-41] expose per-source-bin (tau_local, density, temp)
+                # only when the FGPA-tail regularizer is active. Default-OFF
+                # path is byte-equivalent: same renderer, same return type.
+                if args.fgpa_tail_weight > 0.0:
+                    tau_pred_mb, fgpa_fields_mb = volume_render_physics(
+                        model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
+                        return_tau_local=True,
+                    )
+                else:
+                    tau_pred_mb = volume_render_physics(
+                        model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
+                    )
+                    fgpa_fields_mb = None
                 # ---- [D-24] data loss: log1p MSE, capped at TAU_MAX, masked. ----
                 # log1p(tau) compresses the long Lyman-alpha tail; cap at
                 # TAU_MAX = 10 so saturated bins don't dominate; mask out DLA
@@ -777,6 +877,52 @@ def train(args):
                     loss_mb = loss_mb + args.pf_loss_weight * loss_pf_mb
                     pf_loss_chunks.append(loss_pf_mb.detach())
 
+                # ---- [D-41] FGPA-tail regularizer ----
+                # Per-source-bin Huber residual on
+                #   r = log(tau_local) - beta*log(Delta) - gamma*log(T) - C
+                # where (tau_local, Delta, T) come from the network's forward
+                # pass (fgpa_fields_mb) and C is the truth-anchored offset
+                # cached at startup. The FGPA-valid mask was also computed
+                # from truth at startup and is sliced by ray-index here. The
+                # constraint is per-voxel and absolute (C is frozen), which
+                # is the structural property that makes #1 immune to the
+                # [D-40] amplitude-shrink degeneracy.
+                if args.fgpa_tail_weight > 0.0:
+                    tau_local_mb = fgpa_fields_mb["tau_local"]
+                    density_pred_mb = fgpa_fields_mb["density"]
+                    temp_pred_mb = fgpa_fields_mb["temp"]
+                    # Numeric guards. Network outputs are bounded-physics
+                    # (positive density, temp > 0 via softplus); clamp_min
+                    # is belt-and-braces against random-init edge cases.
+                    log_tau_p = torch.log(tau_local_mb.clamp_min(1e-30))
+                    log_d_p = torch.log(density_pred_mb.clamp_min(1e-30))
+                    log_T_p = torch.log(temp_pred_mb.clamp_min(1e-30))
+                    r_mb = (
+                        log_tau_p
+                        - args.fgpa_beta * log_d_p
+                        - args.fgpa_gamma * log_T_p
+                        - fgpa_C
+                    )
+                    # Huber per element, then mask + mean.
+                    fgpa_delta = args.fgpa_huber_delta
+                    huber = torch.where(
+                        r_mb.abs() < fgpa_delta,
+                        0.5 * r_mb * r_mb,
+                        fgpa_delta * (r_mb.abs() - 0.5 * fgpa_delta),
+                    )
+                    mask_fgpa_mb = fgpa_valid_mask[s:e]
+                    if mask_fgpa_mb.any():
+                        loss_fgpa_mb = (
+                            (huber * mask_fgpa_mb.to(huber.dtype)).sum()
+                            / mask_fgpa_mb.sum().clamp(min=1.0)
+                        )
+                    else:
+                        # All bins in this microbatch are saturation-side
+                        # (rare; happens on degenerate ray selections).
+                        loss_fgpa_mb = torch.zeros((), dtype=huber.dtype, device=huber.device)
+                    loss_mb = loss_mb + args.fgpa_tail_weight * loss_fgpa_mb
+                    fgpa_loss_chunks.append(loss_fgpa_mb.detach())
+
                 if chunk_i == 0 and args.use_log_prior:
                     loss_prior_term = (
                         tau_amp_prior_weight
@@ -817,17 +963,23 @@ def train(args):
                 torch.stack(pf_loss_chunks).mean().item()
                 if pf_loss_chunks else 0.0
             )
+            loss_fgpa_val = (
+                torch.stack(fgpa_loss_chunks).mean().item()
+                if fgpa_loss_chunks else 0.0
+            )
             loss_total = loss_data + loss_meanF_val + (
                 tau_amp_prior_weight * loss_prior.item() if args.use_log_prior else 0.0
             )
-            # Add the [D-39] components' weighted contribution to the printed
-            # total. loss_data already absorbs the saturation-band weighting
-            # (in-place re-weight of the per-bin schedule); the rank-order and
-            # P_F terms enter additively with their CLI weights.
+            # Add the [D-39]/[D-41] components' weighted contribution to the
+            # printed total. loss_data already absorbs the saturation-band
+            # weighting (in-place re-weight of the per-bin schedule); the
+            # rank-order, P_F, and FGPA-tail terms enter additively with
+            # their CLI weights.
             loss_total = (
                 loss_total
                 + args.rank_order_weight * loss_rank_order_val
                 + args.pf_loss_weight * loss_pf_band_val
+                + args.fgpa_tail_weight * loss_fgpa_val
             )
             grad_norm = model.out_layer.weight.grad.norm().item() \
                 if model.out_layer.weight.grad is not None else 0.0
@@ -841,6 +993,8 @@ def train(args):
                     extras += f" rank={loss_rank_order_val:.4e}"
                 if args.pf_loss_weight > 0.0:
                     extras += f" pf={loss_pf_band_val:.4e}"
+                if args.fgpa_tail_weight > 0.0:
+                    extras += f" fgpa={loss_fgpa_val:.4e}"
                 print(
                     f"Step {step}/{args.max_steps} | loss={loss_total:.4f} "
                     f"(data={loss_data:.4f}, meanF={loss_meanF_val:.4e}, "
@@ -872,6 +1026,8 @@ def train(args):
                     mlflow.log_metric("loss_rank_order", loss_rank_order_val, step=step)
                 if args.pf_loss_weight > 0.0:
                     mlflow.log_metric("loss_pf_band", loss_pf_band_val, step=step)
+                if args.fgpa_tail_weight > 0.0:
+                    mlflow.log_metric("loss_fgpa_tail", loss_fgpa_val, step=step)
 
             # Checkpoint ---------------------------------------------------
             if (args.checkpoint_interval > 0

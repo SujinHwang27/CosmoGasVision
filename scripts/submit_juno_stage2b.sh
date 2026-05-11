@@ -43,6 +43,31 @@ fi
 : "${RANK_ORDER_PAIRS:=64}"
 : "${PF_LOSS_WEIGHT:=0.0}"
 
+# [D-41] FGPA-tail regularizer flags. Defaults preserve all prior trajectories
+# byte-equivalently (fgpa_tail_weight=0.0 = OFF). For the [D-41] Tier-1 smoke:
+#   FGPA_TAIL_WEIGHT=0.1 FGPA_BETA=1.6 FGPA_GAMMA=-0.7
+#   FGPA_VALID_TAU_MAX=0.5 FGPA_HUBER_DELTA=0.5
+#   JUNO_BATCH=fgpa-tail-smoke
+: "${FGPA_TAIL_WEIGHT:=0.0}"
+: "${FGPA_BETA:=1.6}"
+: "${FGPA_GAMMA:=-0.7}"
+: "${FGPA_VALID_TAU_MAX:=0.5}"
+: "${FGPA_HUBER_DELTA:=0.5}"
+
+# [D-41] anti-degeneracy guard: the FGPA-tail Huber residual is unbounded
+# below (log(tau_local) -> -inf as tau_amp -> 0), so --use_log_prior on
+# log_tau_amp is REQUIRED for fgpa-tail-* batches. Auto-enable when
+# FGPA_TAIL_WEIGHT > 0. Other batches preserve their historical default
+# (no log-prior unless explicitly opted in via USE_LOG_PRIOR=1).
+: "${USE_LOG_PRIOR:=0}"
+if (( $(echo "${FGPA_TAIL_WEIGHT} > 0" | bc -l) )); then
+  USE_LOG_PRIOR=1
+fi
+LOG_PRIOR_FLAG=""
+if [[ "${USE_LOG_PRIOR}" == "1" ]]; then
+  LOG_PRIOR_FLAG="--use_log_prior"
+fi
+
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 SHORTHASH=$(cd "${JUNO_WORK}" && git rev-parse --short HEAD 2>/dev/null || echo nogit)
 
@@ -55,6 +80,8 @@ case "${JUNO_BATCH}" in
   pub-t4)            RUN_NAME="Stage2bPub-T4-P${PHYSICS_ID}-S${SEED}-${SHORTHASH}-${TIMESTAMP}" ;;
   sat-aware-smoke)   RUN_NAME="Stage2bSatAware-T1smoke-P${PHYSICS_ID}-S${SEED}-${SHORTHASH}-${TIMESTAMP}" ;;
   sat-aware-pub)     RUN_NAME="Stage2bSatAware-T1pub-P${PHYSICS_ID}-S${SEED}-${SHORTHASH}-${TIMESTAMP}" ;;
+  fgpa-tail-smoke)   RUN_NAME="Stage2bFgpaTail-T1smoke-P${PHYSICS_ID}-S${SEED}-${SHORTHASH}-${TIMESTAMP}" ;;
+  fgpa-tail-pub)     RUN_NAME="Stage2bFgpaTail-T1pub-P${PHYSICS_ID}-S${SEED}-${SHORTHASH}-${TIMESTAMP}" ;;
   *)                 RUN_NAME="" ;;
 esac
 
@@ -77,6 +104,7 @@ echo "RUN_NAME=${RUN_NAME:-<pipeline.py auto-generated>}"
 echo "JUNO_BATCH=${JUNO_BATCH}"
 echo "MEAN_FLUX_OBS=${MEAN_FLUX_OBS}"
 echo "SAT_BAND_WEIGHT=${SAT_BAND_WEIGHT} RANK_ORDER_WEIGHT=${RANK_ORDER_WEIGHT} RANK_ORDER_PAIRS=${RANK_ORDER_PAIRS} PF_LOSS_WEIGHT=${PF_LOSS_WEIGHT}"
+echo "FGPA_TAIL_WEIGHT=${FGPA_TAIL_WEIGHT} FGPA_BETA=${FGPA_BETA} FGPA_GAMMA=${FGPA_GAMMA} FGPA_VALID_TAU_MAX=${FGPA_VALID_TAU_MAX} FGPA_HUBER_DELTA=${FGPA_HUBER_DELTA}"
 echo "physics=${PHYSICS_ID} n_rays=${N_RAYS} microbatch=${MICROBATCH} accum=${ACCUM_STEPS} max_steps=${MAX_STEPS} warmup=${WARMUP_STEPS} seed=${SEED}"
 nvidia-smi --query-gpu=name,memory.free,driver_version --format=csv | tail -1
 
@@ -93,6 +121,12 @@ python -u experiments/nerf/pipeline.py \
     --rank_order_weight "${RANK_ORDER_WEIGHT}" \
     --rank_order_pairs "${RANK_ORDER_PAIRS}" \
     --pf_loss_weight "${PF_LOSS_WEIGHT}" \
+    --fgpa_tail_weight "${FGPA_TAIL_WEIGHT}" \
+    --fgpa_beta "${FGPA_BETA}" \
+    --fgpa_gamma "${FGPA_GAMMA}" \
+    --fgpa_valid_tau_max "${FGPA_VALID_TAU_MAX}" \
+    --fgpa_huber_delta "${FGPA_HUBER_DELTA}" \
+    ${LOG_PRIOR_FLAG} \
     ${RUN_NAME:+--run_name "${RUN_NAME}"}
 
 # === Post-run MLflow tag injection (publication-class batches only) ===
@@ -100,7 +134,7 @@ python -u experiments/nerf/pipeline.py \
 # batches we add provenance tags so the host-side replay can discriminate
 # publication-class runs from cost-survey runs and trace [D-34] anchor +
 # [D-24] loss-bundle context. Hits the local file store directly.
-if [[ "${JUNO_BATCH}" == pub-* || "${JUNO_BATCH}" == sat-aware-* ]]; then
+if [[ "${JUNO_BATCH}" == pub-* || "${JUNO_BATCH}" == sat-aware-* || "${JUNO_BATCH}" == fgpa-tail-* ]]; then
   python -u - <<PYEOF
 import os, sys
 from mlflow.tracking import MlflowClient
@@ -118,21 +152,35 @@ runs = client.search_runs(
 if not runs:
     print("FATAL: run '${RUN_NAME}' not found after pipeline exit.", file=sys.stderr); sys.exit(11)
 run = runs[0]
-stage_tag = "2b-sat-aware" if "${JUNO_BATCH}".startswith("sat-aware-") else "2b-publication"
+batch = "${JUNO_BATCH}"
+if batch.startswith("sat-aware-"):
+    stage_tag = "2b-sat-aware"
+elif batch.startswith("fgpa-tail-"):
+    stage_tag = "2b-fgpa-tail"
+else:
+    stage_tag = "2b-publication"
 client.set_tag(run.info.run_id, "stage", stage_tag)
-client.set_tag(run.info.run_id, "juno_batch", "${JUNO_BATCH}")
+client.set_tag(run.info.run_id, "juno_batch", batch)
 client.set_tag(run.info.run_id, "mean_flux_obs_target", "${MEAN_FLUX_OBS}")
 client.set_tag(run.info.run_id, "mean_flux_obs_source", "kirkman2007")
 client.set_tag(run.info.run_id, "anchor_corrected", "true")
 client.set_tag(run.info.run_id, "loss_bundle", "log1p+cap+mask")
-if "${JUNO_BATCH}".startswith("sat-aware-"):
+if batch.startswith("sat-aware-"):
     client.set_tag(run.info.run_id, "pf_loss_weight", "${PF_LOSS_WEIGHT}")
     client.set_tag(run.info.run_id, "sat_band_weight", "${SAT_BAND_WEIGHT}")
     client.set_tag(run.info.run_id, "rank_order_weight", "${RANK_ORDER_WEIGHT}")
     client.set_tag(run.info.run_id, "rank_order_pairs", "${RANK_ORDER_PAIRS}")
     client.set_tag(run.info.run_id, "successor_of", "[D-39]")
     client.set_tag(run.info.run_id, "addendum", "5")
-print(f"[tagger] run_id={run.info.run_id} batch=${JUNO_BATCH} stage={stage_tag} OK")
+if batch.startswith("fgpa-tail-"):
+    client.set_tag(run.info.run_id, "fgpa_tail_weight", "${FGPA_TAIL_WEIGHT}")
+    client.set_tag(run.info.run_id, "fgpa_beta", "${FGPA_BETA}")
+    client.set_tag(run.info.run_id, "fgpa_gamma", "${FGPA_GAMMA}")
+    client.set_tag(run.info.run_id, "fgpa_valid_tau_max", "${FGPA_VALID_TAU_MAX}")
+    client.set_tag(run.info.run_id, "fgpa_huber_delta", "${FGPA_HUBER_DELTA}")
+    client.set_tag(run.info.run_id, "successor_of", "[D-40]")
+    client.set_tag(run.info.run_id, "decision_id", "[D-41]")
+print(f"[tagger] run_id={run.info.run_id} batch={batch} stage={stage_tag} OK")
 PYEOF
 fi
 

@@ -98,7 +98,7 @@ def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
     return torch.clamp(H, min=0.0)
 
-def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3):
+def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3, return_tau_local=False):
     """
     Differentiable Lyman-alpha optical depth rendering with windowed RSD convolution.
 
@@ -192,5 +192,25 @@ def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=
 
     if tau_amp is not None:
         tau = tau * tau_amp
+
+    if return_tau_local:
+        # [D-41] FGPA-tail regularizer per-source-bin probe. The "local"
+        # optical depth is the column-source amplitude that would appear
+        # if the line profile were a delta function: integrated under the
+        # normalized line profile, this is exactly n_hi * dv / (b * sqrt(pi)),
+        # i.e., the per-source-bin contribution stripped of Voigt convolution
+        # mixing. Multiplied by tau_amp so the FGPA residual is comparable
+        # to truth-side tau_truth_local at the same tau_amp. We also surface
+        # density and temp at the source-bin grid so the caller can evaluate
+        # log(tau_local) - beta*log(density) - gamma*log(temp) - C without
+        # re-running the MLP forward pass.
+        amp_scalar = tau_amp if tau_amp is not None else 1.0
+        tau_local = amp_scalar * n_hi * dv_per_bin / (b * sqrt_pi)        # (n_rays, n_src)
+        fgpa_fields = {
+            "tau_local": tau_local,
+            "density": density,
+            "temp": temp,
+        }
+        return tau, fgpa_fields
 
     return tau

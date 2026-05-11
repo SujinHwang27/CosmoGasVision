@@ -336,7 +336,7 @@ graph TD
 
   **Successor research direction (ranked, per PI):**
   1. **P_F-targeted loss term** (highest leverage). Direct address of (c): put P_F (or band-integrated proxy at k_∥∈[10^−2.5, 10^−1.5] s/km) into the training objective. Differentiable; doesn't require new inputs.
-  2. **FGPA-tail regularizer** (medium). Constrains τ-PDF tails where (c) predicts the rescale-vs-trained divergence lives. Complementary to #1.
+  2. **FGPA-tail regularizer** (medium). FGPA = **Fluctuating Gunn-Peterson Approximation** (Bi & Davidsen 1997; Hui & Gnedin 1997): in the photoionized diffuse-IGM regime the local Lyα optical depth obeys $\tau_{\rm local} \propto \Delta^{\beta}\,T^{\gamma}$ with $\beta \approx 1.6$, $\gamma \approx -0.7$. "FGPA-tail" names the construction that uses this scaling as a per-voxel physics prior; in the v1 design ([D-41]) the regularizer is applied at low-τ source bins where FGPA is valid, indirectly constraining the saturated-tail residual by pinning the network's $(\rho, T) \to n_{HI}$ relation on the diffuse majority. Complementary to #1.
   3. **Velocity-gradient conditioning branch** (lowest for this wrinkle). Architectural; addresses a different failure mode (peculiar-velocity line structure), not directly the saturation-nonlinearity gap.
 
   **Task C status (final):** authorized — dispatched this session, reframed from "validate rescale-as-preview" to "quantify the (c)-attributable gap across pub-t1 checkpoint family".
@@ -486,6 +486,36 @@ graph TD
   **§4.1 redirect to FGPA-tail still holds**: a per-pixel constraint on the τ-vs-Δ scaling in the strong-absorber regime would penalize amplitude-shrink in the saturation band where the bias concentrates ([D-39] Addenda 3-4 τ-binned residual). Integrated-statistic constraints (#1 family) are demonstrably gameable via scale-distortion; per-pixel constraints (#2 family, now promoted) are not.
 
   **Diagnostic artifact**: `scripts/diag_pf_per_bin.py` (Hann + δ_F-normalized P_F per-bin dump via `compute_PF_1d` → `compute_p_flux` wrapper; chunked render at chunk_rays=32 matching the W1-A / Task C / overlay convention). Pre-fix: original draft of this script called `_render_tau_for_model` un-chunked at n_rays=1024 → hung the Voigt kernel silently for an hour without producing JSON output; fixed in commit (this session) by routing through `_render_tau_chunked`.
+
+- **[D-41] Per-pixel FGPA-tail regularizer — smoke-level FAIL via tau_pred → 0 degeneracy (2026-05-11, PI)** —
+
+  **Spec**: P1, n_rays=64, microbatch=32, **50-step smoke** (Tier-1 SKIPPED post-smoke verdict), seed=0, anchor 0.979. CLI: `--fgpa_tail_weight=0.1 --fgpa_beta=1.6 --fgpa_gamma=-0.7 --fgpa_valid_tau_max=0.5 --fgpa_huber_delta=0.5 --use_log_prior`. β/γ frozen per Hui-Gnedin 1997. MLflow run `21fb45cb3cd54793911824950591d44c`. C anchor = −9.2151 log-units (truth-side cache; FGPA-valid mask 131072/131072 = 100% of source bins).
+
+  **Empirical observation (per [D-37], leads the framing):**
+
+  | Step | loss_total | loss_data | loss_meanF | loss_fgpa | mean_F_pred | tau_amp |
+  |------|------------|-----------|------------|-----------|-------------|---------|
+  | 1    | 0.6709     | 0.0220    | 1.22e-2    | **6.367** | 0.8687      | 1.0000  |
+  | 10   | 0.6591     | 0.0184    | 8.50e-3    | 6.323     | 0.8868      | 0.9970  |
+  | 50   | **0.0419** | 0.0106    | 4.41e-4    | **0.3085** | **1.0000** | 0.9906  |
+
+  `loss_fgpa` descended 20× (6.37 → 0.31) BUT `mean_F_pred → 1.0000` exactly: **the network drove tau_pred → 0 everywhere**. `tau_amp` stayed at 0.99 (log_prior guard held), so the network achieved tau-collapse via `n_HI = density · X_HI → 0`, evading the tau_amp anchor entirely.
+
+  **Mechanism (the new degeneracy, not in PI's original anti-degeneracy audit):** the Huber loss is bounded below — its linear regime `delta·(|r| − 0.5·delta)` has gradient ±delta per element regardless of how negative `r` is. As `n_HI → 0`, `log(tau_local) → −∞` and `r → −∞`, but the optimizer pays constant per-element gradient to drive `n_HI` down. The data MSE (log1p+cap+mask) is **weakly informative on the diffuse-bin majority** (most bins are diffuse, `log1p(tau_truth)` is small, so `(log1p(0) − log1p(tau_truth))²` averages to ~0.01 — the basin is shallow). The mean-F anchor only pays 4e-4 for mean_F=1.0 vs 0.979. Net: the loss landscape has a low-cost basin at tau ≈ 0 that the optimizer finds within 50 steps.
+
+  **Verdict**: FAIL at smoke-level. Tier-1 SKIPPED (~$1.50 / 50 min Juno saved per [D-40] precedent on cost discipline). The §4.1 #2 family (per-pixel FGPA constraint on network-predicted state) is **structurally gameable** at this data-loss strength.
+
+  **Architectural finding (load-bearing for the next design):** [D-40] and [D-41] share a structural cause — **any regularizer evaluated only at the network's own predicted state is gameable when the data loss is weakly informative on the diffuse-bin majority.** PI [D-40] said "the [D-40] family is gameable via scale-distortion; per-pixel constraints are not" — [D-41] proves that wrong. The next discipline: **regularize against ground-truth-anchored (not self-consistent) quantities.** Velocity-gradient conditioning (§4.1 #3) passes this test because `∇v_pec` is observation-derived; the network cannot game it by shrinking its own outputs.
+
+  **Redirect**: §4.1 #3 (velocity-gradient conditioning) promoted to next-up. §4.1 #1 ([D-40]) and §4.1 #2 ([D-41]) both retired as smoke- or eval-falsified.
+
+  **Anti-degeneracy audit refresh (binding for [D-42]):**
+  - "Any regularizer evaluated only at the network's predicted state is gameable when `loss_data` is weakly informative on the diffuse-bin majority."
+  - Structurally-immune-by-design test: the regularizer must include a term whose minimum is achieved only at non-trivial prediction. Penalize deviation from **ground-truth-anchored** quantities, not self-consistent ones.
+
+  **Artifacts**: `cloud_runs/fgpa_tail_smoke.log` (50-step trace); MLflow run `21fb45cb3cd54793911824950591d44c`. Implementation: `experiments/nerf/pipeline.py` + `src/models/nerf.py` (new `return_tau_local` kwarg) + `scripts/submit_juno_stage2b.sh` (env-var passthrough + `fgpa-tail-{smoke,pub}` JUNO_BATCH cases; never dispatched).
+
+  **References**: [D-37], [D-39] (Addenda 3-5), [D-40] (Addendum 1). PI [D-41] design spec + verdict (this session). Per [D-37] honest-reporting: smoke-level negative result, recorded as such — not spun.
 ---
 
 ## 4. The Data (Lineage & Governance)
