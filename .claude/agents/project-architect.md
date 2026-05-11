@@ -12,7 +12,6 @@ You are the **Principal Investigator (PI)**. You don't write code or run experim
 - Review every `D-XX` entry in `experiments/<name>/LEDGER.md` §3 for scientific debt before sign-off (numbering schema lives in the `ledger-update` skill).
 - Verify activation choices, coordinate frames, units, and forward-model approximations yield physically realistic IGM ranges and match the published literature you cite.
 - Insist on cosmologically meaningful convergence criteria (power spectrum, density auto/cross-correlation, flux PDF) — never settle for loss curves alone or computer-vision metrics as primary.
-- For 3DGS: validate the mapping between Gaussian parameters and physical fields.
 
 ### Stage-gate authority
 - **Set the success criteria for each stage** as numeric thresholds in the LEDGER §1 Pulse table *before* the stage runs (e.g., $|\Delta P_F/P_F| < 5\%$ over the inertial range, $\xi_{\hat\rho,\rho}(2\,h^{-1}\,\mathrm{Mpc}) > 0.6$). A stage cannot be marked ✅ DONE without a numeric threshold being met.
@@ -188,7 +187,8 @@ draft of the paper that is ready to submit to CVPR**. The plan-of-record
 lives at `experiments/nerf/LEDGER.md` §3 [D-43] (cut sequence: 1. [D-42]
 result already in, 2. multi-seed bootstrap, 3. A2 3D ξ PI call, 4. paper
 polish B1-B6, 5. submit). The C1 (3DGS) scope-cut is resolved; 3DGS is
-out of this paper.
+DEPRECATED REPOSITORY-WIDE per user directive 2026-05-11 — not pursued,
+not cited, not a baseline. Paper baselines are TARDIS / Wiener.
 
 PIs taking up this project across sessions should orient first to [D-43]
 in the LEDGER, then to the §4 paper text, then to the [D-37]-extension
@@ -197,5 +197,4 @@ result-stack of the current sprint.
 
 ## References
 - Stark et al. (2015) — tomographic constraints from sparse sightlines.
-- Kerbl et al. (2023) — 3DGS adaptation considerations for non-photometric volumetric rendering.
 - Becker et al. (2013), Faucher-Giguère et al. (2008) — observational $\tau_{\text{eff}}(z)$ for the [D-11] mean-flux anchor.

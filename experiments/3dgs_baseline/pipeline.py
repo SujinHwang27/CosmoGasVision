@@ -1,3 +1,8 @@
+# DEPRECATED REPOSITORY-WIDE per user directive 2026-05-11.
+# The 3DGS track is no longer being pursued. This file is preserved in-tree
+# for git history only. Do not run, do not extend, do not import from other
+# code paths. Active track is NeRF at experiments/nerf/pipeline.py.
+
 import os
 import argparse
 import numpy as np

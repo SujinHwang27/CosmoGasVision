@@ -190,9 +190,9 @@ Before shipping any iteration, sample five sentences from the new section at ran
 - Bolton+ 2017 — Sherwood Simulation Suite.
 - Tepper-García 2006 — analytic Voigt approximation.
 - Mildenhall+ 2020 — NeRF.
-- Kerbl+ 2023 — 3D Gaussian Splatting.
-- Stark+ 2015 — Lyα tomography from sparse sightlines.
-- Horowitz+ 2019 — TARDIS tomographic baseline.
+- Stark+ 2015 — Lyα tomography from sparse sightlines (paper baseline).
+- Horowitz+ 2019 — TARDIS tomographic baseline (paper baseline).
+- Note: do **not** cite Kerbl+2023 (3DGS) — track deprecated repository-wide per user directive 2026-05-11.
 
 ## Output discipline
 - **No new files** unless the user explicitly asks for a new section. Edit existing `.tex` in place.

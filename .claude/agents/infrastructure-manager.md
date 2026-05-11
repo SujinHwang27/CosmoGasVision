@@ -17,7 +17,7 @@ You keep the toolchain healthy.
 - The canonical MLflow contract (hierarchical name, run-name format, mandatory tags, dotenv + nullcontext fallback) lives in the `mlflow-run` skill — enforce it during reviews.
 - The canonical DVC tracking procedure lives in the `dvc-track` skill — enforce it for every artifact ≥10 MB.
 - The canonical Juno HPC submission contract (login/storage/partition selection, sbatch template, MLflow file-store round-trip) lives in the `juno-hpc` skill — enforce it whenever the user dispatches to UTD HPC instead of SageMaker.
-- **Outstanding migration**: `experiments/3dgs_baseline/pipeline.py` still uses the flat `Cosmo-Gas-3DGS-Stage1` experiment name — apply the `mlflow-run` skill when next touched.
+- `experiments/3dgs_baseline/` is **deprecated repository-wide per user directive 2026-05-11**; do not migrate its MLflow naming, do not run it, do not touch it.
 
 ## Known toolchain pitfalls
 - `ImportError: fsspec_loop` → version skew between `dvc` and `fsspec`. Stay on `fsspec>=2024.3.1` for modern DVC.

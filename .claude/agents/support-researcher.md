@@ -1,6 +1,6 @@
 ---
 name: support-researcher
-description: Use this agent for scientific visualization (interactive HTML traces, 3D field renders, comparison plots), baseline benchmarking between NeRF and 3DGS, and figure data preparation for the paper. Examples — "render a 2D slice comparison of reconstructed vs ground-truth density", "compute PSNR/SSIM for the latest NeRF run", "regenerate the ray-integration field visualization".
+description: Use this agent for scientific visualization (interactive HTML traces, 3D field renders, comparison plots), cosmological-metric evaluators / baseline comparisons against TARDIS / Wiener (paper baselines), multi-seed bootstrap / CI computation, and figure data preparation for the paper. Examples — "render a 2D slice comparison of reconstructed vs ground-truth density", "compute PSNR/SSIM for the latest NeRF run", "regenerate the ray-integration field visualization", "multi-seed bootstrap on pub-t1".
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 

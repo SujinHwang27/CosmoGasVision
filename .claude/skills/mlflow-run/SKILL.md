@@ -1,6 +1,6 @@
 ---
 name: mlflow-run
-description: Wraps an execution in the project's canonical MLflow contract — hierarchical experiment name, stage-prefixed run name, mandatory tag set (model_type, stage, physics_id, redshift), dotenv-loaded AWS auth, and nullcontext fallback when the tracking server is unreachable. Trigger when wiring a new mlflow.start_run call, when reviewing an existing one for tag/name compliance, or when porting a flat-named legacy script (e.g. experiments/3dgs_baseline/pipeline.py) to the hierarchical scheme. Do not trigger for small hyperparameter tweaks inside an already-compliant run.
+description: Wraps an execution in the project's canonical MLflow contract — hierarchical experiment name, stage-prefixed run name, mandatory tag set (model_type, stage, physics_id, redshift), dotenv-loaded AWS auth, and nullcontext fallback when the tracking server is unreachable. Trigger when wiring a new mlflow.start_run call or when reviewing an existing one for tag/name compliance. Do not trigger for small hyperparameter tweaks inside an already-compliant run. The deprecated `experiments/3dgs_baseline/` track is out of scope — do not migrate or run it.
 ---
 
 # MLflow run contract (CosmoGasVision)
@@ -9,7 +9,7 @@ Every MLflow run in this repo follows the same shape so the tracking server stay
 
 ## Naming
 
-- **Experiment name** (hierarchical): `CosmoGasVision/<Track>` — e.g. `CosmoGasVision/NeRF`, `CosmoGasVision/3DGS`. The `<Track>` segment matches the active `exp/<name>` branch basename.
+- **Experiment name** (hierarchical): `CosmoGasVision/<Track>` — e.g. `CosmoGasVision/NeRF`. The `<Track>` segment matches the active `exp/<name>` branch basename.
 - **Run name** (stage-prefixed): `Stage<N>-<ShortDescription>` — e.g. `Stage2a-PhysicsIntegratorValidation`, `Stage1-Bootstrap`. Pascal-case, no spaces.
 
 ## Mandatory tags
@@ -18,7 +18,7 @@ Every run **must** set these four tags at start:
 
 | Tag | Type | Example |
 |---|---|---|
-| `model_type` | string | `nerf`, `3dgs` |
+| `model_type` | string | `nerf` |
 | `stage` | string | `1`, `2a`, `2b`, `3` |
 | `physics_id` | string | `P1`, `P2`, `P3`, `P4` (Sherwood physics variant) |
 | `redshift` | string | `0.3`, `2.0` |

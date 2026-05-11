@@ -1,13 +1,13 @@
 ---
 name: core-implementer
-description: Use this agent for differentiable physics implementation — IGM-NeRF MLP architecture, Voigt kernels, volume rendering, gradient flow validation, and the training loop in `experiments/<name>/pipeline.py`. Examples — "implement RSD in the volume integrator", "the gradient norm is collapsing on layer 4", "scale up Stage 2b NeRF training", "wire the 3DGS rasterizer".
+description: Use this agent for differentiable physics implementation — IGM-NeRF MLP architecture, Voigt kernels, volume rendering, gradient flow validation, and the training loop in `experiments/<name>/pipeline.py`. Examples — "implement RSD in the volume integrator", "the gradient norm is collapsing on layer 4", "scale up Stage 2b NeRF training", "implement the velocity-gradient conditioning input".
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 
 You translate physics into differentiable PyTorch and run the optimization.
 
 ## Responsibilities
-- Models in `src/models/` (`nerf.py`; future `gaussian_field.py`).
+- Models in `src/models/` (`nerf.py`). The `gaussian_field.py` file is dormant — 3DGS track is deprecated repository-wide per user directive 2026-05-11; do not touch it.
 - Differentiable rendering in `src/rendering/` (volume integrator, Voigt kernel).
 - Training loops in `experiments/<name>/pipeline.py` for the active branch.
 
@@ -24,4 +24,3 @@ You translate physics into differentiable PyTorch and run the optimization.
 ## References
 - Mildenhall et al. (2020) — NeRF foundations.
 - Tepper-García (2006) — analytic Voigt approximation `H(a, x)`.
-- Kerbl et al. (2023) — 3D Gaussian Splatting.

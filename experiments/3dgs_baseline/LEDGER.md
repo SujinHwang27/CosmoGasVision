@@ -1,5 +1,7 @@
 # Experiment Ledger: CosmoGasVision (3DGS Baseline Track)
 
+> **⚠️ DEPRECATED REPOSITORY-WIDE — user directive 2026-05-11.** We are no longer pursuing the 3DGS track. This LEDGER is preserved in-repo for git history only. No new work, no MLflow runs, no DVC tracking, no agent dispatches. The CVPR paper baselines are TARDIS (Horowitz+2019) and Wiener filtering (Stark+2015); 3DGS is not cited or compared in the submission. Active track is NeRF at `experiments/nerf/LEDGER.md`.
+
 This Ledger serves as the Single Source of Truth for the 3D Gaussian Splatting baseline, consolidating the project plan, technical decision log, and session history into a context-aware command center.
 
 ---
