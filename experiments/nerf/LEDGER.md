@@ -999,6 +999,67 @@ graph TD
   - **Stage 3 framing**: looser (run on imperfect ρ + report gate-(a) residual as covariate) vs strict (require gate-(a) closure) vs hybrid (truth-baseline first, reconstructed after closure) — **user directed defense-panel adversarial review before PI decision**.
   - **[D-12] walk-back**: if [D-46] succeeds, Stage 3 must use held-out physics or held-out region to remove the classifier-leakage that [D-12] originally guarded against.
 
+  ---
+
+  **Addendum 1 — Defense-panel attack + amendment (2026-05-11).** Defense-panel adversarial review per user directive landed verdict **NEEDS WORK on option (A)**. 4 KILLER + 4 SERIOUS attacks identified across 3 examiners (cosmology / ML-stats / methods-skeptic).
+
+  **Two structurally fatal attacks against option (A) Stage 3 framing**:
+  - **COSMO-1 (KILLER)**: The [D-39] cross-physics R-invariance result ($R \in \{18.87, 19.10, 20.47, 23.75\}$, monotonic in feedback strength) means the **reconstruction's failure mode is itself feedback-correlated**. A classifier on imperfect ρ cannot distinguish "feedback physics" from "reconstruction deficit" signal without an explicit decoupling test option (A) does not spec.
+  - **METHODS-1 (KILLER)**: Option (A) is the **only framing that cannot produce a null outcome** — every accuracy result is "publishable with a covariate," which is the [D-37]-rule-7 anti-pattern the candidate's own discipline forbids.
+
+  **Dominance scoring**: option (C) hybrid avoids 4 of 5 killers; option (B) strict avoids 5 of 5 but accepts indefinite Stage 3 block. Panel recommendation: adopt (C) directly.
+
+  **[D-46]↔[D-12] structural conflict re-surfaced**. METHODS-2 attack confirmed by direct read of [D-12] (line 123): "Rejected the conditional-physics_id-embedding alternative because Stage 3's feedback-classification question requires that the reconstruction network is unaware of the physics label — otherwise the discriminator's signal is leaked through the generator." [D-46]'s physics_id embedding **is the exact intervention [D-12] rejected**. The "partially walked back" language understates the conflict. Mitigation: **held-out region split** is the only structurally valid approach (held-out physics has N=1 test, statistically weak). [D-46] Tier-1 dispatch is now **blocked on held-out region implementation** in the loader.
+
+  **[D-15] 85% bar empirical anchor**. STATS-2 attack confirmed by direct read of [D-15] (line 126): 85% accuracy target is **project-side, no external citation**. Option (C) step 1 (truth-baseline first) provides the empirical anchor. Option (A) cannot anchor its own pass/fail bar.
+
+  **User decision 2026-05-11 (post-panel)**: Adopt (C) hybrid; amend [D-46] with held-out region requirement. Captured as [D-47].
+
+  **Next sprint queue (revised)**:
+  - **Held-out region split** in `SherwoodLoader` (data-engineer, ~2-4 hrs) — required before any [D-46] Tier-1 dispatch
+  - **Truth-baseline 3D ResNet on ground-truth ρ crops** (core-implementer, ~4 hrs) — option (C) step 1; establishes [D-15] empirical ceiling, anchors the 85% bar
+  - **[D-46] code implementation** (in flight; can land as-is — Tier-1 dispatch gated on held-out region)
+  - **3D-ρ crop extraction** (in flight; foundation for both truth-baseline and reconstructed-baseline Stage 3)
+
+  **Scope-level concerns surfaced by panel** (apply to all options, not framing-fixable):
+  - z=0.3-only scope must be stated explicitly in any Stage 3 contribution claim (no extrapolation language)
+  - N=1 simulation realization per physics: no sample-level variance estimate for "AGN-strong universe vs no-feedback"; cite Bocquet+ 2020 multi-realization discipline as acknowledged limit
+  - Wiener-baseline Stage 3 comparison owed if Stage 3 ships as headline claim; deferrable to follow-on paper
+  - Crop bootstrap unit must be pre-registered (sightline-level bootstrap from [D-44] doesn't generalize to crop-level accuracy; cite Politis-Romano 1994 block bootstrap)
+
+---
+
+- **[D-47] Stage 3 framing — option (C) hybrid (truth-baseline first, then gap) — adopted post defense-panel review (2026-05-11, user + PI)** —
+
+  **User decision**: Adopt option (C) hybrid for Stage 3. Truth-baseline run first (3D ResNet on ground-truth $\rho$ crops over $\{P_1, P_2, P_3, P_4\}$ at $z=0.3$) establishes the classifier ceiling empirically. Reconstructed-baseline (run only after a counterfactual closes gate-(a) at the held-out-region-evaluated level) measures the gap to ceiling. Both reported with the gate-(a) residual context.
+
+  **Why (C) over (A)** (per defense-panel verdict):
+  - (A) violates [D-37]-rule 7 (anti-pattern: every framing produces a publishable number, no null-outcome path)
+  - (A) cannot anchor its own [D-15] 85% bar without first running (C) step 1
+  - (A) cannot distinguish feedback signal from reconstruction-deficit signal under [D-39] R-invariance
+  - (C) dominates (A) on 4 of 5 killer attacks
+
+  **Why (C) over (B)**:
+  - (B) blocks Stage 3 indefinitely if no counterfactual closes gate-(a); honest but slow
+  - (C) delivers truth-baseline as a real research finding regardless of reconstruction status; preserves Stage 3 as a research deliverable even if reconstruction never closes
+
+  **Implementation (sequenced)**:
+  1. **Truth-baseline** (no reconstruction needed): extract ground-truth $\rho/\bar\rho$ crops via `SherwoodLoader.extract_rho_crops(...)` (data-engineer in flight); train 3D ResNet on $\{P_1, P_2, P_3, P_4\}$ 4-way classification; report accuracy + 3-seed CI. **This is the [D-15] empirical ceiling.** Honest research result regardless of subsequent reconstruction quality.
+  2. **Reconstructed-baseline** (gated on a successful counterfactual closing gate-(a) under held-out-region evaluation): apply the same 3D ResNet to crops extracted from the reconstructed $\rho$ field on the held-out region. Report accuracy + 3-seed CI + gate-(a) residual as covariate (conditional-accuracy estimator pre-registered per STATS-1 attack).
+  3. **Gap**: report `truth_ceiling - reconstructed_accuracy` as the headline measure of reconstruction fidelity for downstream feedback classification.
+
+  **Held-out region requirement** (from [D-46] Addendum 1): the box is split into train and held-out regions; [D-46] (or any future conditional generator) trains on train-region sightlines; Stage 3 evaluates on held-out-region crops. Sherwood box is 60 Mpc/h; reasonable split is 50/50 by axis bisection or 80/20 with held-out region a contiguous slab. Specifics deferred to data-engineer's held-out split sprint.
+
+  **Pre-registered conditional-accuracy estimator (per STATS-1 attack)**: report $\hat A(r)$ at $r = \{r_{25}, r_{50}, r_{75}\}$ where $r$ is per-crop gate-(a) residual mass. Interpretation rule: if $\hat A(r_{25}) - \hat A(r_{75}) > 0.10$ (10 percentage points), classifier accuracy is reading the reconstruction deficit, not the physics — **negative result trigger**, Stage 3 blocked at that residual range.
+
+  **Bootstrap unit (per STATS-4 attack)**: moving-block bootstrap on crop spatial position; block length set empirically by crop-crop accuracy covariance correlation length (measured on a pilot run, ~1 hr host-side).
+
+  **Scope statement (per COSMO-2)**: Stage 3 claims are explicitly scoped to $z=0.3$ low-redshift IGM regime. No extrapolation language to high-redshift in any Stage 3 contribution.
+
+  **References**: [D-12] (anti-leakage rule), [D-13] gate (a) (closure prerequisite for reconstructed step), [D-15] (85% target — empirical anchor now via truth-baseline), [D-37]-rule 7 (decision-quality discipline), [D-39] Addendum 4 (R-invariance feedback-correlation concern), [D-46] (the [D-12] walk-back creating the need for held-out region).
+
+  **Review trail**: User-decided post defense-panel KILLER attack verdict. PI sign-off on the (C) hybrid implementation plan: this entry. No defense-panel re-review needed since (C) is the panel's recommendation.
+
   **Addendum 1 — Bootstrap results & rule evaluation (2026-05-11, PI).** Artefact `experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json` landed (driver `scripts/d44_bootstrap_KS_meanF.py`, 5.8 min wall, K=512 resamples per cell, seeds {42–46}). Anti-degeneracy F1/F2 PASS (sightline-level bootstrap; pred and truth indices from independent PCG64 streams; `indices_identical=False`).
 
   **Results (mean ± σ; q16 / q84):**
