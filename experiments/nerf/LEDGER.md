@@ -919,6 +919,86 @@ graph TD
 
   **Review-trail**: PI delivered architectural recommendation with moderate confidence. User pruned 4 modifications + authorized "Go" on the 4-step migration plan. Steps 1 + 4 executed this commit; Steps 2 + 3 deferred per honest-budget reassessment.
 
+---
+
+- **[D-46] Post-CVPR research continuation: joint-physics conditional MLP with physics_id embedding (2026-05-11, PI design spec)** —
+
+  **User directive 2026-05-11** (post HEAD `16e773b`): "Paper is paper; continue finishing the research. Writing a CVPR paper was a step for an intermediate report, not a final step. Identify what's in this research project's scope, and continue."
+
+  **Project scope statement (PI re-anchor).** CosmoGasVision's research question: can a continuous neural IGM field, supervised by sparse Lyα sightlines through a differentiable forward model, recover a 3D gas-density reconstruction faithful enough to (i) close all three [D-13] structure gates at `pub-t1` cross-physics, (ii) carry a downstream Stage 3 feedback-physics classification signal ≥85% per [D-15], and (iii) extend across redshift? CVPR paper closed item (i) partially (mean-flux/KS); gate (a) P_F and gate (b) 3D ξ remain. Strict (c)-IS-the-cause claim reserved for successor work per [D-39].
+
+  **User-decided parameters (2026-05-11)**:
+  - Time horizon: research-driven; venue decided when results land
+  - Budget: no monthly Juno cap; track per-sprint
+  - Multi-redshift (z=0.1, 2.2): DEFERRED to separate paper; this track stays at z=0.3
+  - Stage 3 framing decision: defense-panel adversarial review BEFORE PI sign-off
+
+  **Hypothesis (hedged).** Pooling all four Sherwood feedback variants into one MLP with a physics_id embedding *may* close the saturation-band deficit because high-τ peaks quadruple per gradient step at fixed sightline budget. Cross-physics invariance of the failure ($R \in [\RsatRangeLo, \RsatRangeHi]$ across 4/4 cells per [D-39]) is used as a *signal*, not a nuisance. Not "structurally immune", not "expected to close", not "highest-leverage" — first test of the multi-physics joint-training axis under the discipline of three failed single-physics counterfactuals on the loss/regularizer axis.
+
+  **Falsified-prior cascade ([D-37]-ext rule 2)**:
+  - [D-40] integrated $P_F$-band loss FAIL (amplitude-shrink, D1)
+  - [D-41] per-pixel FGPA tail regularizer FAIL (self-consistent-state collapse, D2)
+  - [D-42] velocity-gradient conditioning FAIL (density-head-only collapse, D3)
+  - [D-46] uniquely tests: a **data-axis** intervention (pool training data across physics), structurally orthogonal to D1/D2/D3 (all loss/regularizer/architecture-input axis).
+
+  **Anti-degeneracy audit ([D-37]-ext rule 4)**:
+  - D1 (amplitude-shrink): loss unchanged from [D-39] baseline; no new integrated-band weighting. [D-46] does not introduce new D1 surface; inherits [D-39]'s gate-(a) failure as the baseline to beat.
+  - D2 (self-consistent state collapse): no per-pixel regularizer added; data-distribution shift only.
+  - D3 (asymmetric-head collapse): physics_id input is a symmetric categorical embedding feeding all heads equally, structurally orthogonal to [D-42]'s asymmetric derived-quantity input.
+  - **D-new (residual risk)**: model could ignore physics_id and degenerate to physics-agnostic. Caught by smoke gate 7 (embedding-non-degeneracy).
+
+  **Math contract**:
+  - Architecture: append learned embedding $e_p \in \mathbb{R}^{16}$ indexed by `physics_id` $\in \{0,1,2,3\}$. Concatenate $e_p$ to Fourier-encoded input. No other architecture change.
+  - Loss: unchanged from [D-24]/[D-11]/[D-21] base. **No new loss term in the headline pass.**
+  - Optional Tier-1 conditional: cross-physics invariance penalty $\mathcal{L}_{\text{inv}} = \lambda_{\text{inv}} \sum_{p \neq p'} \|f_\theta(x; e_p) - f_\theta(x; e_{p'})\|^2_{\text{saturated-mask}}$, $\lambda_{\text{inv}}=0$ at smoke.
+  - Training data: 4096 sightlines (1024 per physics) interleaved per microbatch (no physics-blocking).
+
+  **Smoke-gate spec (host machine, 50-step P-mixed budget)**:
+  1. No NaN / Inf
+  2. `loss_total(50) / loss_total(10) < 0.85` (descent, [D-19])
+  3. `mean_F` ∈ [0.5, 0.99] AND `|mean_F − 1.000| > 0.001` (trivial-collapse backstop, [D-42] lesson)
+  4. `tau_amp` ∈ [0.5, 2.0] across all 4 physics simultaneously
+  5. Density spread ≥ 1.45 per physics (anti-collapse, [D-41]/[D-42] derived)
+  6. X_HI spread ≥ 6 × 10⁻⁵ per physics (asymmetric anti-collapse, [D-42] lesson)
+  7. **Embedding non-degeneracy**: $\|e_{p_i} - e_{p_j}\|_2 > 0.1$ for at least one pair after 50 steps (NEW — catches D-new residual risk)
+
+  **Tier-1 conditional ladder**:
+  - All 7 smoke gates PASS → dispatch single P-mixed Tier-1 Juno cell (256 effective rays, 12,500 steps; ~$1.50)
+  - Tier-1 closes gate-(a) $|\Delta P_F/P_F|$ to within 20% on ≥2/4 physics → escalate to 4-cell `pub-t1`-equivalent eval; ~$6 further
+  - Tier-1 gate-(a) still >30% across 4/4 → retire [D-46], next candidate or user call
+
+  **Pre-committed falsification rules (6)**:
+  1. Smoke gate 5 fails on any physics → retire, bank new collapse class
+  2. Tier-1 gate-(a) residual **larger** than per-physics [D-39] baseline → retire, foreclose joint-training axis
+  3. Embedding $e_p$ collapses to rank-1 → physics axis degenerate; retire
+  4. Tier-1 closes gate-(a) but opens gate-(c) KS (trade) → not progress; retire and revisit
+  5. Closure only on $P_1/P_2$ (no-fb/stellar) and not $P_3/P_4$ (AGN) → partial result, not closure
+  6. Tier-1 surfaces entirely new degeneracy class → retire, bank audit-coverage gap
+
+  **Pre-committed stop conditions**:
+  - Any smoke gate fails → retire at smoke; no Tier-1
+  - Smoke passes but `mean_F` drifts to 1.0000 ± 0.0005 on ≥2/4 → trivial-collapse signature; retire
+  - Embedding gate 7 fails → retire
+  - Tier-1 wallclock > 1.5× projection → check stability, may abort
+
+  **Hand-off**:
+  - **Owner**: `core-implementer`. Surface: `src/models/nerf.py` (+20 LOC embedding head), `experiments/nerf/pipeline.py` (+30 LOC concat + CLI flags `--use_physics_embedding`, `--lambda_inv`). No integrator changes; no loader changes beyond `physics_id` field passthrough.
+  - **Artifacts**: 5-step memory smoke + 50-step P-mixed host smoke gate readout at `experiments/nerf/artifacts/eval/d46_smoke/<run_id>_gates.json`.
+  - **Effort estimate**: 6-8 hours implementation; 10-15 min wallclock smoke.
+
+  **Parallel Stage-3 infrastructure work** (independent of [D-46] outcome; PI recommends dispatching):
+  - 3D-$\rho$ crop extraction in `SherwoodLoader.extract_rho_crops(...)` (`data-engineer`, ~2 hrs, host-only)
+  - 3D ResNet baseline architecture on ground-truth crops to establish ceiling accuracy (`core-implementer`, ~4 hrs, deferred until [D-46] code lands)
+  - A2 3D $\xi_{\hat\rho,\rho}$ extraction on `pub-t1` checkpoints (data-engineer + Juno, ~$2-5, deferred until budget approved)
+
+  **Review trail**: PI-only sign-off at design-spec stage. **Defense-panel review MANDATORY before Tier-1 dispatch** per [D-37]-ext rule 6 (cumulative ladder ~$10-15 exceeds $5 threshold). User authorized design-spec landing 2026-05-11; Tier-1 dispatch pending smoke + defense-panel pass.
+
+  **References**: [D-12] (independent-models concession — partially walked back here), [D-13] (gate set), [D-15] (Stage 3 success criteria), [D-37]-extension (rules 1-7), [D-39] (mechanism-(c) positive ID + cross-physics R), [D-40]/[D-41]/[D-42] (retired counterfactuals + audit-class signatures D1/D2/D3), [D-44] (multi-seed bootstrap), [D-45] (master-source architecture).
+
+  **Open PI calls** ([D-46] does not block on these; they block the *post-[D-46] decision tree*):
+  - **Stage 3 framing**: looser (run on imperfect ρ + report gate-(a) residual as covariate) vs strict (require gate-(a) closure) vs hybrid (truth-baseline first, reconstructed after closure) — **user directed defense-panel adversarial review before PI decision**.
+  - **[D-12] walk-back**: if [D-46] succeeds, Stage 3 must use held-out physics or held-out region to remove the classifier-leakage that [D-12] originally guarded against.
+
   **Addendum 1 — Bootstrap results & rule evaluation (2026-05-11, PI).** Artefact `experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json` landed (driver `scripts/d44_bootstrap_KS_meanF.py`, 5.8 min wall, K=512 resamples per cell, seeds {42–46}). Anti-degeneracy F1/F2 PASS (sightline-level bootstrap; pred and truth indices from independent PCG64 streams; `indices_identical=False`).
 
   **Results (mean ± σ; q16 / q84):**
