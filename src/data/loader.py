@@ -17,6 +17,25 @@ from scipy.ndimage import label as _scipy_label
 # SherwoodLoader per run so this dict is per-process).
 _VPEC_GRAD_STATS_CACHE: Dict[Tuple[int, float], Dict[str, float]] = {}
 
+# ---------------------------------------------------------------------------
+# Stage 3 infrastructure: 3D overdensity crop extraction for the feedback
+# classifier (parallel to [D-46]).
+# ---------------------------------------------------------------------------
+# In-memory cache of full 3D overdensity grids (rho / <rho>) keyed by
+# (physics_id, redshift_rounded_3dp, n_grid). The CIC deposition of ~10^9
+# particles to a 768^3 grid is expensive (minutes per physics, ~3.4 GB
+# working set), so we hold the result for the lifetime of the loader's
+# process. The cache is bounded by the host's RAM — caller is responsible
+# for not loading more physics variants than the host can hold.
+_RHO_FIELD_CACHE: Dict[Tuple[int, float, int], np.ndarray] = {}
+
+# Loose physical bound for the overdensity field. Per the spec sanity check
+# every crop must lie in [1e-3, 1e3]; below this is unphysically void,
+# above is denser than a virialized halo and would indicate a deposition
+# bug, not an IGM crop.
+_RHO_CROP_LO = 1.0e-3
+_RHO_CROP_HI = 1.0e3
+
 # Header byte layout matches Sherwood/src/utils.py:
 #   7 doubles (z, Om, OL, Ob, h100, box, Xh) + 2 int32 (nbins, num_los)
 _N_HEADER_BYTES = 7 * 8 + 2 * 4
@@ -410,6 +429,175 @@ class SherwoodLoader:
                 f"v_pec_grad_truth post-zscore std {g_std:.6f} outside [0.9, 1.1]"
             )
         print("Data sanity check passed.")
+
+    # ----------------------------------------------------------------------
+    # Stage 3 infrastructure: 3D overdensity crop extraction (parallel to
+    # [D-46]). Used by the feedback classifier (next dispatch).
+    # ----------------------------------------------------------------------
+    def extract_rho_crops(
+        self,
+        physics_id: int,
+        redshift: float,
+        crop_size: int,
+        n_crops: int,
+        seed: int = 42,
+        n_grid: int = 768,
+    ) -> Tuple["torch.Tensor", "torch.Tensor"]:
+        """
+        Extract random 3D overdensity (rho / <rho>) cubes from the native
+        simulation grid for the feedback classifier.
+
+        The full 3D field is materialized once per (physics_id, redshift,
+        n_grid) via `SherwoodIGMGalLoader.load_3d_field('rho', ...)` —
+        CIC-deposited from the GADGET HDF5 snapshot — and cached in module
+        memory for the lifetime of the process. Crops are then carved from
+        the cached field via periodic-BC slicing.
+
+        Parameters
+        ----------
+        physics_id : int
+            One of {1, 2, 3, 4}.
+        redshift : float
+            Snapshot redshift (currently only z=0.300 is materialized in
+            `SherwoodIGM_gal/extracted/`; other redshifts will require
+            extracting the corresponding `snapdir_NNN`).
+        crop_size : int
+            Side length of each cubic crop in grid cells. Must satisfy
+            `0 < crop_size <= n_grid`.
+        n_crops : int
+            Number of crops to extract per call.
+        seed : int, default 42
+            Seed for the RNG used to pick crop corners. Same seed produces
+            byte-identical crops.
+        n_grid : int, default 768
+            Side length of the native simulation grid. The Sherwood IGM_gal
+            snapshots are 768^3 native; smaller values trigger a CIC
+            deposition at that lower resolution (useful for fast smokes).
+
+        Returns
+        -------
+        crops : torch.Tensor of shape (n_crops, 1, crop_size, crop_size, crop_size)
+            Float32 overdensity. Channel axis inserted for 3D-CNN consumption.
+        labels : torch.Tensor of shape (n_crops,) and dtype long
+            All entries equal `physics_id` (broadcast). Class label for
+            the feedback classifier.
+
+        Notes
+        -----
+        * Periodic BC: crop corners are drawn uniformly from `[0, n_grid)^3`;
+          a crop that runs off the box wraps around via modular indexing
+          (`np.take` with `mode='wrap'`). This matches the simulation's
+          periodic boundary conditions.
+        * Reproducibility: a fresh `np.random.default_rng(seed)` is used per
+          call (no global RNG mutation).
+        * Validation: `_validate_rho_crops` (positivity, NaN, range bound
+          `[1e-3, 1e3]`) is asserted on the assembled tensor before return.
+        * Cross-track: 3D fields live in `SherwoodIGM_gal/extracted/` and
+          are loaded via `SherwoodIGMGalLoader`, NOT from the sightline
+          binaries the rest of this class consumes. The `self.data_root`
+          attribute is unrelated to the 3D field path; the IGM_gal loader
+          uses its own default of `SherwoodIGM_gal/extracted/`.
+        """
+        # ---- shape / argument validation
+        if physics_id not in self.physics_models:
+            raise ValueError(f"Invalid physics_id {physics_id}. Must be 1-4.")
+        if not isinstance(crop_size, int) or crop_size <= 0:
+            raise ValueError(f"crop_size must be a positive int; got {crop_size!r}")
+        if crop_size > n_grid:
+            raise ValueError(
+                f"crop_size {crop_size} exceeds n_grid {n_grid}; not supported."
+            )
+        if not isinstance(n_crops, int) or n_crops <= 0:
+            raise ValueError(f"n_crops must be a positive int; got {n_crops!r}")
+
+        # ---- materialize (or fetch from cache) the full rho / <rho> field
+        cache_key = (int(physics_id), round(float(redshift), 3), int(n_grid))
+        rho_field = _RHO_FIELD_CACHE.get(cache_key)
+        if rho_field is None:
+            # Import here so SherwoodLoader has no hard h5py dependency for
+            # callers that only consume sightlines.
+            from src.data.igm_gal_loader import SherwoodIGMGalLoader
+
+            igm_loader = SherwoodIGMGalLoader()
+            # The IGM_gal loader does not currently key by redshift in its
+            # path (it pins z=0.300); the `redshift` argument participates
+            # in the cache key so a future multi-redshift loader can drop in
+            # without API churn.
+            rho_field = igm_loader.load_3d_field(
+                physics_id=physics_id, field="rho", n_grid=n_grid
+            ).astype(np.float32, copy=False)
+            _RHO_FIELD_CACHE[cache_key] = rho_field
+
+        N = rho_field.shape[0]
+        if rho_field.ndim != 3 or rho_field.shape != (N, N, N):
+            raise ValueError(
+                f"Expected cubic 3D rho field, got shape {rho_field.shape}"
+            )
+
+        # ---- deterministic corner sampling
+        rng = np.random.default_rng(int(seed))
+        corners = rng.integers(low=0, high=N, size=(n_crops, 3), dtype=np.int64)
+
+        # ---- periodic-BC crop assembly
+        # Precompute the per-axis crop offset vector [0, 1, ..., L-1].
+        offset = np.arange(crop_size, dtype=np.int64)
+        crops = np.empty(
+            (n_crops, 1, crop_size, crop_size, crop_size), dtype=np.float32
+        )
+        for c in range(n_crops):
+            i0, j0, k0 = corners[c]
+            ii = (i0 + offset) % N
+            jj = (j0 + offset) % N
+            kk = (k0 + offset) % N
+            # Outer-product 3D indexing — picks up the wrapped block in one shot.
+            crop = rho_field[np.ix_(ii, jj, kk)]
+            crops[c, 0] = crop  # float32 already
+
+        # ---- output sanity check (positivity / NaN / loose physical bound)
+        self._validate_rho_crops(crops)
+
+        # ---- torch handoff. `from_numpy` shares memory but the upstream
+        # array is a fresh np.empty so no autograd-graph contamination.
+        # The tensor is leaf and `requires_grad=False`; downstream callers
+        # can `.to(device)` or set `requires_grad_(True)` as needed.
+        crops_t = torch.from_numpy(crops)
+        labels_t = torch.full(
+            (n_crops,), fill_value=int(physics_id), dtype=torch.long
+        )
+        return crops_t, labels_t
+
+    @staticmethod
+    def _validate_rho_crops(crops: np.ndarray) -> None:
+        """
+        Sanity check on assembled overdensity crops.
+
+        Contract per the Stage 3 dispatch:
+          * No NaN / inf cells.
+          * All cells > 0 (overdensity is mass / <mass>, strictly positive
+            for any non-empty cell; CIC deposition guarantees non-negative
+            but the IGM_gal loader validates mean ~ 1 which already requires
+            non-emptyness).
+          * All cells in `[1e-3, 1e3]` — loose physical bound. Below 1e-3
+            is unphysically void on a 78 kpc/h cell; above 1e3 is denser
+            than a virialized halo and would indicate a deposition bug.
+        """
+        if not np.isfinite(crops).all():
+            n_bad = int((~np.isfinite(crops)).sum())
+            raise AssertionError(
+                f"rho_crops contain {n_bad} non-finite cells (NaN or inf)."
+            )
+        cmin = float(crops.min())
+        cmax = float(crops.max())
+        if cmin < _RHO_CROP_LO:
+            raise AssertionError(
+                f"rho_crops min {cmin:.3e} below physical floor "
+                f"{_RHO_CROP_LO:.0e}."
+            )
+        if cmax > _RHO_CROP_HI:
+            raise AssertionError(
+                f"rho_crops max {cmax:.3e} above physical ceiling "
+                f"{_RHO_CROP_HI:.0e}."
+            )
 
     def get_world_coordinates(self, data: Dict) -> np.ndarray:
         """
