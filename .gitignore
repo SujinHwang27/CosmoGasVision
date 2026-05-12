@@ -39,6 +39,11 @@ wheels/
 Sherwood/
 SherwoodIGM_gal/
 
+# Disk cache for CIC-deposited rho/<rho> 3D fields (Sprint-1 [D-46]/[D-47]
+# Stage 3 infra). Regenerable from the sim binaries above; per the same
+# precedent it is neither git- nor DVC-tracked.
+Sherwood/.rho_field_cache/
+
 # Experiments: track source (LEDGER.md, pipeline.py, configs); DVC-track artifacts
 experiments/**/artifacts/
 experiments/**/__pycache__/

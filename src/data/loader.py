@@ -1,7 +1,13 @@
+import hashlib
+import json
 import os
+import tempfile
 import warnings
-import numpy as np
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, Optional, Tuple
+
+import numpy as np
 import torch  # kept for downstream import-compatibility
 from scipy.ndimage import label as _scipy_label
 
@@ -35,6 +41,322 @@ _RHO_FIELD_CACHE: Dict[Tuple[int, float, int], np.ndarray] = {}
 # bug, not an IGM crop.
 _RHO_CROP_LO = 1.0e-3
 _RHO_CROP_HI = 1.0e3
+
+# ---------------------------------------------------------------------------
+# Disk-cache for CIC-deposited rho/<rho> fields (Sprint-1 of [D-46]/[D-47]
+# Stage 3 infra prep). Persists the result of `load_3d_field` between Python
+# processes so the ~9 min/process CIC cost is paid once-ever per
+# (physics_id, redshift, n_grid). On a cache hit the disk read is mmap'd and
+# the in-memory `_RHO_FIELD_CACHE` is repopulated; target <= 15 s round-trip.
+#
+# Default location is D:\...\Sherwood\.rho_field_cache\ per the project's
+# C:-drive-constrained storage layout. Override via COSMOGAS_RHO_CACHE_DIR.
+# ---------------------------------------------------------------------------
+_RHO_CACHE_SCHEMA_VERSION = 1
+
+# Sentinel for the default cache location. Resolved at call time (not import
+# time) so a test can `monkeypatch.setenv("COSMOGAS_RHO_CACHE_DIR", ...)`
+# without having to reload the module.
+_RHO_CACHE_DEFAULT_DIR = Path(
+    r"D:\Data\sujin\CosmoGasVision\Sherwood\.rho_field_cache"
+)
+
+
+def _resolve_rho_cache_dir() -> Path:
+    """Return the directory where rho-field cache entries are stored.
+
+    Honors the ``COSMOGAS_RHO_CACHE_DIR`` env var when set; otherwise falls
+    back to the D:-drive default. Per the storage directive we deliberately
+    do NOT fall back to ``~/.cache`` or ``tempfile.gettempdir()`` on Windows
+    (both can resolve to C:); a manual override is required to relocate.
+    """
+    override = os.environ.get("COSMOGAS_RHO_CACHE_DIR")
+    if override:
+        return Path(override)
+    return _RHO_CACHE_DEFAULT_DIR
+
+
+def _rho_cache_basename(physics_id: int, redshift: float, n_grid: int) -> str:
+    return (
+        f"rho_field_p{int(physics_id)}"
+        f"_z{float(redshift):.3f}"
+        f"_n{int(n_grid)}"
+    )
+
+
+def _rho_cache_paths(
+    physics_id: int, redshift: float, n_grid: int, cache_dir: Optional[Path] = None
+) -> Tuple[Path, Path]:
+    """Return ``(npy_path, json_path)`` for this cache key."""
+    base = _rho_cache_basename(physics_id, redshift, n_grid)
+    root = cache_dir if cache_dir is not None else _resolve_rho_cache_dir()
+    return root / f"{base}.npy", root / f"{base}.json"
+
+
+def _sherwood_snapshot_mtime_utc(physics_id: int) -> Optional[str]:
+    """ISO-8601 UTC mtime of the upstream ``snap_012.0.hdf5`` for this
+    physics variant, or ``None`` if the snapshot is not locally available.
+
+    The mtime is what we use to detect that the underlying simulation has
+    been re-extracted / changed; if mtime drifts the cache entry is stale
+    and must be regenerated.
+    """
+    from src.data.igm_gal_loader import PHYSICS_DIRS as _PHYSICS_DIRS
+
+    if physics_id not in _PHYSICS_DIRS:
+        return None
+    # The IGM_gal loader's default root is `SherwoodIGM_gal/extracted`,
+    # resolved relative to CWD. Mirror that here. A non-default root is
+    # exotic enough that callers using one are responsible for cache hygiene.
+    snap = (
+        Path("SherwoodIGM_gal")
+        / "extracted"
+        / _PHYSICS_DIRS[physics_id]
+        / "snapdir_012"
+        / "snap_012.0.hdf5"
+    )
+    if not snap.exists():
+        return None
+    ts = datetime.fromtimestamp(snap.stat().st_mtime, tz=timezone.utc)
+    # Microsecond precision is overkill; second-precision matches the FS
+    # granularity we care about and avoids spurious mismatches from clock
+    # rounding.
+    return ts.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _sha256_first_1mb(path: Path) -> str:
+    """SHA-256 of the first 1 MB of ``path``. Cheap fingerprint to detect
+    truncation / partial overwrite without re-hashing a ~17 GB .npy."""
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        h.update(fh.read(1024 * 1024))
+    return h.hexdigest()
+
+
+def _atomic_write_bytes(target: Path, payload: bytes) -> None:
+    """Atomic write via temp-file + ``os.replace``. Used for the manifest.
+    The .npy is written via ``np.save`` to a temp path then replaced."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=target.name + ".", suffix=".tmp", dir=str(target.parent)
+    )
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(payload)
+        os.replace(tmp_name, target)
+    except Exception:
+        # Best-effort cleanup on failure; never bubble the cleanup error.
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_write_npy(target: Path, array: np.ndarray) -> None:
+    """Atomic ``np.save`` via a sibling ``.tmp`` then ``os.replace``.
+
+    We pass an *open file handle* to ``np.save`` (not a string path), which
+    bypasses np.save's "auto-append .npy if missing" behavior — that
+    behavior creates a second file at ``tmp_name + ".npy"`` while leaving
+    the empty mkstemp-created file at ``tmp_name``, which would then be
+    the (empty!) file we move into place. Writing to the fd directly keeps
+    the data and the path we control in sync.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=target.name + ".", suffix=".tmp", dir=str(target.parent)
+    )
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            np.save(fh, array, allow_pickle=False)
+        os.replace(tmp_name, target)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _validate_rho_disk_cache(
+    npy_path: Path,
+    json_path: Path,
+    physics_id: int,
+    redshift: float,
+    n_grid: int,
+) -> Optional[np.ndarray]:
+    """Validate the on-disk cache entry for this key.
+
+    Returns the mmap'd array on success, or ``None`` on any validation
+    failure. On failure, the corrupt cache files are removed and a
+    ``warnings.warn`` is emitted describing the failure mode. No exception
+    is raised — the caller falls through to fresh CIC deposition. This is
+    by spec: cache-corruption must not bubble; only fresh-CIC failure does.
+    """
+    if not (npy_path.exists() and json_path.exists()):
+        return None
+
+    failure_mode: Optional[str] = None
+    try:
+        with open(json_path, "r", encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, json.JSONDecodeError) as exc:
+        failure_mode = f"manifest unreadable: {exc!r}"
+        manifest = None
+
+    if manifest is not None:
+        # Schema version gate
+        if manifest.get("schema_version") != _RHO_CACHE_SCHEMA_VERSION:
+            failure_mode = (
+                f"schema_version {manifest.get('schema_version')!r} != "
+                f"{_RHO_CACHE_SCHEMA_VERSION}"
+            )
+
+        # Key fields
+        elif int(manifest.get("physics_id", -1)) != int(physics_id):
+            failure_mode = (
+                f"physics_id mismatch: manifest={manifest.get('physics_id')} "
+                f"requested={physics_id}"
+            )
+        elif round(float(manifest.get("redshift", -1.0)), 3) != round(
+            float(redshift), 3
+        ):
+            failure_mode = (
+                f"redshift mismatch: manifest={manifest.get('redshift')} "
+                f"requested={redshift}"
+            )
+        elif int(manifest.get("n_grid", -1)) != int(n_grid):
+            failure_mode = (
+                f"n_grid mismatch: manifest={manifest.get('n_grid')} "
+                f"requested={n_grid}"
+            )
+
+        # mtime check
+        elif (current_mtime := _sherwood_snapshot_mtime_utc(physics_id)) is not None:
+            if manifest.get("sherwood_snapshot_mtime_utc") != current_mtime:
+                failure_mode = (
+                    f"sherwood_snapshot_mtime_utc mismatch: manifest="
+                    f"{manifest.get('sherwood_snapshot_mtime_utc')!r} "
+                    f"current={current_mtime!r}"
+                )
+
+        # NaN in stats (degenerate manifest)
+        elif any(
+            (not isinstance(manifest.get(k), (int, float)))
+            or not np.isfinite(manifest.get(k))
+            for k in ("mean", "min", "max")
+        ):
+            failure_mode = "manifest mean/min/max non-finite or absent"
+
+        # Loose physical-mean bound for rho/<rho>
+        elif not (0.95 <= float(manifest["mean"]) <= 1.05):
+            failure_mode = (
+                f"manifest mean {manifest['mean']:.4f} outside [0.95, 1.05] "
+                "for rho/<rho>"
+            )
+
+        # First-MB hash (detects partial truncation / overwrite)
+        else:
+            try:
+                actual_hash = _sha256_first_1mb(npy_path)
+            except OSError as exc:
+                failure_mode = f"sha256 read failed: {exc!r}"
+                actual_hash = None
+            if (
+                failure_mode is None
+                and manifest.get("sha256_first_1MB") != actual_hash
+            ):
+                failure_mode = (
+                    f"sha256_first_1MB mismatch: manifest="
+                    f"{manifest.get('sha256_first_1MB')!r} "
+                    f"actual={actual_hash!r}"
+                )
+
+    if failure_mode is None:
+        # Open as mmap; shape/dtype assertion last (np.load surfaces I/O
+        # errors and pickle issues before we touch the data).
+        try:
+            arr = np.load(npy_path, mmap_mode="r", allow_pickle=False)
+        except (OSError, ValueError, EOFError) as exc:
+            failure_mode = f"np.load failed: {exc!r}"
+            arr = None
+        if failure_mode is None:
+            expected_shape = (int(n_grid),) * 3
+            if arr.shape != expected_shape:
+                failure_mode = (
+                    f"shape mismatch: on-disk {arr.shape} != expected "
+                    f"{expected_shape}"
+                )
+            elif arr.dtype != np.dtype(manifest["dtype"]):
+                failure_mode = (
+                    f"dtype mismatch: on-disk {arr.dtype} != manifest "
+                    f"{manifest['dtype']!r}"
+                )
+
+    if failure_mode is not None:
+        warnings.warn(
+            f"rho-field disk cache invalid for "
+            f"(physics_id={physics_id}, redshift={redshift}, n_grid={n_grid}): "
+            f"{failure_mode}. Removing and falling through to CIC deposition.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        for p in (npy_path, json_path):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+        return None
+
+    return arr
+
+
+def _write_rho_disk_cache(
+    rho_field: np.ndarray,
+    physics_id: int,
+    redshift: float,
+    n_grid: int,
+) -> None:
+    """Persist ``rho_field`` to the disk cache atomically (npy first, then
+    manifest). On any failure, best-effort clean up partial files and emit
+    a warning; never bubble (cache write failure must not break the call).
+    """
+    npy_path, json_path = _rho_cache_paths(physics_id, redshift, n_grid)
+    try:
+        _atomic_write_npy(npy_path, rho_field)
+        sha = _sha256_first_1mb(npy_path)
+        manifest = {
+            "physics_id": int(physics_id),
+            "redshift": float(redshift),
+            "n_grid": int(n_grid),
+            "sherwood_snapshot_mtime_utc": _sherwood_snapshot_mtime_utc(physics_id),
+            "schema_version": _RHO_CACHE_SCHEMA_VERSION,
+            "sha256_first_1MB": sha,
+            "shape": list(rho_field.shape),
+            "dtype": str(rho_field.dtype),
+            "mean": float(rho_field.mean()),
+            "min": float(rho_field.min()),
+            "max": float(rho_field.max()),
+        }
+        _atomic_write_bytes(
+            json_path,
+            json.dumps(manifest, indent=2, sort_keys=True).encode("utf-8"),
+        )
+    except Exception as exc:  # noqa: BLE001 — we intentionally don't bubble
+        warnings.warn(
+            f"Failed to write rho-field disk cache for "
+            f"(physics_id={physics_id}, redshift={redshift}, n_grid={n_grid}): "
+            f"{exc!r}. The in-memory cache is still populated; this run is "
+            "not affected, but a future process will re-run CIC.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        for p in (npy_path, json_path):
+            try:
+                p.unlink()
+            except OSError:
+                pass
 
 # Header byte layout matches Sherwood/src/utils.py:
 #   7 doubles (z, Om, OL, Ob, h100, box, Xh) + 2 int32 (nbins, num_los)
@@ -514,19 +836,48 @@ class SherwoodLoader:
         cache_key = (int(physics_id), round(float(redshift), 3), int(n_grid))
         rho_field = _RHO_FIELD_CACHE.get(cache_key)
         if rho_field is None:
-            # Import here so SherwoodLoader has no hard h5py dependency for
-            # callers that only consume sightlines.
-            from src.data.igm_gal_loader import SherwoodIGMGalLoader
+            # Tier-2: disk cache (Sprint-1 [D-46]/[D-47] Stage 3 infra). Try
+            # to read a previously CIC-deposited field from
+            # `Sherwood/.rho_field_cache/` before falling back to the ~9 min
+            # CIC deposition. Validation failures are non-fatal — the disk
+            # entry is cleaned up and we fall through to fresh deposition.
+            npy_path, json_path = _rho_cache_paths(
+                physics_id, redshift, n_grid
+            )
+            disk_arr = _validate_rho_disk_cache(
+                npy_path, json_path, physics_id, redshift, n_grid
+            )
+            if disk_arr is not None:
+                # mmap'd, dtype already matches what we'd produce. Cast to
+                # float32 only if the on-disk dtype differs (it won't, given
+                # we write float32, but defensively keep the invariant).
+                if disk_arr.dtype != np.float32:
+                    rho_field = np.asarray(disk_arr, dtype=np.float32)
+                else:
+                    # Materialize into RAM (the per-call crop loop does
+                    # fancy-indexing which we don't want to thrash from
+                    # an mmap; for production n_grid=768 this is ~1.7 GB
+                    # float32, well within RAM budget).
+                    rho_field = np.array(disk_arr, dtype=np.float32, copy=True)
+                _RHO_FIELD_CACHE[cache_key] = rho_field
+            else:
+                # Tier-3: fresh CIC deposition (cost: ~9 min for n_grid=768).
+                # Import here so SherwoodLoader has no hard h5py dependency
+                # for callers that only consume sightlines.
+                from src.data.igm_gal_loader import SherwoodIGMGalLoader
 
-            igm_loader = SherwoodIGMGalLoader()
-            # The IGM_gal loader does not currently key by redshift in its
-            # path (it pins z=0.300); the `redshift` argument participates
-            # in the cache key so a future multi-redshift loader can drop in
-            # without API churn.
-            rho_field = igm_loader.load_3d_field(
-                physics_id=physics_id, field="rho", n_grid=n_grid
-            ).astype(np.float32, copy=False)
-            _RHO_FIELD_CACHE[cache_key] = rho_field
+                igm_loader = SherwoodIGMGalLoader()
+                # The IGM_gal loader does not currently key by redshift in
+                # its path (it pins z=0.300); the `redshift` argument
+                # participates in the cache key so a future multi-redshift
+                # loader can drop in without API churn.
+                rho_field = igm_loader.load_3d_field(
+                    physics_id=physics_id, field="rho", n_grid=n_grid
+                ).astype(np.float32, copy=False)
+                _RHO_FIELD_CACHE[cache_key] = rho_field
+                # Persist for the next process. Failures here warn but do
+                # not bubble (current run already has the in-memory copy).
+                _write_rho_disk_cache(rho_field, physics_id, redshift, n_grid)
 
         N = rho_field.shape[0]
         if rho_field.ndim != 3 or rho_field.shape != (N, N, N):

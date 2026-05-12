@@ -40,3 +40,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = []
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (production-scale CIC; deselect with '-m \"not slow\"')",
+]

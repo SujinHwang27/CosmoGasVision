@@ -1,3 +1,8 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+
+# Disk cache for CIC-deposited rho/<rho> 3D fields (Sprint-1 [D-46]/[D-47]
+# Stage 3 infra). Regenerable from the sim binaries; per "Sim binaries not
+# DVC-tracked" precedent in CLAUDE.md this should not be DVC-tracked either.
+Sherwood/.rho_field_cache/
