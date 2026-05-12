@@ -26,20 +26,41 @@ class IGMNeRF(nn.Module):
     Continuous MLP mapping 3D position -> density, temp, h1_frac, vpec.
     """
     def __init__(self, hidden_dim=256, num_layers=8, L=10,
-                 use_velocity_gradient_conditioning: bool = False):
+                 use_velocity_gradient_conditioning: bool = False,
+                 use_physics_embedding: bool = False,
+                 n_physics: int = 4,
+                 physics_embedding_dim: int = 16):
         super().__init__()
         # use_velocity_gradient_conditioning toggles the [D-42] sidecar feature
         # (Sherwood-truth dv_pec/dchi, z-scored, detached) concatenated onto the
         # encoded coordinate before layer 1 — see LEDGER §3 [D-42] Math contract.
+        #
+        # use_physics_embedding toggles the [D-46] joint-physics conditioning:
+        # a learned nn.Embedding(n_physics, physics_embedding_dim) indexed by
+        # per-ray physics_id is concatenated onto the encoded coordinate at
+        # MLP input (layer 1) ONLY — NOT at the skip-connection layer 5.
+        # This *may* let a single MLP fit the 4 Sherwood feedback variants
+        # jointly (hedged: see LEDGER §3 [D-46]). Default-OFF preserves
+        # byte-equivalent baseline; tested in tests/test_physics_embedding.py.
         self.encoding = PositionalEncoding(L)
         self.use_velocity_gradient_conditioning = use_velocity_gradient_conditioning
+        self.use_physics_embedding = use_physics_embedding
+        self.n_physics = n_physics
+        self.physics_embedding_dim = physics_embedding_dim
+
         encoded_dim = 3 + 2 * 3 * L
         g_dim = 1 if use_velocity_gradient_conditioning else 0
-        in_dim = encoded_dim + g_dim
-        # Skip-connection re-injects the SAME concatenated (encoded, g) vector
-        # so that g remains visible at layer 5; this keeps the conditioning
-        # signal accessible after the residual fan-in.
-        skip_dim = in_dim
+        # [D-46]: physics embedding adds physics_embedding_dim to layer-1
+        # in_features only (not to the skip-connection re-injection vector).
+        e_dim = physics_embedding_dim if use_physics_embedding else 0
+        in_dim = encoded_dim + g_dim + e_dim
+        # Skip-connection re-injects the (encoded, g) vector but NOT the
+        # physics embedding e_p — per [D-46] Math contract, physics_id is a
+        # coord-level conditioning applied at MLP input only.
+        skip_dim = encoded_dim + g_dim
+
+        if use_physics_embedding:
+            self.physics_embedding = nn.Embedding(n_physics, physics_embedding_dim)
 
         self.layers1 = nn.ModuleList()
         for i in range(4):
@@ -60,24 +81,53 @@ class IGMNeRF(nn.Module):
         self.softplus = nn.Softplus()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, x, g: Optional[torch.Tensor] = None):
+    def forward(self, x, g: Optional[torch.Tensor] = None,
+                physics_id: Optional[torch.Tensor] = None):
         encoded = self.encoding(x)
+        # Skip-connection input is (encoded[, g]) — without e_p, per [D-46].
         if g is not None:
             # [D-42]: concatenate the z-scored velocity-gradient feature as a
             # raw scalar onto the encoded coordinate (no positional encoding —
             # g is already ~ N(0, 1)). Constructor must have been built with
             # use_velocity_gradient_conditioning=True so layer_1 has the +1
             # in_features.
-            h_in = torch.cat([encoded, g], dim=-1)
+            skip_in = torch.cat([encoded, g], dim=-1)
         else:
-            h_in = encoded
+            skip_in = encoded
+
+        # [D-46]: physics embedding is concatenated AFTER coords (order:
+        # [fourier_encoded_coords, g?, e_p]). Embedding enters layer 1 only;
+        # it is excluded from skip_in so the residual fan-in matches the
+        # baseline skip_dim contract.
+        if physics_id is not None:
+            if not self.use_physics_embedding:
+                raise RuntimeError(
+                    "physics_id passed to forward() but model was built with "
+                    "use_physics_embedding=False."
+                )
+            # physics_id shape: (n_rays,) long. Broadcast across n_bins to
+            # match (n_rays, n_bins, ...) coords/encoded shape.
+            e_p = self.physics_embedding(physics_id)            # (n_rays, e_dim)
+            # Add a bin axis and broadcast to (n_rays, n_bins, e_dim).
+            target_shape = list(encoded.shape[:-1]) + [self.physics_embedding_dim]
+            e_p_expanded = e_p.unsqueeze(1).expand(target_shape)
+            h_in = torch.cat([skip_in, e_p_expanded], dim=-1)
+        else:
+            if self.use_physics_embedding:
+                raise RuntimeError(
+                    "Model was built with use_physics_embedding=True but no "
+                    "physics_id was passed to forward()."
+                )
+            h_in = skip_in
+
         h = h_in
 
         for layer in self.layers1:
             h = self.relu(layer(h))
 
-        # NeRF residual/skip connection re-injects the (encoded[, g]) vector.
-        h = torch.cat([h, h_in], dim=-1)
+        # NeRF residual/skip connection re-injects the (encoded[, g]) vector
+        # — physics embedding e_p is intentionally excluded per [D-46].
+        h = torch.cat([h, skip_in], dim=-1)
 
         for layer in self.layers2:
             h = self.relu(layer(h))
@@ -119,7 +169,7 @@ def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
 
     return torch.clamp(H, min=0.0)
 
-def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3, return_tau_local=False, g=None):
+def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=0.3, return_tau_local=False, g=None, physics_id=None):
     """
     Differentiable Lyman-alpha optical depth rendering with windowed RSD convolution.
 
@@ -158,7 +208,10 @@ def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=
     # [D-42] When `g` is provided, the MLP forward concatenates it onto the
     # encoded coordinate before layer 1. Default-OFF path (g=None) is
     # bit-identical to the pre-[D-42] forward.
-    fields = mlp(ray_points, g=g)         # (n_rays, n_bins, 4)
+    # [D-46] When `physics_id` is provided, the MLP forward concatenates the
+    # learned physics embedding e_p onto the layer-1 input only. Default-OFF
+    # path (physics_id=None) is bit-identical to the pre-[D-46] forward.
+    fields = mlp(ray_points, g=g, physics_id=physics_id)  # (n_rays, n_bins, 4)
     density = fields[..., 0]              # rho / <rho>
     temp = fields[..., 1]                 # K
     h1_frac = fields[..., 2]              # X_HI in [0, 1]

@@ -173,6 +173,25 @@ def parse_args(argv=None):
                         "default. See experiments/nerf/LEDGER.md [D-42] for "
                         "the spec.")
 
+    # [D-46] joint-physics conditional MLP with physics_id embedding ---------
+    p.add_argument("--use_physics_embedding",
+                   action="store_true",
+                   help="[D-46] joint-physics conditional MLP. Loads all 4 "
+                        "Sherwood physics variants (P1..P4) into a single "
+                        "dataset, attaches a per-ray physics_id, and trains "
+                        "the IGMNeRF with a learned nn.Embedding(4, 16) "
+                        "concatenated onto the layer-1 input. Microbatches "
+                        "are composed by interleaving (no physics-blocking) "
+                        "so each gradient step mixes all 4 physics. When ON, "
+                        "--physics is interpreted as a logging hint only — "
+                        "the dataset draws from all 4. Disabled by default. "
+                        "See experiments/nerf/LEDGER.md [D-46] for the spec.")
+    p.add_argument("--lambda_inv", type=float, default=0.0,
+                   help="[D-46] Tier-1 conditional cross-physics invariance "
+                        "penalty weight. Per spec, code path is stubbed and "
+                        "disabled (0.0) at smoke; wired forward if Tier-1 "
+                        "lands. Default 0.0 = OFF.")
+
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
@@ -310,16 +329,21 @@ def load_dataset(args):
     """Load sightlines or fall back to dummy data for smoke runs.
 
     Returns ``(coords, vel_axis, tau_gt_profile, mask_no_dla_profile, box_max,
-    v_pec_grad_truth)`` as float32/bool tensors. The first axis of ``coords``,
-    ``tau_gt_profile``, ``mask_no_dla_profile``, and (when [D-42] is enabled)
-    ``v_pec_grad_truth`` has been truncated to ``args.n_rays``. Coords are
-    already normalized to the unit cube.
+    v_pec_grad_truth, physics_id_per_ray)`` as float32/bool/long tensors.
+    Coords are already normalized to the unit cube.
 
     The ``mask_no_dla_profile`` (bool, ``True`` = include in loss/mean-flux
     reductions) is the [D-24] DLA exclusion mask emitted by the loader.
 
     ``v_pec_grad_truth`` is returned when ``--use_velocity_gradient_conditioning``
     is set (z-scored, shape ``(n_rays, n_bins)``, float32). Otherwise ``None``.
+
+    ``physics_id_per_ray`` is a (n_rays,) long tensor of zero-indexed physics
+    ids (P1->0, P2->1, P3->2, P4->3). When ``--use_physics_embedding`` is OFF,
+    every entry equals ``args.physics - 1`` (passthrough only; not used in
+    forward because the model is in flag-off mode). When ON, the function
+    loads sightlines from ALL 4 physics, stacks them along the ray axis, and
+    fills ``physics_id_per_ray`` with the per-ray label (per [D-46] spec).
     """
     if not os.path.exists(args.data_root):
         print(f"Warning: Data root {args.data_root} missing. Using dummy data.")
@@ -340,10 +364,106 @@ def load_dataset(args):
             v_pec_grad_truth = torch.randn(
                 args.n_rays, nbins_dummy, generator=gen, dtype=torch.float32,
             )
+        # [D-46] dummy-data physics_id_per_ray. When the joint-physics flag
+        # is ON we *may* still want a deterministic smoke without real
+        # Sherwood data: assign physics_ids in 4 contiguous blocks so the
+        # microbatch interleaver has 4 distinct labels to draw from.
+        if args.use_physics_embedding:
+            n_rays = args.n_rays
+            # Equal-split blocks; tail rays land in P4 if n_rays % 4 != 0.
+            block = max(1, n_rays // 4)
+            physics_id_per_ray = torch.full((n_rays,), 3, dtype=torch.long)
+            for p_idx in range(4):
+                s = p_idx * block
+                e = (p_idx + 1) * block if p_idx < 3 else n_rays
+                physics_id_per_ray[s:e] = p_idx
+        else:
+            physics_id_per_ray = torch.full(
+                (args.n_rays,), args.physics - 1, dtype=torch.long,
+            )
         return (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
-                box_max, v_pec_grad_truth)
+                box_max, v_pec_grad_truth, physics_id_per_ray)
 
     loader = SherwoodLoader(args.data_root)
+
+    # [D-46] joint-physics path: load all 4 physics, stack, label per-ray.
+    # Default-OFF preserves the pre-[D-46] single-physics behavior (and the
+    # bit-equivalent regression contract — the model under flag-off is
+    # constructed without nn.Embedding so it does not consume from the RNG
+    # stream).
+    if args.use_physics_embedding:
+        n_rays = args.n_rays
+        n_rays_per_physics = n_rays // 4
+        if n_rays % 4 != 0:
+            print(
+                f"[warn] [D-46] --n_rays={n_rays} not divisible by 4; "
+                f"truncating to {n_rays_per_physics * 4} rays "
+                f"({n_rays_per_physics} per physics)."
+            )
+        coords_list, tau_list, mask_list = [], [], []
+        v_grad_list = [] if args.use_velocity_gradient_conditioning else None
+        physics_id_list = []
+        box_max = None
+        vel_axis = None
+        for p_idx, physics_label in enumerate([1, 2, 3, 4]):
+            sl = loader.load_sightlines(physics_label, 0.3)
+            coords_raw = loader.get_world_coordinates(sl)
+            if box_max is None:
+                box_max = sl['header']['box_kpc_h']
+            else:
+                # All 4 physics share the 60 Mpc/h box; sanity-check.
+                assert sl['header']['box_kpc_h'] == box_max, (
+                    f"[D-46] physics {physics_label} box_kpc_h mismatch."
+                )
+            if vel_axis is None:
+                vel_axis = torch.tensor(sl['vel_axis'], dtype=torch.float32)
+            coords_p = torch.tensor(
+                coords_raw[:n_rays_per_physics], dtype=torch.float32,
+            ) / box_max
+            tau_p = torch.tensor(
+                sl['tau_h1'][:n_rays_per_physics], dtype=torch.float32,
+            )
+            mask_p = torch.tensor(
+                sl['mask_no_dla'][:n_rays_per_physics], dtype=torch.bool,
+            )
+            coords_list.append(coords_p)
+            tau_list.append(tau_p)
+            mask_list.append(mask_p)
+            physics_id_list.append(
+                torch.full((coords_p.shape[0],), p_idx, dtype=torch.long)
+            )
+            if args.use_velocity_gradient_conditioning:
+                v_grad_p = torch.tensor(
+                    sl['v_pec_grad_truth'][:n_rays_per_physics],
+                    dtype=torch.float32,
+                )
+                v_grad_list.append(v_grad_p)
+            print(
+                f"[D-46] loaded P{physics_label}: "
+                f"{coords_p.shape[0]} rays x {coords_p.shape[1]} bins "
+                f"(physics_id={p_idx}).",
+                flush=True,
+            )
+        coords = torch.cat(coords_list, dim=0)
+        tau_gt_profile = torch.cat(tau_list, dim=0)
+        mask_no_dla_profile = torch.cat(mask_list, dim=0)
+        physics_id_per_ray = torch.cat(physics_id_list, dim=0)
+        v_pec_grad_truth = (
+            torch.cat(v_grad_list, dim=0) if v_grad_list is not None else None
+        )
+        n_dla_bins = int((~mask_no_dla_profile).sum().item())
+        n_total_bins = int(mask_no_dla_profile.numel())
+        print(
+            f"[D-46] joint dataset: {coords.shape[0]} rays x "
+            f"{coords.shape[1]} bins (4 physics interleaved at microbatch "
+            f"level). DLA mask: {n_dla_bins}/{n_total_bins} bins excluded "
+            f"({100.0 * n_dla_bins / max(1, n_total_bins):.3f}%).",
+            flush=True,
+        )
+        return (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
+                box_max, v_pec_grad_truth, physics_id_per_ray)
+
+    # Default-OFF path: single-physics, baseline behavior, byte-equivalent.
     sightlines = loader.load_sightlines(args.physics, 0.3)
     coords_raw = loader.get_world_coordinates(sightlines)
 
@@ -384,8 +504,14 @@ def load_dataset(args):
     print(f"Run scope: {n_rays} rays x {coords.shape[1]} bins (full grid).")
     print(f"[D-24] DLA mask: {n_dla_bins}/{n_total_bins} bins excluded "
           f"({100.0 * n_dla_bins / max(1, n_total_bins):.3f}%).")
+    # [D-46] passthrough: physics_id is logged-only when the flag is OFF.
+    # The model is constructed without nn.Embedding so this tensor is never
+    # passed to forward(); it's surfaced for downstream MLflow tagging only.
+    physics_id_per_ray = torch.full(
+        (coords.shape[0],), args.physics - 1, dtype=torch.long,
+    )
     return (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
-            box_max, v_pec_grad_truth)
+            box_max, v_pec_grad_truth, physics_id_per_ray)
 
 
 def save_checkpoint(path, *, model, optimizer, scheduler, log_tau_amp,
@@ -468,7 +594,7 @@ def train(args):
 
     # Dataset --------------------------------------------------------------
     (coords, vel_axis, tau_gt_profile, mask_no_dla_profile,
-     box_max, v_pec_grad_profile) = load_dataset(args)
+     box_max, v_pec_grad_profile, physics_id_per_ray) = load_dataset(args)
     coords = coords.to(device)
     vel_axis = vel_axis.to(device)
     tau_gt_profile = tau_gt_profile.to(device)
@@ -478,6 +604,12 @@ def train(args):
     # MLP input only. No autograd link back to it.
     if v_pec_grad_profile is not None:
         v_pec_grad_profile = v_pec_grad_profile.to(device)
+    # [D-46]: per-ray physics_id (zero-indexed). Used by the IGMNeRF forward
+    # only when args.use_physics_embedding is True; otherwise it's a
+    # passthrough tensor whose only consumer is the per-ray microbatch
+    # composition logic (which falls back to a single contiguous block when
+    # the flag is off).
+    physics_id_per_ray = physics_id_per_ray.to(device)
     if args.disable_dla_mask:
         mask_no_dla_profile = torch.ones_like(mask_no_dla_profile, dtype=torch.bool)
         print(
@@ -617,9 +749,14 @@ def train(args):
         )
 
     # Model ---------------------------------------------------------------
+    # [D-46] use_physics_embedding gates the learned nn.Embedding(4, 16) head.
+    # Default-OFF preserves byte-equivalent baseline: the embedding is not
+    # instantiated and does not consume from the RNG stream, so layer init
+    # is unchanged from the pre-[D-46] code.
     model = IGMNeRF(
         hidden_dim=256, num_layers=8, L=10,
         use_velocity_gradient_conditioning=args.use_velocity_gradient_conditioning,
+        use_physics_embedding=args.use_physics_embedding,
     ).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
     sigma_log = 0.5
@@ -674,7 +811,14 @@ def train(args):
             mlflow.set_tags({
                 "model_type": "nerf",
                 "stage": "2b",
-                "physics_id": str(args.physics),
+                # [D-46] When the joint-physics flag is ON, physics_id is no
+                # longer a single scalar per run — the dataset contains all 4.
+                # We tag the run as "P-mixed" so downstream slicing recognizes
+                # this and falls back to the per-cell physics decomposition
+                # exposed elsewhere (e.g., 4-cell pub-t1 eval).
+                "physics_id": (
+                    "P-mixed" if args.use_physics_embedding else str(args.physics)
+                ),
                 "redshift": "0.3",
                 "n_rays": str(args.n_rays),
                 "seed": str(args.seed),
@@ -684,6 +828,12 @@ def train(args):
                 # downstream eval scripts to slice the run table.
                 "velocity_gradient_conditioning": (
                     "on" if args.use_velocity_gradient_conditioning else "off"
+                ),
+                # [D-46] tag set: --feature physics_embedding when ON; the
+                # lambda_inv weight is logged as a param below.
+                "feature": (
+                    "physics_embedding"
+                    if args.use_physics_embedding else "baseline"
                 ),
             })
             if resume_run_id is None:
@@ -715,6 +865,9 @@ def train(args):
                     "use_velocity_gradient_conditioning": (
                         args.use_velocity_gradient_conditioning
                     ),
+                    # [D-46] joint-physics conditional MLP parameters.
+                    "use_physics_embedding": args.use_physics_embedding,
+                    "lambda_inv": args.lambda_inv,
                     "loss_form": (
                         ("log1p_mse_capped" if args.tau_max < 1e8 else "log1p_mse_uncapped")
                         + ("_masked" if not args.disable_dla_mask else "_unmasked")
@@ -745,14 +898,60 @@ def train(args):
             rank_rng = torch.Generator(device=device)
             rank_rng.manual_seed(args.seed + 9173)
 
-        # Helper: produce iterable of (start, end) microbatch slices.
-        def microbatch_slices():
-            for chunk_i in range(args.accum_steps):
-                s = chunk_i * args.microbatch
-                e = min(s + args.microbatch, n_rays_actual)
-                if s >= e:
-                    return
-                yield s, e
+        # [D-46] microbatch composition RNG. Used only when the joint-physics
+        # path is active. Seeded deterministically off args.seed so two runs
+        # at the same seed produce the same interleaved index sequence.
+        d46_rng = None
+        d46_per_physics_indices = None
+        if args.use_physics_embedding:
+            d46_rng = torch.Generator(device=device)
+            d46_rng.manual_seed(args.seed + 4646)
+            # Pre-bucket ray indices by physics_id so the per-step interleaver
+            # only needs to draw 16 indices per bucket. This assumes (and the
+            # loader guarantees) that physics_id_per_ray is contiguous in
+            # blocks of n_rays_per_physics, but we don't rely on it — we
+            # derive the buckets from the tensor itself.
+            d46_per_physics_indices = [
+                torch.nonzero(physics_id_per_ray == p_idx, as_tuple=True)[0]
+                for p_idx in range(4)
+            ]
+
+        # Helper: produce iterable of (ray_indices, mb_size) microbatches.
+        # In the default-OFF path this is byte-equivalent to the prior
+        # contiguous (start, end) iteration — torch.arange(s, e) is the
+        # same as the slice `s:e` on every consumer below.
+        # In the [D-46] flag-ON path this yields interleaved indices: each
+        # microbatch contains microbatch//4 rays drawn (with replacement
+        # across steps; without within-microbatch) from each of P1/P2/P3/P4
+        # so the gradient step mixes all 4 physics every step.
+        def microbatch_index_iter():
+            if args.use_physics_embedding:
+                per_physics_quota = args.microbatch // 4
+                for chunk_i in range(args.accum_steps):
+                    chunks = []
+                    for p_idx in range(4):
+                        pool = d46_per_physics_indices[p_idx]
+                        if pool.numel() == 0:
+                            continue
+                        # Random subset with replacement across the dataset
+                        # cycle (NOT within a microbatch — we draw distinct
+                        # indices per draw via torch.randperm on the pool).
+                        perm = torch.randperm(
+                            pool.numel(), generator=d46_rng, device=device,
+                        )[:per_physics_quota]
+                        chunks.append(pool[perm])
+                    if not chunks:
+                        return
+                    idx = torch.cat(chunks, dim=0)
+                    yield idx, idx.numel()
+            else:
+                for chunk_i in range(args.accum_steps):
+                    s = chunk_i * args.microbatch
+                    e = min(s + args.microbatch, n_rays_actual)
+                    if s >= e:
+                        return
+                    idx = torch.arange(s, e, device=device)
+                    yield idx, idx.numel()
 
         # Training loop ----------------------------------------------------
         for step in range(start_step + 1, args.max_steps + 1):
@@ -775,22 +974,36 @@ def train(args):
             # microbatch (a per-bin attribute of the GT data, independent of
             # tau_pred), so the [D-21] chain-rule identity still holds — the
             # only change is that F_cycle is now the *masked* cycle mean.
+            # [D-46] Cache the per-step microbatch index list so Pass 1 and
+            # Pass 2 see the exact same composition. Without this, Pass 1
+            # would compute mean_F over one interleaved draw and Pass 2 would
+            # backward against a different draw — the [D-21] chain-rule
+            # identity would no longer hold. We materialize the iterator once
+            # per step and reuse it in both passes.
+            microbatch_indices = list(microbatch_index_iter())
+
             with torch.no_grad():
                 weighted_F_sum = 0.0
                 total_F_count = 0
-                for s, e in microbatch_slices():
+                for idx_mb, mb_size in microbatch_indices:
                     # [D-42]: slice the per-(ray, bin) gradient feature in lockstep
                     # with `coords`. Loader-side data is 1:1 aligned with the
                     # source-bin grid (same n_bins, same ray ordering) so direct
-                    # index slicing is correct — no interpolation needed.
+                    # index gather is correct — no interpolation needed.
                     g_mb = None
                     if v_pec_grad_profile is not None:
-                        g_mb = v_pec_grad_profile[s:e].unsqueeze(-1)  # (mb, n_bins, 1)
-                    tau_pred_mb = volume_render_physics(
-                        model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp,
-                        g=g_mb,
+                        g_mb = v_pec_grad_profile[idx_mb].unsqueeze(-1)  # (mb, n_bins, 1)
+                    # [D-46]: pass physics_id per-microbatch only when the
+                    # embedding flag is on — otherwise the model rejects it.
+                    pid_mb = (
+                        physics_id_per_ray[idx_mb]
+                        if args.use_physics_embedding else None
                     )
-                    mask_mb = mask_no_dla_profile[s:e]
+                    tau_pred_mb = volume_render_physics(
+                        model, coords[idx_mb], vel_axis=vel_axis, tau_amp=tau_amp,
+                        g=g_mb, physics_id=pid_mb,
+                    )
+                    mask_mb = mask_no_dla_profile[idx_mb]
                     F_pred_mb = torch.exp(-tau_pred_mb)
                     weighted_F_sum += (F_pred_mb * mask_mb).sum().item()
                     total_F_count += int(mask_mb.sum().item())
@@ -823,7 +1036,7 @@ def train(args):
             rank_order_loss_chunks = []
             pf_loss_chunks = []
             fgpa_loss_chunks = []
-            for chunk_i, (s, e) in enumerate(microbatch_slices()):
+            for chunk_i, (idx_mb, mb_size) in enumerate(microbatch_indices):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
                 # is local to this microbatch's backward pass. Without this,
                 # the second chunk's .backward() raises "Trying to backward
@@ -831,23 +1044,29 @@ def train(args):
                 # freed the shared exp node. log_tau_amp.grad still
                 # accumulates correctly (sum over chunks).
                 tau_amp_chunk = torch.exp(log_tau_amp)
-                # [D-42]: per-microbatch slice of the velocity-gradient feature
+                # [D-42]: per-microbatch gather of the velocity-gradient feature
                 # (direct ray index on the same source-bin grid; no resampling).
                 g_mb = None
                 if v_pec_grad_profile is not None:
-                    g_mb = v_pec_grad_profile[s:e].unsqueeze(-1)  # (mb, n_bins, 1)
+                    g_mb = v_pec_grad_profile[idx_mb].unsqueeze(-1)  # (mb, n_bins, 1)
+                # [D-46]: physics_id per-microbatch only when the embedding
+                # flag is on (model rejects the kwarg otherwise).
+                pid_mb = (
+                    physics_id_per_ray[idx_mb]
+                    if args.use_physics_embedding else None
+                )
                 # [D-41] expose per-source-bin (tau_local, density, temp)
                 # only when the FGPA-tail regularizer is active. Default-OFF
                 # path is byte-equivalent: same renderer, same return type.
                 if args.fgpa_tail_weight > 0.0:
                     tau_pred_mb, fgpa_fields_mb = volume_render_physics(
-                        model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
-                        return_tau_local=True, g=g_mb,
+                        model, coords[idx_mb], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
+                        return_tau_local=True, g=g_mb, physics_id=pid_mb,
                     )
                 else:
                     tau_pred_mb = volume_render_physics(
-                        model, coords[s:e], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
-                        g=g_mb,
+                        model, coords[idx_mb], vel_axis=vel_axis, tau_amp=tau_amp_chunk,
+                        g=g_mb, physics_id=pid_mb,
                     )
                     fgpa_fields_mb = None
                 # ---- [D-24] data loss: log1p MSE, capped at TAU_MAX, masked. ----
@@ -858,8 +1077,8 @@ def train(args):
                 # zero-weight bins contribute zero gradient, exactly the
                 # supervision behavior PI specified.
                 tau_pred_eff = tau_pred_mb.clamp_max(TAU_MAX)
-                tau_gt_eff = tau_gt_profile[s:e].clamp_max(TAU_MAX)
-                mask_mb = mask_no_dla_profile[s:e]   # True = include
+                tau_gt_eff = tau_gt_profile[idx_mb].clamp_max(TAU_MAX)
+                mask_mb = mask_no_dla_profile[idx_mb]   # True = include
                 diff = torch.log1p(tau_pred_eff) - torch.log1p(tau_gt_eff)
                 diff_sq = diff * diff
 
@@ -870,7 +1089,7 @@ def train(args):
                 # The schedule depends only on truth-side flux (cached at
                 # startup), so it does NOT introduce any tau_pred dependence
                 # in the weights -> [D-21] mean-F identity is unaffected.
-                sat_mask_mb = sat_band_profile[s:e]   # (mb, n_bins) bool
+                sat_mask_mb = sat_band_profile[idx_mb]   # (mb, n_bins) bool
                 if args.sat_band_weight != 1.0:
                     weight_mb = mask_mb.to(diff_sq.dtype) + (
                         args.sat_band_weight - 1.0
@@ -914,7 +1133,7 @@ def train(args):
                 if args.rank_order_weight > 0.0:
                     loss_rank_mb = _sat_band_rank_loss(
                         tau_pred_mb,
-                        tau_gt_profile[s:e],
+                        tau_gt_profile[idx_mb],
                         sat_mask_mb,
                         n_pairs=args.rank_order_pairs,
                         generator=rank_rng,
@@ -941,7 +1160,7 @@ def train(args):
                         F_pred_mb, dv_kms,
                     )
                     P_pred_band_mb = band_mean_inertial(psd_pred_mb, k_ax_mb)
-                    P_truth_band_mb = P_F_truth_band[s:e]
+                    P_truth_band_mb = P_F_truth_band[idx_mb]
                     rel_residual = (
                         (P_pred_band_mb - P_truth_band_mb) / P_truth_band_mb
                     )
@@ -982,7 +1201,7 @@ def train(args):
                         0.5 * r_mb * r_mb,
                         fgpa_delta * (r_mb.abs() - 0.5 * fgpa_delta),
                     )
-                    mask_fgpa_mb = fgpa_valid_mask[s:e]
+                    mask_fgpa_mb = fgpa_valid_mask[idx_mb]
                     if mask_fgpa_mb.any():
                         loss_fgpa_mb = (
                             (huber * mask_fgpa_mb.to(huber.dtype)).sum()
@@ -1001,6 +1220,23 @@ def train(args):
                         * (log_tau_amp ** 2) / (2 * sigma_log ** 2)
                     )
                     loss_mb = loss_mb + loss_prior_term
+
+                # [D-46] Tier-1 conditional invariance penalty stub.
+                #
+                #   L_inv = lambda_inv * sum_{p != p'} ||f_theta(x; e_p) -
+                #                                       f_theta(x; e_p')||^2
+                #
+                # restricted to the saturated-mask bins, per LEDGER §3 [D-46]
+                # Math contract. Default-OFF (lambda_inv=0.0) at smoke per
+                # the spec's "Loss: unchanged from [D-24]/[D-11]/[D-21] base"
+                # discipline constraint — we wire it forward only if Tier-1
+                # lands and the smoke gates pass.
+                if args.lambda_inv > 0.0:
+                    raise NotImplementedError(
+                        "[D-46] lambda_inv > 0 is a Tier-1 conditional code "
+                        "path; the spec specifies this stays stubbed and "
+                        "disabled at smoke. Re-enable after Tier-1 lands."
+                    )
 
                 (loss_mb / args.accum_steps).backward()
                 data_loss_chunks.append(loss_data_mb.detach())

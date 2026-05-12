@@ -195,7 +195,10 @@ def test_mask_source_is_tau_GT_derived_not_tau_pred_derived():
         "Pass 1 anchor 'weighted_F_sum = 0.0' missing from pipeline.py — "
         "Pass 1 cycle-mean reduction structure changed; re-pin this test."
     )
-    p1_window = src[p1_anchor.end(): p1_anchor.end() + 600]
+    # Window widened from 600 to 1200 chars to accommodate the [D-46]
+    # comment-block expansion in the Pass 1 loop (the semantic check is
+    # unchanged: the mask must be referenced somewhere inside Pass 1).
+    p1_window = src[p1_anchor.end(): p1_anchor.end() + 1200]
     assert mask_var in p1_window, (
         f"Pass 1 (cycle-mean reduction) does not reference '{mask_var}'. "
         f"Either the mask source moved, or the variable was renamed — "
@@ -204,17 +207,25 @@ def test_mask_source_is_tau_GT_derived_not_tau_pred_derived():
     )
 
     # ---- (b) Pass 2 (chunk loop) references the SAME mask. ----
-    # The Pass 2 chunk loop is the second `for chunk_i, (s, e) in
-    # enumerate(microbatch_slices())` (the first is the no_grad pass).
+    # The Pass 2 chunk loop is the only `for chunk_i, <unpack>` enumerate over
+    # the microbatch iterator. [D-46] renamed the iterator from
+    # `microbatch_slices()` to a pre-materialized `microbatch_indices` list
+    # (so Pass 1 and Pass 2 see the same interleaved composition); the
+    # unpacking shape changed from `(s, e)` to `(idx_mb, mb_size)`. The
+    # semantic check is unchanged: a single enumerate-over-chunks loop in
+    # Pass 2 that references mask_no_dla_profile.
     chunk_iter_matches = list(
-        re.finditer(r"for chunk_i, \(s, e\) in enumerate\(microbatch_slices\(\)\)", src)
+        re.finditer(
+            r"for chunk_i, \([^)]*\) in enumerate\((microbatch_slices\(\)|microbatch_indices)\)",
+            src,
+        )
     )
     # Pass 2 has the enumerate (it needs chunk_i for the prior term);
     # Pass 1 does not. So we expect exactly one chunk_i loop in train().
     assert len(chunk_iter_matches) >= 1, (
-        "Pass 2 chunk loop signature ('for chunk_i, (s, e) in "
-        "enumerate(microbatch_slices())') not found — pipeline structure "
-        "changed; re-pin mask consistency."
+        "Pass 2 chunk loop signature ('for chunk_i, (<unpack>) in "
+        "enumerate(microbatch_slices()|microbatch_indices)') not found — "
+        "pipeline structure changed; re-pin mask consistency."
     )
     pass2_start = chunk_iter_matches[-1].end()
     pass2_window = src[pass2_start: pass2_start + 3000]
