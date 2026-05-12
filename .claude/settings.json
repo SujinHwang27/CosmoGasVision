@@ -45,7 +45,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "if [ -n \"$(find paper_cvpr/sec paper_cvpr/main.tex paper_cvpr/preamble.tex paper_cvpr/main.bib -newer paper_cvpr/main.pdf 2>/dev/null)\" ] || [ ! -f paper_cvpr/main.pdf ]; then cd paper_cvpr && latexmk -pdf -interaction=nonstopmode main.tex >/tmp/latexmk-stop.log 2>&1 || { echo 'paper_cvpr build FAILED (last 20 lines):' >&2; tail -20 /tmp/latexmk-stop.log >&2; }; fi; exit 0",
+            "command": "if [ -n \"$(find papers/shared/sec papers/shared/numbers.tex papers/shared/main.bib papers/cvpr2026/main.tex papers/cvpr2026/preamble.tex -newer papers/cvpr2026/main.pdf 2>/dev/null)\" ] || [ ! -f papers/cvpr2026/main.pdf ]; then cd papers/cvpr2026 && latexmk -pdf -interaction=nonstopmode main.tex >/tmp/latexmk-stop.log 2>&1 || { echo 'papers/cvpr2026 build FAILED (last 20 lines):' >&2; tail -20 /tmp/latexmk-stop.log >&2; }; fi; exit 0",
             "timeout": 120
           }
         ]

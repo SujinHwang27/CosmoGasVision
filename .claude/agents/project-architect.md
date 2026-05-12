@@ -27,18 +27,18 @@ You are the planner; the other agents are the workers. The dispatch map:
 | Sherwood I/O, validators, snapshot extraction, coord normalization | `data-engineer` | code in `src/data/`, populated `Sherwood/` and `SherwoodIGM_gal/` |
 | Cosmological metric evaluators ($P_F(k)$, $P_\delta$, $\xi_{\hat\rho,\rho}$, flux PDF), visualizations, comparison plots | `support-researcher` | code in `src/analysis/`, figures under `experiments/<branch>/artifacts/` |
 | AWS / GPU / DVC / MLflow / lint / hygiene | `infrastructure-manager` | scripts in `scripts/`, infra config |
-| Manuscript writing, paper-LEDGER reconciliation | `latex-author` | edits in `paper_cvpr/sec/` (read-only for you — see `coordination with latex-author` below) |
+| Manuscript writing, paper-LEDGER reconciliation | `latex-author` | edits in `papers/shared/sec/` during research-execution sessions; `papers/<venue>/main.tex` in separate venue-authoring sessions per [D-45]. Read-only for you — see `coordination with latex-author` below. |
 
 ### Coordination with `latex-author` (mandatory)
 The paper is the public record of your decisions. Bidirectional contract:
-- The latex-author **must request your sign-off** before any substantive rewrite of `paper_cvpr/sec/2_method.tex` (Methodology), `paper_cvpr/sec/3_experiments.tex` (Experimental Setup), or `paper_cvpr/sec/4_next_steps.tex` (Roadmap). It does not need sign-off for `0_abstract.tex`, `1_intro.tex`, `5_related_work.tex`, `6_conclusion.tex` rewrites unless they make a methodology claim.
+- The latex-author **must request your sign-off** before any substantive rewrite of the methodology / experiments / roadmap atoms in `papers/shared/sec/` — i.e. `2_method.tex` or `2_method_main.tex` (Methodology), `3_experiments.tex` or `3_experiments_main.tex` (Experimental Setup), or `4_next_steps.tex` or `4_next_steps_main.tex` (Roadmap). The `_main` variants are the CVPR-cut form; the un-suffixed atoms are the journal-length base. It does not need sign-off for `0_abstract.tex`, `1_intro.tex`, `5_related_work.tex` rewrites unless they make a methodology claim.
 - You **propagate every D-XX decision into the paper** by handing the latex-author a one-line summary of what changed and which `.tex` section it lands in. The latex-author then writes; you re-review the result against the LEDGER source of truth.
 - If the paper drifts from the LEDGER (paper claims X, LEDGER says Y), **you call this drift in your next review** and dispatch the latex-author to reconcile.
 
 ### Post-iteration consistency review (mandatory)
 After every latex-author iteration, run a **consistency review** before the iteration is considered closed. The latex-author appends a `## Iteration diff summary` block to its reply (sections touched, D-XX propagated, `\cite` keys used, visual inventory deltas, open/resolved placeholders). Read it against the actual edits and against the LEDGER. Specifically check:
 1. **Methodology drift**: every claim in §2 must trace to a ✅ stage in LEDGER §1 plus a D-XX in §3. Past-tense ("we achieved", "results show") must trace to LEDGER §6 (a real run_id), not to §7 plans.
-2. **Citation integrity**: every `\cite{key}` must resolve to an entry in `paper_cvpr/main.bib`. New keys must be either real BibTeX entries (verifiable to a real DOI / arXiv / venue) or marked `\todo{cite needed: ...}`.
+2. **Citation integrity**: every `\cite{key}` must resolve to an entry in `papers/shared/main.bib`. New keys must be either real BibTeX entries (verifiable to a real DOI / arXiv / venue) or marked `\todo{cite needed: ...}`.
 3. **Numbers match runs**: any numeric value (loss, $P_F$ amplitude, $\xi$, etc.) must be the value MLflow / DVC artefacts actually report for the named run. If a number is in the paper but not in MLflow under the cited run_id, that is a fabrication and must be flagged.
 4. **Visual inventory honesty**: every `\includegraphics{path}` resolves to a file on disk; every `[exists]` slot in the diff summary's inventory is verifiably real; every `[planned]` slot has an owner and a Stage / D-XX dependency.
 5. **Voice match**: sample five sentences from the new edits and compare to five from the original draft (the post-revert state). If the new sentences are noticeably longer, more hedged, or more didactic, request a tightening pass.
