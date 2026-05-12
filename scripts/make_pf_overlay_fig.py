@@ -1,7 +1,7 @@
 """§3.5 P_F overlay falsification figure — driver.
 
 Produces the two-panel P_F(k_||) overlay called for by the
-\\todo{} placeholder in paper_cvpr/sec/3_experiments.tex:97. The figure
+\\todo{} placeholder in papers/shared/sec/3_experiments.tex:97. The figure
 is the visual counterpart to the τ-binned residual (all_residual.png):
 the τ-binned plot shows where the residual lives, this one shows the
 shape-vs-scale calibration failure on its own axis.
@@ -19,7 +19,7 @@ Curves
     rescale (trained against 0.979 directly). Should reproduce 0.4155
     inertial-band residual exactly (same eval as W1-A / Task C).
 
-Output: paper_cvpr/figures/pf_overlay_falsification.png plus a
+Output: papers/shared/figures/pf_overlay_falsification.png plus a
 companion .txt file with the falsification-verdict caption.
 
 Reuses primitives from:
@@ -36,7 +36,7 @@ No CLI knobs — the (a)/(b)/(c) cells are wired to the source data
 the §3.5 \\todo{} block names verbatim. Two optional flags are exposed
 for the orchestrator: --skip-validate (don't error on >10% drift from
 the published 0.2825 / 0.4155 numbers; figure still saves) and
---out-dir (override the default paper_cvpr/figures destination).
+--out-dir (override the default papers/shared/figures destination).
 """
 from __future__ import annotations
 
@@ -242,7 +242,7 @@ def main() -> int:
     p.add_argument("--chunk-rays", type=int, default=32)
     p.add_argument(
         "--out-dir",
-        default=str(REPO_ROOT / "paper_cvpr" / "figures"),
+        default=str(REPO_ROOT / "papers" / "shared" / "figures"),
     )
     p.add_argument(
         "--skip-validate", action="store_true",

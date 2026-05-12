@@ -27,7 +27,7 @@ Usage:
     uv run python -u scripts/diag_tau_max_sensitivity.py
 
 Outputs:
-    - paper_cvpr/figures/tau_max_sensitivity.png  (DVC-tracked)
+    - papers/shared/figures/tau_max_sensitivity.png  (DVC-tracked)
     - prints the verdict + per-bin table to stdout
 """
 
@@ -54,7 +54,7 @@ from src.models.nerf import IGMNeRF, volume_render_physics  # noqa: E402
 
 REPO_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
 DATA_ROOT = os.path.join(REPO_ROOT, "Sherwood")
-FIG_PATH = os.path.join(REPO_ROOT, "paper_cvpr", "figures",
+FIG_PATH = os.path.join(REPO_ROOT, "papers", "shared", "figures",
                         "tau_max_sensitivity.png")
 
 S3_BUCKET = "cosmo-gas-vision-storage"

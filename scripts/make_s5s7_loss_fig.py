@@ -1,11 +1,11 @@
-"""Build the S5/S7 ablation overlay figure for paper_cvpr/sec/2_method.tex (per [D-38]).
+"""Build the S5/S7 ablation overlay figure for papers/shared/sec/2_method.tex (per [D-38]).
 
 Inputs: four cloud_runs/<TAG>/mlflow/ file-stores, each containing one MLflow run with
 per-step metric history (loss_data, mean_flux_pred, ...).
 
 Outputs:
-  paper_cvpr/figures/s5s7_loss_curves.png
-  paper_cvpr/figures/s5s7_loss_curves.pdf
+  papers/shared/figures/s5s7_loss_curves.png
+  papers/shared/figures/s5s7_loss_curves.pdf
 
 Caption / framing is PI-dictated (see dispatch); this script renders the figure only.
 """
@@ -117,7 +117,7 @@ def main() -> None:
 
     fig.tight_layout()
 
-    out_dir = REPO / "paper_cvpr" / "figures"
+    out_dir = REPO / "papers" / "shared" / "figures"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_png = out_dir / "s5s7_loss_curves.png"
     out_pdf = out_dir / "s5s7_loss_curves.pdf"

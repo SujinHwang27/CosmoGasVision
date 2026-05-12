@@ -114,8 +114,10 @@ def parse_args(argv=None):
     # [D-11] mean-F soft constraint; they do NOT modify the [D-21] two-pass
     # mean-F gradient identity. See LEDGER §3 [D-39] Addendum 4 for the
     # mechanism-(c) saturation-regime hypothesis these flags are designed to
-    # test, and ``paper_cvpr/sec/4_next_steps.tex`` §4.1 #1 for the PI design
-    # spec these flags implement.
+    # test. The sat-band/FGPA-tail PI design specs they implement are in
+    # LEDGER §3 [D-40] (sat-aware) / [D-41] (FGPA-tail); both retired
+    # empirically. See also ``papers/shared/sec/4_next_steps_main.tex``
+    # §4.1 (Three retired counterfactual interventions).
     p.add_argument("--sat_band_weight", type=float, default=1.0,
                    help="[D-39] saturation-band data-MSE up-weight. Bins with "
                         "F_gt in [0.05, 0.30] (truth flux, computed once, "

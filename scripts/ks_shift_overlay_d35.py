@@ -183,7 +183,7 @@ def main() -> int:
     p.add_argument("--target-mean-flux", type=float, default=0.979)
     p.add_argument(
         "--out-png",
-        default=str(REPO_ROOT / "paper_cvpr" / "figures" / "ks_shift_overlay_d35.png"),
+        default=str(REPO_ROOT / "papers" / "shared" / "figures" / "ks_shift_overlay_d35.png"),
     )
     args = p.parse_args()
 

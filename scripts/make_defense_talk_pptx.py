@@ -36,7 +36,7 @@ from pptx.util import Inches, Pt
 ROOT = Path(__file__).resolve().parents[1]
 TALK_DIR = ROOT / "experiments" / "nerf" / "talk"
 FIG_DIR = TALK_DIR / "figures"
-PAPER_FIGS = ROOT / "paper_cvpr" / "figures"
+PAPER_FIGS = ROOT / "papers" / "shared" / "figures"
 
 OUT_PATH = TALK_DIR / "defense_talk_5min.pptx"
 

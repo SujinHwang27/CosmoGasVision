@@ -108,7 +108,7 @@ def main() -> int:
     p.add_argument("--L-fourier", type=int, default=10)
     p.add_argument(
         "--out-png",
-        default=str(REPO_ROOT / "paper_cvpr" / "figures" / "proxy_xi_1d_sample.png"),
+        default=str(REPO_ROOT / "papers" / "shared" / "figures" / "proxy_xi_1d_sample.png"),
     )
     args = p.parse_args()
 

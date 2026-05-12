@@ -3,7 +3,7 @@
 Reads the per-step `loss_data` history from each of the four P{1,2,3,4}-T2
 MLflow file-stores under cloud_runs/batch2-extracted/, overlays them on a
 log-y loss-vs-step plot, and writes the figure to
-paper_cvpr/figures/cross_physics_convergence.png.
+papers/shared/figures/cross_physics_convergence.png.
 
 The figure carries the PI-required headline: under the [D-24] log1p+cap+mask
 loss, the four feedback variants converge symmetrically — the cross-physics
@@ -20,7 +20,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 BATCH2 = ROOT / "cloud_runs" / "batch2-extracted"
-OUT = ROOT / "paper_cvpr" / "figures" / "cross_physics_convergence.png"
+OUT = ROOT / "papers" / "shared" / "figures" / "cross_physics_convergence.png"
 
 CELLS = {
     "P1 (no fdbk)":  ("P1-N256-S0-1778118060-66d2cc", "C0"),
