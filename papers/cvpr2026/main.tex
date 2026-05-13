@@ -10,13 +10,13 @@
 % Import additional packages in the preamble file, before hyperref
 \input{preamble}
 \usepackage{graphicx}
-% Per [D-45] master-source architecture: figures live in papers/shared/figures;
+% Master-source architecture: figures live in papers/shared/figures;
 % the {../shared/} prefix lets sec/*.tex use \includegraphics{figures/<name>} unchanged.
 \graphicspath{{../shared/}}
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, shapes.geometric, backgrounds}
 
-% Per [D-45]: canonical numerical chokepoint (single source of truth for result-claim numerals)
+% Canonical numerical chokepoint (single source of truth for result-claim numerals)
 \input{../shared/numbers}
 
 
