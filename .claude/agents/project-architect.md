@@ -180,6 +180,64 @@ decisions and crowded out the hedged framing the evidence supported.
    discipline run, not a failed one — what would be failed is bending
    the spec to wring a positive number out of any of those checkpoints.
 
+**Extension 2 (added 2026-05-13 per dual-panel-overturn on [D-46]-cascade-close + sprint-5 source choice; LEDGER [D-37]-Extension 2):**
+
+Five new rules surfaced by convergent attack from a 3-examiner defense panel + a 4-persona panel (per [D-42-meta] precedent) on three PI prior-session load-bearing claims (D1–D4 orthogonality, §4.2 invariance argument, sprint-5 option-(a) recommendation). R8–R11 banked as rules-of-record; R12 DEFERRED pending an operational test on a fresh sprint-N candidate.
+
+8. **Cascade-close formality.** A "cascade close" / "structural foreclosure"
+   / "axes retired" claim in either LEDGER or paper text requires EITHER (a)
+   a formally-defined intervention space with an axis-coverage proof under
+   a stated decomposition criterion, OR (b) re-verbing to "N specific
+   interventions on a falsification queue produced N distinct degeneracy
+   signatures." Author-curated typologies cannot support "completeness"
+   claims at face value. Cites: Goodfellow+ 2016 Ch. 7 (regularization
+   taxonomy precedent); Battaglia+ 2018 (inductive-bias taxonomy precedent);
+   D'Amour+ 2020 (underspecification as the correct ML frame when multiple
+   loss-degenerate basins coexist).
+
+9. **Invariance-verb discipline.** "Invariance" / "cross-physics-invariant"
+   / "physics-invariant" verbs are reserved for (i) group-equivariance
+   contexts (Cohen-Welling 2016) OR (ii) statistically-confirmed cross-
+   condition stability (e.g., [D-42-meta] Item 3 5-seed bootstrap on cross-
+   physics R). Colloquial "invariance" usage in paper or LEDGER text must
+   be replaced with "underspecification of the supervision regime"
+   (D'Amour+ 2020) or "shortcut learning" (Geirhos+ 2020) where the latter
+   applies. Scope statement obligatory: which physics? at which redshift?
+   in which simulation suite?
+
+10. **Retired-model reuse contract.** A "model retired for reason X is
+    still usable for purpose Y" reuse is admissible IFF an explicit written
+    orthogonality argument shows reason X ⊥ purpose Y. Default presumption:
+    **NOT admissible**. "Mandatory hedging-language contract" is reporting-
+    layer mitigation, not methodology-layer fix (Dwork et al. 2015 Science
+    349:6248 "reusable holdout"; Yarkoni & Westfall 2017 §4 prediction-fit
+    confounding; Gelman & Hill 2006 §7 confounded-treatment-effect
+    estimation). Applied 2026-05-13 to overturn sprint-5 option (a) →
+    option (c) per [D-52].
+
+11. **Venue-register distinction.** Paper text must distinguish "CVPR-
+    publishable register" (6 pages; positive-contribution-foregrounded;
+    negative-result narratives compress to one paragraph) from "thesis-
+    defense / journal-length register" (long-form negative-result
+    rationalization permissible). Long-form negative-result rationalization
+    belongs in journals/thesis chapters, NOT in CVPR-track atoms. Cites:
+    Lipton & Steinhardt 2019 ("Troubling Trends in Machine Learning
+    Scholarship" §4); Locatello et al. 2019 ICML (negative-result paired
+    with positive deliverable).
+
+12. **Upstream-vs-parallel axis discipline (DEFERRED, candidate rule).**
+    When PI flags a candidate Nth axis during a cascade-close audit, must
+    declare whether the candidate is **upstream** of the existing axes
+    (higher leverage; defeats completeness claims by definition) or
+    **parallel** (same level; one candidate among many). Upstream
+    candidates cannot be foreclosed-by-implication from parallel-axis
+    retirements. Operational test for "upstream vs parallel" not yet spec'd
+    — defer R12 until a next defense-panel review surfaces a concrete
+    operational test on a fresh sprint-N candidate. The supervision-target
+    axis ([D-53]) is the load-bearing standing example: panels diagnosed
+    it as upstream-of-D1-D4 (not parallel-5th); the [D-53] entry banks the
+    binding rule for it specifically, in advance of R12 generalizing.
+
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
 The user has authorized the near-term mission as: **complete the first
