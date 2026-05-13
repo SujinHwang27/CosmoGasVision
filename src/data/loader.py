@@ -3,9 +3,10 @@ import json
 import os
 import tempfile
 import warnings
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Literal, Optional, Tuple, Union
 
 import numpy as np
 import torch  # kept for downstream import-compatibility
@@ -357,6 +358,126 @@ def _write_rho_disk_cache(
                 p.unlink()
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Sprint-2 [D-49]: held-out region spatial split for the Stage 3 classifier.
+# Mandatory mitigation for the [D-12] anti-leakage rule under the [D-46]
+# physics_id-embedding walk-back, per [D-47] option-C hybrid framing.
+# See experiments/nerf/design/sprint2_heldout_split.md for the design.
+# ---------------------------------------------------------------------------
+
+Region = Literal["train", "val", "test", "heldout"]
+
+
+@dataclass(frozen=True)
+class HeldoutSplitScheme:
+    """Geometry of the train / val / test partition of the periodic box.
+
+    Contiguous-slab partition along one axis (x by default); other axes are
+    unconstrained. train + val + test cover [0, 1] exactly on the split axis;
+    train is [0, train_x_max), val is [train_x_max, val_x_max), test is
+    [val_x_max, 1.0). All intervals right-open in normalized box coords.
+    """
+
+    train_x_max: float = 0.7
+    val_x_max: float = 0.85
+    axis: int = 0  # 0=x, 1=y, 2=z
+
+
+DEFAULT_SCHEME = HeldoutSplitScheme()
+
+
+def _coord_to_array(
+    coord: Union[float, np.ndarray, "torch.Tensor"]
+) -> np.ndarray:
+    """Convert region-helper input to a float64 np.ndarray. Accepts:
+    - float (single scalar coord on the split axis)
+    - np.ndarray shape (3,) (single 3D coord)
+    - np.ndarray shape (N, 3) (batch of 3D coords)
+    - torch.Tensor of any of the above shapes
+    """
+    if hasattr(coord, "detach"):
+        coord = coord.detach().cpu().numpy()
+    return np.asarray(coord, dtype=np.float64)
+
+
+def _region_label_scalar(x: float, scheme: HeldoutSplitScheme) -> str:
+    if x < scheme.train_x_max:
+        return "train"
+    if x < scheme.val_x_max:
+        return "val"
+    return "test"
+
+
+def region_mask(
+    coord_normalized: Union[float, np.ndarray, "torch.Tensor"],
+    scheme: HeldoutSplitScheme = DEFAULT_SCHEME,
+) -> Union[str, np.ndarray]:
+    """Discrete region label given normalized coord(s).
+
+    Parameters
+    ----------
+    coord_normalized : float, np.ndarray (3,), or np.ndarray (N, 3)
+        Coord in [0, 1). For 3D input only ``coord_normalized[..., scheme.axis]``
+        is consulted; scalar input is interpreted as already on the split axis.
+
+    Returns
+    -------
+    str ("train" | "val" | "test") for single-coord input;
+    np.ndarray of dtype <U5 for batched (N, 3) input.
+    """
+    arr = _coord_to_array(coord_normalized)
+    if arr.ndim == 0:
+        return _region_label_scalar(float(arr), scheme)
+    if arr.ndim == 1 and arr.shape == (3,):
+        return _region_label_scalar(float(arr[scheme.axis]), scheme)
+    if arr.ndim == 2 and arr.shape[1] == 3:
+        xs = arr[:, scheme.axis]
+        out = np.empty(xs.shape, dtype="<U5")
+        out[xs < scheme.train_x_max] = "train"
+        out[(xs >= scheme.train_x_max) & (xs < scheme.val_x_max)] = "val"
+        out[xs >= scheme.val_x_max] = "test"
+        return out
+    raise ValueError(
+        f"coord_normalized must be float, (3,), or (N, 3); got shape {arr.shape}"
+    )
+
+
+def _dist_to_train_scalar(x: float, scheme: HeldoutSplitScheme) -> float:
+    if x < scheme.train_x_max:
+        return 0.0
+    return min(x - scheme.train_x_max, 1.0 - x)
+
+
+def distance_to_train_region(
+    coord_normalized: Union[float, np.ndarray, "torch.Tensor"],
+    scheme: HeldoutSplitScheme = DEFAULT_SCHEME,
+) -> Union[float, np.ndarray]:
+    """Shortest periodic 1D distance along ``scheme.axis`` from the query
+    coord to the train interval ``[0, scheme.train_x_max]``.
+
+    0 inside train; in (0, 0.5*(1 - train_x_max)] outside train. Periodic
+    wraparound: with train_x_max=0.7, a point at x=0.99 is distance 0.01
+    (close via wraparound back to x=0), NOT 0.29.
+    """
+    arr = _coord_to_array(coord_normalized)
+    if arr.ndim == 0:
+        return _dist_to_train_scalar(float(arr), scheme)
+    if arr.ndim == 1 and arr.shape == (3,):
+        return _dist_to_train_scalar(float(arr[scheme.axis]), scheme)
+    if arr.ndim == 2 and arr.shape[1] == 3:
+        xs = arr[:, scheme.axis]
+        outside = xs >= scheme.train_x_max
+        below = xs - scheme.train_x_max
+        above = 1.0 - xs
+        dist = np.zeros_like(xs)
+        dist[outside] = np.minimum(below[outside], above[outside])
+        return dist
+    raise ValueError(
+        f"coord_normalized must be float, (3,), or (N, 3); got shape {arr.shape}"
+    )
+
 
 # Header byte layout matches Sherwood/src/utils.py:
 #   7 doubles (z, Om, OL, Ob, h100, box, Xh) + 2 int32 (nbins, num_los)
@@ -916,6 +1037,181 @@ class SherwoodLoader:
             (n_crops,), fill_value=int(physics_id), dtype=torch.long
         )
         return crops_t, labels_t
+
+    def extract_rho_crops_split(
+        self,
+        physics_id: int,
+        redshift: float,
+        crop_size: int,
+        n_crops: int,
+        region: Region,
+        scheme: HeldoutSplitScheme = DEFAULT_SCHEME,
+        seed: int = 42,
+        n_grid: int = 768,
+        max_rejections: int = 100_000,
+    ) -> Tuple["torch.Tensor", "torch.Tensor", np.ndarray]:
+        """Extract crops whose voxel support is wholly within ``region``.
+
+        Sprint-2 [D-49] companion to :meth:`extract_rho_crops`. Straddling
+        crops (those whose split-axis voxel range crosses a region boundary
+        or wraps around the periodic seam) are REJECTED, not relabelled,
+        per the strict-rejection policy in
+        ``experiments/nerf/design/sprint2_heldout_split.md`` §5.
+
+        Parameters
+        ----------
+        physics_id, redshift, crop_size, n_crops, seed, n_grid
+            As in :meth:`extract_rho_crops`.
+        region : {"train", "val", "test", "heldout"}
+            Target partition. "heldout" = val ∪ test.
+        scheme : HeldoutSplitScheme
+            Geometry of the partition. Defaults to 70/15/15 along axis-0.
+        max_rejections : int
+            Upper bound on rejected draws before raising ``RuntimeError``.
+            Catches pathological combinations of ``region`` and ``crop_size``.
+
+        Returns
+        -------
+        crops : torch.Tensor (n_crops, 1, crop_size, crop_size, crop_size)
+        labels : torch.Tensor (n_crops,) long — physics_id (broadcast)
+        distances : np.ndarray (n_crops,) float32 — per-crop
+            distance_to_train_region evaluated at the crop CENTER in
+            normalized box coords. 0 for ``region="train"``; > 0 otherwise.
+        """
+        # ---- argument validation
+        if physics_id not in self.physics_models:
+            raise ValueError(f"Invalid physics_id {physics_id}. Must be 1-4.")
+        if not isinstance(crop_size, int) or crop_size <= 0:
+            raise ValueError(f"crop_size must be a positive int; got {crop_size!r}")
+        if crop_size > n_grid:
+            raise ValueError(
+                f"crop_size {crop_size} exceeds n_grid {n_grid}; not supported."
+            )
+        if not isinstance(n_crops, int) or n_crops <= 0:
+            raise ValueError(f"n_crops must be a positive int; got {n_crops!r}")
+        valid_regions = ("train", "val", "test", "heldout")
+        if region not in valid_regions:
+            raise ValueError(
+                f"region must be one of {valid_regions}; got {region!r}"
+            )
+        if scheme.axis not in (0, 1, 2):
+            raise ValueError(f"scheme.axis must be in {{0, 1, 2}}; got {scheme.axis!r}")
+        if not (0.0 < scheme.train_x_max < scheme.val_x_max < 1.0):
+            raise ValueError(
+                "scheme must satisfy 0 < train_x_max < val_x_max < 1; got "
+                f"train_x_max={scheme.train_x_max}, val_x_max={scheme.val_x_max}"
+            )
+
+        # ---- voxel-index intervals per region (right-open).
+        # Use floor() implicitly via int() so the split is robust against
+        # non-multiple-of-N fractions (e.g., 0.7 * 32 = 22.4 -> 22).
+        train_end = int(scheme.train_x_max * n_grid)
+        val_end = int(scheme.val_x_max * n_grid)
+        region_voxel_start = {
+            "train": 0,
+            "val": train_end,
+            "test": val_end,
+            "heldout": train_end,
+        }[region]
+        region_voxel_end = {
+            "train": train_end,
+            "val": val_end,
+            "test": n_grid,
+            "heldout": n_grid,
+        }[region]
+        # Acceptance interval on the split axis for a corner c: a crop is
+        # wholly in region iff c >= region_voxel_start AND
+        # c + crop_size <= region_voxel_end. Wraparound is automatically
+        # impossible because region_voxel_end <= n_grid.
+        corner_min = region_voxel_start
+        corner_max_inclusive = region_voxel_end - crop_size
+        if corner_max_inclusive < corner_min:
+            raise ValueError(
+                f"crop_size {crop_size} too large for region {region!r}: "
+                f"region width {region_voxel_end - region_voxel_start} voxels at "
+                f"n_grid={n_grid}, scheme={scheme!r}."
+            )
+
+        # ---- materialize the rho field via the three-tier cache (sprint-1 [D-48]).
+        cache_key = (int(physics_id), round(float(redshift), 3), int(n_grid))
+        rho_field = _RHO_FIELD_CACHE.get(cache_key)
+        if rho_field is None:
+            npy_path, json_path = _rho_cache_paths(
+                physics_id, redshift, n_grid
+            )
+            disk_arr = _validate_rho_disk_cache(
+                npy_path, json_path, physics_id, redshift, n_grid
+            )
+            if disk_arr is not None:
+                rho_field = np.array(disk_arr, dtype=np.float32, copy=True)
+                _RHO_FIELD_CACHE[cache_key] = rho_field
+            else:
+                from src.data.igm_gal_loader import SherwoodIGMGalLoader
+
+                igm_loader = SherwoodIGMGalLoader()
+                rho_field = igm_loader.load_3d_field(
+                    physics_id=physics_id, field="rho", n_grid=n_grid
+                ).astype(np.float32, copy=False)
+                _RHO_FIELD_CACHE[cache_key] = rho_field
+                _write_rho_disk_cache(rho_field, physics_id, redshift, n_grid)
+
+        N = rho_field.shape[0]
+        if rho_field.ndim != 3 or rho_field.shape != (N, N, N):
+            raise ValueError(
+                f"Expected cubic 3D rho field, got shape {rho_field.shape}"
+            )
+
+        # ---- rejection sampling on the split axis. y, z are unconstrained
+        # and drawn uniformly from [0, N). One RNG, advanced through both
+        # accepts and rejects so determinism is preserved.
+        rng = np.random.default_rng(int(seed))
+        accepted = np.empty((n_crops, 3), dtype=np.int64)
+        n_accept = 0
+        n_rej = 0
+        while n_accept < n_crops:
+            c = rng.integers(low=0, high=N, size=3, dtype=np.int64)
+            split_c = int(c[scheme.axis])
+            if corner_min <= split_c <= corner_max_inclusive:
+                accepted[n_accept] = c
+                n_accept += 1
+            else:
+                n_rej += 1
+                if n_rej > max_rejections:
+                    raise RuntimeError(
+                        f"Held-out split rejection sampling exceeded "
+                        f"max_rejections={max_rejections}. "
+                        f"region={region!r}, crop_size={crop_size}, "
+                        f"n_grid={n_grid}, scheme={scheme!r}."
+                    )
+
+        # ---- crop assembly. Split-axis is non-wrapping by acceptance; y, z
+        # may wrap (periodic on non-split axes). Use the same np.ix_ pattern
+        # as extract_rho_crops.
+        offset = np.arange(crop_size, dtype=np.int64)
+        crops = np.empty(
+            (n_crops, 1, crop_size, crop_size, crop_size), dtype=np.float32
+        )
+        for c_idx in range(n_crops):
+            i0, j0, k0 = accepted[c_idx]
+            ii = (i0 + offset) % N
+            jj = (j0 + offset) % N
+            kk = (k0 + offset) % N
+            crops[c_idx, 0] = rho_field[np.ix_(ii, jj, kk)]
+
+        # ---- output sanity check (re-use _validate_rho_crops).
+        self._validate_rho_crops(crops)
+
+        # ---- per-crop distance_to_train_region at the crop CENTER, in
+        # normalized box coords.
+        centers = (accepted.astype(np.float64) + (crop_size - 1) / 2.0) / float(N)
+        distances = distance_to_train_region(centers, scheme).astype(np.float32)
+
+        # ---- torch handoff
+        crops_t = torch.from_numpy(crops)
+        labels_t = torch.full(
+            (n_crops,), fill_value=int(physics_id), dtype=torch.long
+        )
+        return crops_t, labels_t, distances
 
     @staticmethod
     def _validate_rho_crops(crops: np.ndarray) -> None:
