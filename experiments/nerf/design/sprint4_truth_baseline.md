@@ -1,10 +1,10 @@
 # Sprint-4 design — 3D ResNet truth-baseline classifier ([D-47] option-C step 1)
 
-**Status**: 🛠 Draft → implementation, 2026-05-12, main-thread (core-implementer dispatch with main-thread fallback per the sprint-1/2/3 permission pattern).
+**Status**: 🛠 Draft → implementation 2026-05-12 → 30-epoch dispatch CONDITIONALLY AUTHORIZED 2026-05-13b post-pre-review amendments (main-thread; see [D-52] post-pre-review amendment block in LEDGER §3 and R13 scope-lock re-verbing audit in [D-37]-Extension 2 update).
 **Predecessor**: Sprint-3 [D-50] CIC chunked-scatter refactor (HEAD `1513999`). Builds on sprint-1 [D-48] disk cache (HEAD `923458f`) and sprint-2 [D-49] held-out region split (HEAD `4ff68fe`).
-**Blocking**: sprint-5 ([D-47] option-C step 2 — reconstructed-baseline classifier) cannot dispatch until sprint-4 closes; sprint-5 reuses this sprint's architecture + training protocol verbatim with `crops` swapped from truth-CIC to NeRF-sampled.
-**Downstream**: [D-47] gap measurement Δ̂(r) = Â_truth(r) − Â_recon(r); [D-15] empirical 85% bar lower-bounded by Â_truth(r).
-**Decision number**: [D-51] (PENDING in §3 at dispatch; DONE block appended at sprint close).
+**Blocking**: sprint-5 ([D-47] option-C step 2 — reconstructed-baseline classifier) **DEFERRED to post-CVPR follow-on under option (b)** per [D-52] scope-lock (2026-05-13a) + post-pre-review amendments (2026-05-13b). Sprint-5 in this CVPR submission cycle ships **option (c) — Â_truth(r) alone** as the deliverable per [D-52].
+**Downstream**: under [D-52] option (c) post-amendment, the deliverable is a **probe-classifier discriminability lower bound** on the Sherwood physics-recipe signature at z=0.3 in the truth ρ field at crop=32³ (Alain & Bengio 2017; Theunissen 2003 — classifier accuracy is a *lower bound* on task discriminability, not a ceiling). The [D-47] gap measurement Δ̂(r) = Â_truth(r) − Â_recon(r) is DEFERRED to post-CVPR follow-on under option (b) (per [D-52]). The [D-15] 85% bar is project-internal per [D-36] (no external observational anchor) and is reported, not gated.
+**Decision number**: [D-51] (PENDING in §3 at dispatch; DONE block appended at sprint close). Scope-lock + amendments tracked at [D-52] (LEDGER §3).
 
 ---
 
@@ -14,7 +14,7 @@ Per **[D-47]** option-C hybrid Stage 3 framing: the headline scientific quantity
 
 Per **[D-12]** + **[D-46] Addendum 1** + sprint-2 [D-49]: the classifier evaluates on the **held-out region only** (val ∪ test). This sprint inherits the [D-49] strict-rejection straddle policy and the periodic 1D distance metric; it does not change the split scheme.
 
-The truth-baseline by itself is **not a paper claim** — it's a measurement instrument. Its purpose is to anchor the gap. Its required property is *trustworthy measurement protocol*, not *high accuracy*.
+**Post-pre-review 2026-05-13b discipline-bar status (R13 scope-lock re-verbing audit, per [D-52] post-pre-review amendments)**: under the dual-panel-overturn-amended [D-52] option (c), the truth-baseline **becomes** the **candidate paper-claim surface** *upon successful AD-5 trivial-baseline-backstop clearance at ≥10 pp margin* (amendment 6). Until AD-5 clears, the truth-baseline remains a measurement instrument in the [D-51] sense; post-AD-5-PASS the discipline-bar upgrades to **probe-classifier discriminability lower bound on the Sherwood physics-recipe signature** (NOT a "ceiling" — accuracy is a lower bound on discriminability per Theunissen 2003 + Alain & Bengio 2017). The required properties are (i) *trustworthy measurement protocol* (the 5-gate + AD-1–AD-5), (ii) AD-5 cleared at ≥10 pp margin (or escalate to capacity-matched-MLP follow-on), and (iii) result reported under one of the four pre-committed outcome branches per [D-52] success-criterion table (above-bar 0.87+ / indistinguishable [0.85, 0.87] / below-bar-with-AD-5-PASS / process-failure or ceiling-disqualified).
 
 ## 2. Implicit-NeRF vs. voxel-substrate boundary
 
@@ -136,11 +136,11 @@ Mirrors the [D-50] 5-criterion table.
 | **(b)** | **r_50 well-definedness** | Test set has ≥ 200 crops in the quintile containing r_50; bootstrap CI half-width at quintile-3 < 0.05 (5 percentage points) | Procedural thinness; raise `n_crops_test` until the gate clears. Not a science blocker. |
 | **(c)** | **Split-determinism end-to-end** | Two independent runs at `(seed_train=42, seed_val=142, seed_test=242, scheme=DEFAULT_SCHEME)` produce: (i) byte-identical train/val/test crop sets per `np.array_equal`, (ii) bit-identical model predictions to fp32, (iii) Â at all 5 quintiles identical to 1e-7 | If non-deterministic, [D-12] anti-leakage audit hook is broken. Critical fix-blocker. |
 | **(d)** | **Â(r) smoothness / no-wild-oscillation** | The 5-quintile Â(r) curve is monotone, OR varies by < 0.10 (10 percentage points) across all 5 bins. No sign pre-committed for monotonicity — truth-baseline is *expected* to be roughly r-invariant since truth ρ has no train/test asymmetry. | Spikes (e.g., quintile-2→quintile-3 drops 30 pp, quintile-3→quintile-4 rises 30 pp) flag data leakage through the boundary. Sprint blocked, escalate to PI. |
-| **(e)** | **Trivial-baseline backstop** — **TWO baselines, both must trail the 3D ResNet by ≥ 5 pp** | (e₁) **mean-overdensity baseline**: 1-scalar `crop.mean()` → FC(4). Must achieve Â_overall ≤ Â_overall(ResNet) − 0.05. (e₂) **mean+variance baseline**: 2-scalar `[crop.mean(), crop.var()]` → FC(4). Must achieve Â_overall ≤ Â_overall(ResNet) − 0.05. | If either trivial baseline matches the 3D ResNet within 5 pp, the task is dominated by low-order moments and the 3D ResNet is measuring a low-dimensional summary statistic, not 3D structure. The [D-47] gap measurement on the 3D-structure axis is then decorative. **Anti-degeneracy hook explicit per [D-37]-ext rule 3.** |
+| **(e)** | **Trivial-baseline backstop — TIGHTENED 2026-05-13b** — **TWO baselines, both must trail the 3D ResNet by ≥ 10 pp** (was 5 pp pre-amendment; tightened under [D-52] AD-5 ceiling-claim-semantics escalation per [D-37]-Extension 2 R13 scope-lock re-verbing audit) | (e₁) **mean-overdensity baseline**: 1-scalar `crop.mean()` → FC(4). Must achieve Â_overall ≤ Â_overall(ResNet) − **0.10**. (e₂) **mean+variance baseline**: 2-scalar `[crop.mean(), crop.var()]` → FC(4). Must achieve Â_overall ≤ Â_overall(ResNet) − **0.10**. | If either trivial baseline matches the 3D ResNet within 10 pp, the deep model is anchored to low-order moment structure NOT to feedback-specific 3D content — escalates to **CEILING-DISQUALIFIED status** per [D-52] AD-5 process-failure routing (a substantive null result publishable as §4 follow-on caveat, NOT as a headline contribution). If margin lands in the [5, 10] pp window, escalate to **capacity-matched-MLP follow-on** (4th-moment + spectral-energy baseline, ~100 params; Loshchilov 2019 precedent) before paper text ships. **Anti-degeneracy hook explicit per [D-37]-ext rule 3 + AD-5 escalation per [D-52] post-pre-review amendment 6.** |
 
-**Distinguishing success metric from gate criteria**:
-- **Success metric** = the reported Â(r_25), Â(r_50), Â(r_75) triplet with CIs. The [D-15] empirical ceiling — there is no pre-set "pass/fail bar" on the value itself; whatever the truth-baseline gets is the ceiling.
-- **Gate criteria** (a)–(e) = procedural correctness of the measurement. The sprint is DONE when the measurement is trustworthy, not when the number is high.
+**Distinguishing success metric from gate criteria (post-pre-review amended 2026-05-13b)**:
+- **Success metric** = the reported Â(r_25), Â(r_50), Â(r_75) triplet with **1k-bootstrap 95% CI** + **block-bootstrap 95% CI** side-by-side (block size = 64 voxels; Politis & Romano 1994; Norberg et al. 2009). The [D-52] post-amendment success criterion has FOUR pre-committed outcome branches: (i) above-bar (CI lower bound at r_50 > 0.87), (ii) indistinguishable-from-bar [0.85, 0.87] per MDE 0.05 at 80% power power-calibration, (iii) below-bar with AD-5 PASS at ≥10 pp margin → "below empirical reference at value X" per [D-37]-ext rule 5 symmetric-honesty, (iv) process-failure or ceiling-disqualified per [D-52] amendment 7 pre-committed routing — NO Â_truth(r) publication in cases (iv). The [D-15] 85% bar is project-internal per [D-36] (no external anchor); paper §3 must disclose this explicitly.
+- **Gate criteria** (a)–(e) = procedural correctness of the measurement + AD-5 ceiling-claim semantics. The sprint is DONE when the measurement is trustworthy AND routes to one of branches (i)–(iii), OR when branch (iv) routes to CEILING-DISQUALIFIED-paper-text-as-null-result.
 
 ## 9. Anti-degeneracy hooks
 
@@ -153,15 +153,23 @@ Inheriting [D-37]-ext rule 3 discipline: "what does this measurement leave uncon
 | AD-3 | **Trivial-statistic identification** — 4 physics distinguishable from low-order moments alone | Gate (e₁) mean-overdensity baseline + (e₂) mean+variance baseline. Both must trail the 3D ResNet by ≥ 5 pp. | Implementation in `src/analysis/conditional_accuracy.py`; outputs `baseline_mean_overdensity.json` + `baseline_mean_variance.json` |
 | AD-4 | **Augmentation label leakage** — buggy per-physics augmentation seed leaks rotation distribution as a label proxy | Augmentation RNG seeded per-sample, independent of label. NEW unit test confirms `random.choice` of transform parameters is invariant across labels at fixed sample-index. Also implicitly caught by gate (e): a 1-scalar baseline is rotation-invariant, so if it fails the inequality, augmentation leakage cannot be the cause. | `tests/test_augmentation_label_independence.py` |
 
-## 10. Hedged framing — verbs to use and avoid
+## 10. Hedged framing — verbs to use and avoid (post-pre-review amended 2026-05-13b per [D-37]-Extension 2 R13 scope-lock re-verbing audit)
 
-When the [D-51] DONE block is written:
+When the [D-51] DONE block is written under [D-52] option (c) post-amendment:
 
-✅ "We train a 3D ResNet-18 classifier as a measurement instrument for the [D-47] empirical ceiling. The conditional accuracy Â(r) is reported per the pre-registered estimator. The truth-baseline yields ceiling Â_overall = X.XX [CI]; this anchors the [D-15] 85% bar."
+✅ "We train a 3D ResNet-18 classifier as a probe-classifier discriminability instrument for the Sherwood physics-recipe signature at z=0.3 in the truth ρ field at crop=32³. The conditional accuracy Â(r) is reported per the pre-registered [D-51] estimator with 1k-bootstrap and block-bootstrap CIs side-by-side. The truth-baseline yields **a probe-classifier discriminability lower bound** Â_overall = X.XX [1k-bootstrap CI] / [block-bootstrap CI] (Alain & Bengio 2017; Theunissen 2003 — accuracy is a lower bound on task discriminability, not a ceiling). Under [D-52] post-pre-review amendments: AD-5 ≥10 pp gate-(e) margin {PASS / FAIL}; outcome routes to branch (i)/(ii)/(iii)/(iv) per [D-52] success-criterion table. The [D-15] 85% bar is project-internal per [D-36]; no external observational anchor."
 
-❌ Avoid: "state-of-the-art 3D classifier", "the classifier successfully identifies feedback physics", "our 3D ResNet achieves X% accuracy" — verbs that promote the instrument to a contribution.
+❌ Avoid:
+- "state-of-the-art 3D classifier", "our 3D ResNet achieves X% accuracy" — promotion of the instrument to a contribution.
+- "**the** empirical ceiling" without scoping qualifier — accuracy is a lower bound on discriminability, not a ceiling on it; the highest-attainable discriminability at this substrate is unknown.
+- "the classifier successfully identifies feedback physics" — overstates: discriminates *Sherwood physics-recipe signatures*, not "feedback physics" in general.
+- "Â_truth(r) **IS** the headline-claim quantity" or "establishes the [D-15] floor empirically at value X" without subjunctive hedge — assertive pre-measurement verbs in violation of [D-37]-ext rule 2.
 
-⚠️ Specifically: if Â(r) comes out >0.95 across all r, the temptation will be to frame this as "truth ρ is highly classifiable" — which is true but trivial. The **honest** framing per [D-37] rule 5 is symmetric: the high accuracy is *necessary* (otherwise the [D-47] gap measurement has no signal) but *not sufficient* for any Stage 3 conclusion. Sprint-5 (reconstructed-baseline) is what closes the scientific question.
+⚠️ Specifically (R14 self-anchored-bar + symmetric-disclosure protection): if Â(r) comes out >0.95 across all r, the panel KILLER A.3 attack lands — Bolton+2017 already publishes Sherwood 4-class discriminability at 1D flux-stat scale. The **honest** framing per [D-37] rule 5 + R14 is: the high accuracy at the 3D ρ crop=32³ substrate is **first measurement at this substrate**, citing Bolton+2017 + Iršič+2017 as 1D-scale cite-precedent, NOT as a novel finding about Sherwood feedback discriminability. The contribution narrows: "first 4-way classification accuracy on 3D ρ/⟨ρ⟩ crops at NeRF-substrate scale, establishing the empirical reference for downstream reconstruction-fidelity audits." Δ̂(r) is deferred to post-CVPR follow-on under option (b).
+
+**Process-failure path verbs** (per [D-52] amendment 7 pre-commit):
+- If AD-1 / gate-(c) / gate-1 FAIL or training diverges: "sprint-5 measurement infrastructure failed pre-condition X; Â_truth(r) is not available for this submission cycle." NO Â_truth value publishable.
+- If AD-5 ≥10 pp gate-(e) FAILS: "the deep model cannot beat capacity-matched trivials at ≥10 pp on Sherwood 4-class crops at 32³; Â_truth(r) reading is anchored to low-order moment structure, NOT to feedback-specific 3D content." Substantive null, §4 follow-on caveat, NOT headline.
 
 ## 11. API surface, files, dispatch plan
 

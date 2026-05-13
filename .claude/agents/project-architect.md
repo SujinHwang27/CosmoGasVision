@@ -238,6 +238,54 @@ Five new rules surfaced by convergent attack from a 3-examiner defense panel + a
     it as upstream-of-D1-D4 (not parallel-5th); the [D-53] entry banks the
     binding rule for it specifically, in advance of R12 generalizing.
 
+**Extension 2 update (added 2026-05-13b per second convergent dual-panel overturn this session — pre-review on [D-52] option-(c) scope-lock; LEDGER [D-37]-Extension 2 update):**
+
+R13 + R14 banked as binding. R15 candidate deferred pending next-session
+operational test.
+
+13. **Scope-lock re-verbing audit.** When a sprint's deliverable surface
+    shifts (e.g., instrument → ceiling-claim, instrument → benchmark,
+    smoke-instrument → headline-claim), a re-verbing audit on (i) the
+    LEDGER scope-lock entry itself, (ii) the predecessor design doc, (iii)
+    any downstream paper-text atom that cites the prior surface is
+    MANDATORY before any downstream dispatch authorization. Trigger
+    pattern: *framing verbs* (about what role the number plays) being
+    assertive while *outcome verbs* (about what value the number is) are
+    hedged is the [D-37]-extension trigger pattern. Cite: 4-persona panel
+    ML-METHOD-C3 KILLER 2026-05-13b on [D-52] entry lines 1316/1318/1320/1328.
+
+14. **Self-anchored bar + symmetric disclosure → rule-7 fragile
+    (clarification to rule 7).** When a project-internal target (e.g.,
+    [D-15] 0.85 bar post-[D-36] retraction of external attribution) is
+    measured against a self-defined ceiling/floor under [D-37]-ext rule 5
+    symmetric-disclosure, the construction is structurally rule-7-fragile
+    (every framing produces a publishable number). Trigger is the
+    *combination* of (a) self-anchored bar + (b) author-defined measurement
+    instrument + (c) symmetric-disclosure publication route. ≥ 1 of the
+    following required to rescue: (i) external observational anchor for
+    the bar; (ii) pre-committed process-failure path producing NO
+    publication under specified failure conditions ([D-52] amendment 7
+    canonical example); (iii) deliverable demoted to NO-publication-as-
+    headline-claim, deferred to follow-on paper. Cite: 4-persona STATS-C1
+    KILLER + 3-examiner C.2 outcome-table 2026-05-13b.
+
+15. **PI sign-off PROVISIONAL by default on stage-gate decisions
+    (DEFERRED, candidate rule).** When PI sign-off touches deliverable-
+    surface verbs or self-anchored bar promotions, the sign-off is
+    **PROVISIONAL** by default; provisional status is lifted by (a)
+    defense-panel pre-review APPROVE, or (b) explicit PI-only annotation
+    with deferred-panel-review tracked in §7. Provisional status is
+    binding on downstream dispatches: a downstream dispatch citing a
+    PROVISIONAL sign-off as gate-prerequisite is itself dispatched
+    provisionally. NOT banked 2026-05-13b per rule-set-growth-rate
+    discipline ([D-45]); operational test = "did next session's PI
+    sign-offs successfully use the PROVISIONAL annotation pattern without
+    rotting?" If yes, bank R15 at session-after. Banking trigger: two
+    consecutive convergent dual-panel overturns on PI-signed positions in
+    the same session (2026-05-13a option-(a) → option-(c); 2026-05-13b
+    option-(c)-as-written → option-(c)-post-amendment) — signal not noise.
+    Self-audit owed under [D-37] rule (c) honest-reporting.
+
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
 The user has authorized the near-term mission as: **complete the first
