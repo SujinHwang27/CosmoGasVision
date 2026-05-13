@@ -270,21 +270,28 @@ operational test.
     KILLER + 3-examiner C.2 outcome-table 2026-05-13b.
 
 15. **PI sign-off PROVISIONAL by default on stage-gate decisions
-    (DEFERRED, candidate rule).** When PI sign-off touches deliverable-
-    surface verbs or self-anchored bar promotions, the sign-off is
-    **PROVISIONAL** by default; provisional status is lifted by (a)
-    defense-panel pre-review APPROVE, or (b) explicit PI-only annotation
-    with deferred-panel-review tracked in §7. Provisional status is
-    binding on downstream dispatches: a downstream dispatch citing a
+    (BANKED 2026-05-13c per third-failure operational test).** When PI
+    sign-off touches deliverable-surface verbs, self-anchored bar
+    promotions, OR **an inherited claim that has not been independently
+    re-verified this session**, the sign-off is **PROVISIONAL** by
+    default; provisional status is lifted by (a) defense-panel pre-review
+    APPROVE, OR (b) explicit PI-only annotation with deferred-panel-review
+    tracked in §7, OR (c) an explicit re-verification check (e.g., for
+    inherited data-locality / artifact-presence / version claims: an
+    empirical filesystem / glob / grep audit in the current session that
+    independently re-establishes the inherited claim). Provisional status
+    is binding on downstream dispatches: a downstream dispatch citing a
     PROVISIONAL sign-off as gate-prerequisite is itself dispatched
-    provisionally. NOT banked 2026-05-13b per rule-set-growth-rate
-    discipline ([D-45]); operational test = "did next session's PI
-    sign-offs successfully use the PROVISIONAL annotation pattern without
-    rotting?" If yes, bank R15 at session-after. Banking trigger: two
-    consecutive convergent dual-panel overturns on PI-signed positions in
-    the same session (2026-05-13a option-(a) → option-(c); 2026-05-13b
-    option-(c)-as-written → option-(c)-post-amendment) — signal not noise.
-    Self-audit owed under [D-37] rule (c) honest-reporting.
+    provisionally. Banking trigger reached 2026-05-13c: three governance
+    failures in one session — (i) 2026-05-13a dual-panel post-mortem
+    overturn of PI option-(a) sign-off; (ii) 2026-05-13b dual-panel
+    pre-review overturn of PI option-(c)-as-written sign-off; (iii)
+    2026-05-13c user-probe overturn of PI inherited-claim "only P1 has
+    local IGM_gal data" — a [D-37] rule (a) framing-vs-observation
+    violation propagated from prior-session §7 to this-session PI
+    re-review without independent re-verification. The (c) clause is the
+    expansion specifically motivated by failure (iii). Cite: LEDGER §7
+    [D-37]-rule-(a)-violation addendum 2026-05-13c.
 
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
