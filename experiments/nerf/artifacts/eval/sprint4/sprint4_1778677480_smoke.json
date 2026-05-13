@@ -1,0 +1,17 @@
+{
+  "run_id": "sprint4_1778677480",
+  "mode": "smoke",
+  "smoke_steps_completed": true,
+  "no_oom": true,
+  "model_params": 8298916,
+  "train_history": [
+    {
+      "epoch": 0,
+      "train_loss": 17.088809728622437,
+      "val_loss": 2.2762595415115356,
+      "val_acc": 0.3125,
+      "lr": 0.0003,
+      "epoch_seconds": 4.43143880000207
+    }
+  ]
+}
