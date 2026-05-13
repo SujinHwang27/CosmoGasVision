@@ -212,20 +212,41 @@ class SherwoodIGMGalLoader:
 # ----------------------------------------------------------------------- CIC
 
 
+_CIC_DEFAULT_CHUNK_SIZE = 1_000_000
+
+
 def _cic_deposit_inplace(
     grid: np.ndarray,
     coords: np.ndarray,
     weights: np.ndarray,
     box: float,
     n_grid: int,
+    chunk_size: int = _CIC_DEFAULT_CHUNK_SIZE,
 ) -> None:
     """Cloud-in-cell deposition of ``weights`` at ``coords`` accumulated
     *in place* into ``grid`` (shape ``(n_grid,)*3``, dtype float64).
 
-    Stays in float32 for the per-particle arithmetic (~½ the memory) and
-    promotes to float64 only at the per-cell accumulation step. Designed
-    to be called once per HDF5 sub-file so the full particle table is
-    never materialized.
+    Particles are processed in chunks of ``chunk_size``; per chunk the
+    per-corner index array and per-corner weight product are sized
+    O(chunk_size) rather than O(N), and contributions are scattered into
+    ``flat_view`` via ``np.add.at`` rather than being materialized through
+    a length-``n_grid**3`` ``np.bincount`` return. This eliminates two
+    peak-memory cliffs that previously OOM'd at production scale:
+
+      (i) the per-corner int64 cast intermediates (~165 MB per array on
+          a 20.6M-particle table, ~1 GB transient per corner across the
+          multiplication chain), and
+      (ii) the float64 bincount return of size ``n_grid**3`` (~3.6 GB at
+           ``n_grid=768``).
+
+    Per-particle arithmetic stays in float32; per-cell accumulation runs
+    in float64 because ``np.add.at`` on a float64 ``flat_view`` promotes
+    float32 values before the add. Designed to be called once per HDF5
+    sub-file so the full particle table is never materialized.
+
+    Numerical equivalence vs. the per-corner bincount implementation is
+    bit-similar up to float64 summation-order drift; verified by the
+    ``test_cic_chunked_numerical_equivalence`` unit test ([D-50] gate).
     """
     if coords.ndim != 2 or coords.shape[1] != 3:
         raise ValueError(f"coords must be (N, 3), got {coords.shape}")
@@ -233,42 +254,56 @@ def _cic_deposit_inplace(
         raise ValueError(
             f"weights length {weights.shape[0]} != coords length {coords.shape[0]}"
         )
+    if chunk_size <= 0:
+        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
 
     coords = np.ascontiguousarray(coords, dtype=np.float32)
     weights = np.ascontiguousarray(weights, dtype=np.float32)
 
     cell = np.float32(box / n_grid)
-    fx = coords[:, 0] / cell
-    fy = coords[:, 1] / cell
-    fz = coords[:, 2] / cell
-
-    ix = np.floor(fx).astype(np.int32)
-    iy = np.floor(fy).astype(np.int32)
-    iz = np.floor(fz).astype(np.int32)
-    dx = fx - ix
-    dy = fy - iy
-    dz = fz - iz
-
-    ix0 = ix % n_grid
-    iy0 = iy % n_grid
-    iz0 = iz % n_grid
-    ix1 = (ix + 1) % n_grid
-    iy1 = (iy + 1) % n_grid
-    iz1 = (iz + 1) % n_grid
-
     n3 = n_grid * n_grid * n_grid
     flat_view = grid.reshape(n3)
-    for ax, ay, az, wx, wy, wz in (
-        (ix0, iy0, iz0, 1 - dx, 1 - dy, 1 - dz),
-        (ix1, iy0, iz0,     dx, 1 - dy, 1 - dz),
-        (ix0, iy1, iz0, 1 - dx,     dy, 1 - dz),
-        (ix0, iy0, iz1, 1 - dx, 1 - dy,     dz),
-        (ix1, iy1, iz0,     dx,     dy, 1 - dz),
-        (ix1, iy0, iz1,     dx, 1 - dy,     dz),
-        (ix0, iy1, iz1, 1 - dx,     dy,     dz),
-        (ix1, iy1, iz1,     dx,     dy,     dz),
-    ):
-        # int64 promotion is needed because n3 can exceed int32 max for n_grid>=1290;
-        # for n_grid=768 we are well under, but cheap insurance.
-        idx = ax.astype(np.int64) * n_grid * n_grid + ay.astype(np.int64) * n_grid + az
-        flat_view += np.bincount(idx, weights=weights * wx * wy * wz, minlength=n3)
+    N = coords.shape[0]
+
+    n_grid_i64 = np.int64(n_grid)
+    n_grid_sq_i64 = n_grid_i64 * n_grid_i64
+
+    for start in range(0, N, chunk_size):
+        stop = min(start + chunk_size, N)
+        cx = coords[start:stop]
+        w = weights[start:stop]
+
+        fx = cx[:, 0] / cell
+        fy = cx[:, 1] / cell
+        fz = cx[:, 2] / cell
+
+        ix = np.floor(fx).astype(np.int32)
+        iy = np.floor(fy).astype(np.int32)
+        iz = np.floor(fz).astype(np.int32)
+        dx = fx - ix
+        dy = fy - iy
+        dz = fz - iz
+
+        ix0 = ix % n_grid
+        iy0 = iy % n_grid
+        iz0 = iz % n_grid
+        ix1 = (ix + 1) % n_grid
+        iy1 = (iy + 1) % n_grid
+        iz1 = (iz + 1) % n_grid
+
+        for ax, ay, az, wx, wy, wz in (
+            (ix0, iy0, iz0, 1 - dx, 1 - dy, 1 - dz),
+            (ix1, iy0, iz0,     dx, 1 - dy, 1 - dz),
+            (ix0, iy1, iz0, 1 - dx,     dy, 1 - dz),
+            (ix0, iy0, iz1, 1 - dx, 1 - dy,     dz),
+            (ix1, iy1, iz0,     dx,     dy, 1 - dz),
+            (ix1, iy0, iz1,     dx, 1 - dy,     dz),
+            (ix0, iy1, iz1, 1 - dx,     dy,     dz),
+            (ix1, iy1, iz1,     dx,     dy,     dz),
+        ):
+            idx = (
+                ax.astype(np.int64) * n_grid_sq_i64
+                + ay.astype(np.int64) * n_grid_i64
+                + az.astype(np.int64)
+            )
+            np.add.at(flat_view, idx, w * wx * wy * wz)

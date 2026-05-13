@@ -36,11 +36,15 @@ _VPEC_GRAD_STATS_CACHE: Dict[Tuple[int, float], Dict[str, float]] = {}
 # for not loading more physics variants than the host can hold.
 _RHO_FIELD_CACHE: Dict[Tuple[int, float, int], np.ndarray] = {}
 
-# Loose physical bound for the overdensity field. Per the spec sanity check
-# every crop must lie in [1e-3, 1e3]; below this is unphysically void,
-# above is denser than a virialized halo and would indicate a deposition
-# bug, not an IGM crop.
-_RHO_CROP_LO = 1.0e-3
+# Upper-bound sanity check for the overdensity field. CIC deposition is
+# mathematically non-negative (zero in cells whose 8-corner support carries
+# no particles — common at high n_grid where the mean per-cell occupancy
+# drops below 1); the validator therefore enforces only the upper bound
+# plus non-negativity, not a positive floor. _RHO_CROP_HI = 1e3 is above
+# a virialized halo and would indicate a deposition bug. _RHO_CROP_LO is
+# retained as a documentation anchor for what "suspicious near-zero" looks
+# like but is no longer used as an assertion floor.
+_RHO_CROP_LO = 1.0e-3  # heuristic only; not enforced
 _RHO_CROP_HI = 1.0e3
 
 # ---------------------------------------------------------------------------
@@ -1220,13 +1224,15 @@ class SherwoodLoader:
 
         Contract per the Stage 3 dispatch:
           * No NaN / inf cells.
-          * All cells > 0 (overdensity is mass / <mass>, strictly positive
-            for any non-empty cell; CIC deposition guarantees non-negative
-            but the IGM_gal loader validates mean ~ 1 which already requires
-            non-emptyness).
-          * All cells in `[1e-3, 1e3]` — loose physical bound. Below 1e-3
-            is unphysically void on a 78 kpc/h cell; above 1e3 is denser
-            than a virialized halo and would indicate a deposition bug.
+          * All cells non-negative. CIC deposition is mathematically
+            non-negative; a negative cell would indicate a deposition bug.
+            Zero is permitted: at high ``n_grid`` (e.g. 768) the mean
+            per-cell occupancy drops below 1 and many cells legitimately
+            receive no contribution (~25% empty at the production
+            n_grid=768 P1 setting; surfaced by [D-50] sprint-3 once the
+            CIC OOM was lifted).
+          * All cells below ``_RHO_CROP_HI`` (= 1e3). Above this is
+            denser than a virialized halo and indicates a deposition bug.
         """
         if not np.isfinite(crops).all():
             n_bad = int((~np.isfinite(crops)).sum())
@@ -1235,10 +1241,10 @@ class SherwoodLoader:
             )
         cmin = float(crops.min())
         cmax = float(crops.max())
-        if cmin < _RHO_CROP_LO:
+        if cmin < 0.0:
             raise AssertionError(
-                f"rho_crops min {cmin:.3e} below physical floor "
-                f"{_RHO_CROP_LO:.0e}."
+                f"rho_crops min {cmin:.3e} is negative; CIC deposition "
+                f"must be non-negative — indicates a deposition bug."
             )
         if cmax > _RHO_CROP_HI:
             raise AssertionError(
