@@ -74,13 +74,22 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 SHORTHASH=$(cd "${JUNO_WORK}" && git rev-parse --short HEAD 2>/dev/null || echo nogit)
 
 # PI caveat C4 (binding, per 2026-05-13d Juno-dispatch review): the script
-# cp -r's ${JUNO_WORK} to scratch; if ${JUNO_WORK} has uncommitted changes
-# when sbatch fires, those run but SHORTHASH misrepresents what executed.
-# [D-37] honest-reporting hygiene rule for HPC dispatches.
-if [[ -n "$(cd "${JUNO_WORK}" && git status --porcelain)" ]]; then
-  echo "FATAL: JUNO_WORK has uncommitted changes; SHORTHASH=${SHORTHASH} would mislead." >&2
+# cp -r's ${JUNO_WORK} to scratch; if ${JUNO_WORK} has uncommitted CONTENT
+# changes to tracked files when sbatch fires, those run but SHORTHASH
+# misrepresents what executed. [D-37] honest-reporting hygiene rule for HPC
+# dispatches.
+#
+# Refinement (2026-05-14, first-Juno-dispatch-feedback): use
+# --untracked-files=no to ignore safe untracked artifacts (old .err/.out
+# logs, backup files, cloud_runs/). Rely on `git config core.fileMode false`
+# on Juno-side .git/config to ignore mode-only changes (Juno workflow
+# chmod's some scripts executable without committing). The remaining
+# tracked-content diff is the only thing that can mis-represent what
+# executed.
+if [[ -n "$(cd "${JUNO_WORK}" && git status --porcelain --untracked-files=no)" ]]; then
+  echo "FATAL: JUNO_WORK has uncommitted CONTENT changes; SHORTHASH=${SHORTHASH} would mislead." >&2
   echo "Commit (or stash) before sbatch. Output of git status:" >&2
-  (cd "${JUNO_WORK}" && git status --short) >&2
+  (cd "${JUNO_WORK}" && git status --short --untracked-files=no) >&2
   exit 9
 fi
 
