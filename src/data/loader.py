@@ -40,12 +40,25 @@ _RHO_FIELD_CACHE: Dict[Tuple[int, float, int], np.ndarray] = {}
 # mathematically non-negative (zero in cells whose 8-corner support carries
 # no particles — common at high n_grid where the mean per-cell occupancy
 # drops below 1); the validator therefore enforces only the upper bound
-# plus non-negativity, not a positive floor. _RHO_CROP_HI = 1e3 is above
-# a virialized halo and would indicate a deposition bug. _RHO_CROP_LO is
+# plus non-negativity, not a positive floor. _RHO_CROP_LO is
 # retained as a documentation anchor for what "suspicious near-zero" looks
 # like but is no longer used as an assertion floor.
+#
+# _RHO_CROP_HI was previously 1.0e3 (calibrated against a virialized-halo
+# benchmark). At n_grid=768 production CIC (80 kpc voxel), individual
+# filament cores and intra-halo gas peaks legitimately reach
+# rho/<rho> ~ 1e4-1e5 (cf. Bolton+2017 §3 SPH density distributions at
+# this resolution). The 1e3 ceiling rejected real data in sprint-4
+# 30-epoch first dispatch (observed max 2.04e+04 on the P1 hold-out
+# crops; data-engineer verification at n_grid=64 had max ~389, but max
+# scales ~50x from n_grid=64 to n_grid=768 due to sharper filament
+# peaks at higher resolution). Relaxed to 1e6 (2026-05-13c) — high
+# enough to admit real filament cores, low enough to still catch
+# overflow / unit-conversion bugs (e.g., 1e20 would still fire).
+# Analogous to the [D-50] sprint-3 _RHO_CROP_LO deviation: validator
+# was too tight, surfaced (not caused) by the production-scale path.
 _RHO_CROP_LO = 1.0e-3  # heuristic only; not enforced
-_RHO_CROP_HI = 1.0e3
+_RHO_CROP_HI = 1.0e6  # relaxed from 1.0e3 per 2026-05-13c; see comment above
 
 # ---------------------------------------------------------------------------
 # Disk-cache for CIC-deposited rho/<rho> fields (Sprint-1 of [D-46]/[D-47]
@@ -1053,7 +1066,8 @@ class SherwoodLoader:
         seed: int = 42,
         n_grid: int = 768,
         max_rejections: int = 100_000,
-    ) -> Tuple["torch.Tensor", "torch.Tensor", np.ndarray]:
+        return_positions: bool = False,
+    ):
         """Extract crops whose voxel support is wholly within ``region``.
 
         Sprint-2 [D-49] companion to :meth:`extract_rho_crops`. Straddling
@@ -1073,6 +1087,15 @@ class SherwoodLoader:
         max_rejections : int
             Upper bound on rejected draws before raising ``RuntimeError``.
             Catches pathological combinations of ``region`` and ``crop_size``.
+        return_positions : bool, default False
+            If True, additionally return per-crop CIC corner positions
+            (integer voxel indices on axes 0, 1, 2). Added under [D-52]
+            amendment 8 to enable block-bootstrap CI computation in
+            ``src.analysis.conditional_accuracy.block_bootstrap_accuracy_ci``
+            on the (axis_1, axis_2) plane (axis-0 is the [D-49] held-out
+            split direction so blocks span the perpendicular plane).
+            Backwards-compatible: default returns the same 3-tuple as
+            before; ``return_positions=True`` returns a 4-tuple.
 
         Returns
         -------
@@ -1081,6 +1104,10 @@ class SherwoodLoader:
         distances : np.ndarray (n_crops,) float32 — per-crop
             distance_to_train_region evaluated at the crop CENTER in
             normalized box coords. 0 for ``region="train"``; > 0 otherwise.
+        positions : np.ndarray (n_crops, 3) int64, ONLY IF
+            ``return_positions=True`` — integer-valued CIC corner positions
+            (corner_x, corner_y, corner_z) in voxel units on the n_grid
+            field. Positions are absolute coordinates on [0, n_grid).
         """
         # ---- argument validation
         if physics_id not in self.physics_models:
@@ -1215,6 +1242,12 @@ class SherwoodLoader:
         labels_t = torch.full(
             (n_crops,), fill_value=int(physics_id), dtype=torch.long
         )
+        if return_positions:
+            # accepted is (n_crops, 3) int64 holding integer CIC corner
+            # voxel indices on axes (0, 1, 2). Return a copy so the caller
+            # cannot mutate the loader's internal buffer.
+            positions = np.array(accepted, dtype=np.int64, copy=True)
+            return crops_t, labels_t, distances, positions
         return crops_t, labels_t, distances
 
     @staticmethod
@@ -1231,8 +1264,12 @@ class SherwoodLoader:
             receive no contribution (~25% empty at the production
             n_grid=768 P1 setting; surfaced by [D-50] sprint-3 once the
             CIC OOM was lifted).
-          * All cells below ``_RHO_CROP_HI`` (= 1e3). Above this is
-            denser than a virialized halo and indicates a deposition bug.
+          * All cells below ``_RHO_CROP_HI`` (= 1e6 post-2026-05-13c).
+            Above this is denser than the densest unresolved filament
+            cores at n_grid=768 (~1e5 peak) and indicates a deposition
+            bug — overflow, sign-flip, or unit-conversion error. The
+            previous 1e3 ceiling rejected real n_grid=768 production
+            data in sprint-4 first dispatch; see module-level comment.
         """
         if not np.isfinite(crops).all():
             n_bad = int((~np.isfinite(crops)).sum())

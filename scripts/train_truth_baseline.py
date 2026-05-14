@@ -41,6 +41,10 @@ if _REPO not in sys.path:
     sys.path.insert(0, _REPO)
 
 from src.analysis.conditional_accuracy import (
+    DEFAULT_BLOCK_SIZE_VOXELS,
+    GATE_E_ESCALATION_BAND_LOW,
+    GATE_E_MARGIN_PP,
+    block_bootstrap_accuracy_ci,
     bootstrap_accuracy_ci,
     compute_quintile_edges,
     evaluate_trivial_baseline_accuracy,
@@ -145,13 +149,18 @@ def draw_split_crops(
     crop_size: int,
     n_grid: int,
     seed: int,
-) -> tuple[torch.Tensor, torch.Tensor, np.ndarray]:
+    return_positions: bool = False,
+):
     """Draw `n_per_physics` crops per physics from a region. Returns
-    (crops, labels, distances) concatenated across the 4 physics.
+    (crops, labels, distances) concatenated across the 4 physics. When
+    ``return_positions=True``, additionally returns the per-crop CIC
+    corner positions (n_total, 3) int64 — required for the [D-52]
+    amendment 8 block-bootstrap CI.
     """
     all_crops, all_labels, all_dists = [], [], []
+    all_positions: list[np.ndarray] = []
     for physics_id in (1, 2, 3, 4):
-        crops, labels, dists = loader.extract_rho_crops_split(
+        result = loader.extract_rho_crops_split(
             physics_id=physics_id,
             redshift=0.300,
             crop_size=crop_size,
@@ -160,11 +169,24 @@ def draw_split_crops(
             scheme=DEFAULT_SCHEME,
             seed=seed,
             n_grid=n_grid,
+            return_positions=return_positions,
         )
+        if return_positions:
+            crops, labels, dists, positions = result
+            all_positions.append(np.asarray(positions, dtype=np.int64))
+        else:
+            crops, labels, dists = result
         # Labels in loader come back as physics_id (1..4); shift to 0..3.
         all_crops.append(crops)
         all_labels.append((labels - 1).to(torch.long))
         all_dists.append(np.asarray(dists, dtype=np.float64))
+    if return_positions:
+        return (
+            torch.cat(all_crops, dim=0),
+            torch.cat(all_labels, dim=0),
+            np.concatenate(all_dists),
+            np.concatenate(all_positions, axis=0),
+        )
     return (
         torch.cat(all_crops, dim=0),
         torch.cat(all_labels, dim=0),
@@ -285,10 +307,12 @@ def main() -> int:
     print(f"[sprint4] mode={'SMOKE' if args.smoke else 'FULL'}")
 
     if args.smoke:
-        # Smoke overrides for fast wiring check
-        args.n_crops_train = 8
-        args.n_crops_val = 4
-        args.n_crops_test = 4
+        # Smoke overrides for fast wiring check. Sizes are clamped low
+        # but large enough to populate every quintile in the test set
+        # (so the block-bootstrap doesn't return all-NaN per-bin CIs).
+        args.n_crops_train = 32
+        args.n_crops_val = 16
+        args.n_crops_test = 24
         args.epochs = 1
         args.batch_size = 8
         args.n_bootstrap = 100
@@ -319,9 +343,13 @@ def main() -> int:
         loader, region="val", n_per_physics=args.n_crops_val,
         crop_size=args.crop_size, n_grid=args.n_grid, seed=args.seed_val,
     )
-    crops_test, labels_test, dist_test = draw_split_crops(
+    # Test set: pull positions too — needed for the [D-52] amendment 8
+    # block-bootstrap CI (positions are voxel-unit CIC corners on the
+    # n_grid field, axes (0, 1, 2)). Train/val do not need positions.
+    crops_test, labels_test, dist_test, positions_test = draw_split_crops(
         loader, region="test", n_per_physics=args.n_crops_test,
         crop_size=args.crop_size, n_grid=args.n_grid, seed=args.seed_test,
+        return_positions=True,
     )
     print(
         f"[sprint4] dataset built in {time.perf_counter()-t_load:.1f}s - "
@@ -409,20 +437,14 @@ def main() -> int:
     t_train_total = time.perf_counter() - t_train_start
     print(f"[sprint4] training done in {t_train_total:.1f}s")
 
-    if args.smoke:
-        print("[sprint4] SMOKE mode: skipping full eval + gates")
-        smoke_summary = {
-            "run_id": run_id,
-            "mode": "smoke",
-            "smoke_steps_completed": True,
-            "no_oom": True,
-            "model_params": n_params,
-            "train_history": train_history,
-        }
-        with open(EVAL_DIR / f"{run_id}_smoke.json", "w", encoding="utf-8") as fh:
-            json.dump(smoke_summary, fh, indent=2, default=str)
-        print(f"[sprint4] smoke OK - wrote {EVAL_DIR/f'{run_id}_smoke.json'}")
-        return 0
+    # Note: smoke mode now FALLS THROUGH to the full-eval path so the
+    # [D-52] amendment-compliant headline.json fields (outcome_branch,
+    # power_calibration, deliverable_framing, scope_disclosure,
+    # prior_work_cites, block-bootstrap CI) are exercised by the wiring
+    # smoke. Sizes are clamped above (n_crops=4/4/4 per physics,
+    # n_bootstrap=100). A separate {run_id}_smoke.json marker is still
+    # written below to confirm smoke completion + the new field
+    # surfaces.
 
     # ----- 4) Load best checkpoint + write r_bin_edges -----------------
     ckpt_path = CKPT_DIR / "resnet18_3d_4class_best.pt"
@@ -449,6 +471,58 @@ def main() -> int:
     )
     triplet = headline_triplet(boot)
 
+    # [D-52] amendment 8: block-bootstrap CI side-by-side with the IID
+    # crop-unit bootstrap (Politis & Romano 1994; Norberg et al. 2009).
+    # Block size = 64 voxels at n_grid=768 ~= 5 h^{-1} Mpc ~= 2x [D-13]
+    # gate scale, applied on the (axis_1, axis_2) plane perpendicular to
+    # the [D-49] held-out axis-0 slab.
+    print(f"[sprint4] running block-bootstrap CI side-by-side "
+          f"(block_size_voxels={DEFAULT_BLOCK_SIZE_VOXELS}, "
+          f"n_bootstrap={args.n_bootstrap}) ...")
+    block_boot = block_bootstrap_accuracy_ci(
+        test_preds, test_truths, dist_test, edges,
+        crop_positions=positions_test,
+        block_size_voxels=DEFAULT_BLOCK_SIZE_VOXELS,
+        n_bootstrap=args.n_bootstrap, alpha=args.alpha,
+        seed=args.seed_test + 17,
+    )
+    block_triplet = headline_triplet(block_boot)
+
+    # Side-by-side comparison: if max |ord_ci_low - block_ci_low| across
+    # the 5 quintiles > 0.02, the block-bootstrap is the headline.
+    diffs = []
+    for k in range(5):
+        ord_lo = boot["per_bin"][k].get("ci_low")
+        blk_lo = block_boot["per_bin"][k].get("ci_low")
+        if ord_lo is not None and blk_lo is not None \
+                and np.isfinite(ord_lo) and np.isfinite(blk_lo):
+            diffs.append(abs(ord_lo - blk_lo))
+    max_ci_low_diff = float(max(diffs)) if diffs else float("nan")
+    use_block_as_headline = bool(
+        np.isfinite(max_ci_low_diff) and max_ci_low_diff > 0.02
+    )
+    bootstrap_comparison = {
+        "max_ci_low_abs_diff_across_quintiles": max_ci_low_diff,
+        "threshold_for_block_as_headline": 0.02,
+        "block_bootstrap_is_headline": use_block_as_headline,
+        "note": (
+            "Per [D-52] amendment 8: if max |ord_ci_low - block_ci_low| "
+            "across the 5 quintiles > 0.02, the block-bootstrap CI is the "
+            "headline number (the IID bootstrap underestimates CI width on "
+            "the spatially-correlated Sherwood rho field). Otherwise the "
+            "two CIs are reported side-by-side without re-ranking."
+        ),
+    }
+    if use_block_as_headline:
+        print(f"[sprint4] block-bootstrap CI is the headline "
+              f"(max ci_low abs diff = {max_ci_low_diff:.4f} > 0.02; "
+              "IID 1k-bootstrap underestimates CI width on this "
+              "spatially-correlated population).")
+    else:
+        print(f"[sprint4] IID 1k-bootstrap and block-bootstrap CIs agree "
+              f"within 0.02 (max ci_low abs diff = {max_ci_low_diff:.4f}); "
+              "reporting both side-by-side without re-ranking.")
+
     cm = compute_confusion_matrix(test_preds, test_truths, num_classes=4)
 
     # ----- 6) Trivial baselines (gate (e)) -----------------------------
@@ -473,12 +547,31 @@ def main() -> int:
     )
 
     resnet_acc = boot["overall"]["accuracy"]
+    # [D-52] amendment 6: AD-5 gate-(e) threshold tightened 5pp -> 10pp.
+    # Margins in [GATE_E_ESCALATION_BAND_LOW, GATE_E_MARGIN_PP) route to
+    # capacity-matched-MLP follow-on escalation (flagged in log + json).
     gate_e1 = evaluate_trivial_baseline_accuracy(
         mean_preds, test_truths, resnet_acc, name="mean-overdensity",
+        margin_pp=GATE_E_MARGIN_PP,
+        escalation_band_low_pp=GATE_E_ESCALATION_BAND_LOW,
     )
     gate_e2 = evaluate_trivial_baseline_accuracy(
         mv_preds, test_truths, resnet_acc, name="mean+variance",
+        margin_pp=GATE_E_MARGIN_PP,
+        escalation_band_low_pp=GATE_E_ESCALATION_BAND_LOW,
     )
+    for gate_label, gate_dict in (("mean-overdensity", gate_e1),
+                                  ("mean+variance", gate_e2)):
+        if gate_dict.get("escalate_to_capacity_matched_mlp"):
+            print(
+                f"[sprint4] AD-5 ESCALATION FLAG (per [D-52] amendment 6): "
+                f"{gate_label} margin = "
+                f"{gate_dict['observed_margin_pp']:.3f} lands in "
+                f"[{GATE_E_ESCALATION_BAND_LOW:.2f}, {GATE_E_MARGIN_PP:.2f}) "
+                "pp band; escalate to capacity-matched-MLP follow-on "
+                "(4th-moment + spectral-energy baseline, ~100 params; "
+                "Loshchilov 2019 precedent) before paper text ships."
+            )
 
     # ----- 7) Five-gate evaluation -------------------------------------
     # (a) sanity floor: overall CI lower bound > 0.50
@@ -529,12 +622,23 @@ def main() -> int:
         "observed_per_bin_accs": finite_accs,
         "is_monotone": is_monotone,
     }
-    # (e) trivial baselines
+    # (e) trivial baselines — AD-5 [D-52] amendment 6 (5pp -> 10pp).
     gate_e = {
         "pass": bool(gate_e1["pass"] and gate_e2["pass"]),
-        "threshold": "both trivial baselines trail ResNet by >= 5 pp",
+        "threshold": (
+            f"both trivial baselines trail ResNet by >= "
+            f"{int(GATE_E_MARGIN_PP * 100)} pp "
+            "(AD-5, [D-52] amendment 6 — tightened from 5 pp under "
+            "R13 scope-lock re-verbing audit)"
+        ),
+        "required_margin_pp": GATE_E_MARGIN_PP,
+        "escalation_band_low_pp": GATE_E_ESCALATION_BAND_LOW,
         "mean_overdensity": gate_e1,
         "mean_variance": gate_e2,
+        "escalate_to_capacity_matched_mlp": bool(
+            gate_e1.get("escalate_to_capacity_matched_mlp")
+            or gate_e2.get("escalate_to_capacity_matched_mlp")
+        ),
     }
 
     gates = {
@@ -545,10 +649,116 @@ def main() -> int:
         "gate_e_trivial_baseline": gate_e,
     }
 
+    # ----- 7b) [D-52] 4-branch outcome routing -------------------------
+    # Per [D-52] amendment 7 pre-committed routing. The decision rule
+    # selects ONE of four branches; the driver continues running and
+    # produces all numbers in every branch — the routing only affects
+    # reporting framing in §3 paper text. Implementation note: the
+    # block-bootstrap-as-headline override (amendment 8) is applied here
+    # — when use_block_as_headline is true, the r_50 CI used for
+    # branching is taken from the block-bootstrap result.
+    headline_per_bin = block_boot["per_bin"] if use_block_as_headline else boot["per_bin"]
+    r50_bin = headline_per_bin[2]
+    r50_ci_low = r50_bin.get("ci_low", float("nan"))
+    process_failure_reasons = []
+    if gate_a.get("pass") is False:
+        process_failure_reasons.append("gate-(a) sanity-floor FAIL")
+    # gate_c is DEFERRED (separate-run determinism check); not a
+    # synchronous process-failure trigger here.
+    # AD-1 anti-leakage lives in tests/test_split_anti_leakage.py and is
+    # checked at test-suite time; recorded here as a top-level marker
+    # for completeness.
+    if not np.isfinite(r50_ci_low):
+        process_failure_reasons.append("r_50 CI lower bound non-finite (training divergence proxy)")
+
+    ad5_pass = bool(gate_e["pass"])
+
+    if process_failure_reasons:
+        outcome_branch = "process_failure"
+        outcome_note = (
+            "sprint-4 measurement infrastructure failed pre-condition(s): "
+            + "; ".join(process_failure_reasons)
+            + ". No A_truth(r) value publishable for this submission cycle."
+        )
+    elif not ad5_pass and gate_e1.get("observed_margin_pp", 0.0) < GATE_E_ESCALATION_BAND_LOW \
+            and gate_e2.get("observed_margin_pp", 0.0) < GATE_E_ESCALATION_BAND_LOW:
+        # Both baselines closer than 5 pp -> hard ceiling-disqualified.
+        outcome_branch = "ceiling_disqualified"
+        outcome_note = (
+            "AD-5 FAIL at >= 10 pp margin (and both trivial baselines "
+            "within the 5 pp band): the deep model cannot beat "
+            "capacity-matched trivials at >= 10 pp on Sherwood 4-class "
+            "crops at 32^3; A_truth(r) reading is anchored to low-order "
+            "moment structure, NOT to feedback-specific 3D content. "
+            "Substantive null result, sec 4 follow-on caveat only."
+        )
+    elif r50_ci_low > 0.87 and ad5_pass:
+        outcome_branch = "above_bar"
+        outcome_note = (
+            "1k-bootstrap CI lower bound at r_50 > 0.87 AND AD-5 PASS "
+            "at >= 10 pp margin -> above-bar reporting per [D-52] "
+            "success-criterion branch (i)."
+        )
+    elif 0.85 <= r50_ci_low <= 0.87:
+        outcome_branch = "indistinguishable_from_bar"
+        outcome_note = (
+            "1k-bootstrap CI lower bound at r_50 in [0.85, 0.87]; "
+            "result reports as indistinguishable from the [D-15] 0.85 bar "
+            "at this n (MDE 0.05 at 80% power per [D-52] amendment 5)."
+        )
+    elif r50_ci_low < 0.85 and ad5_pass:
+        outcome_branch = "below_bar_with_AD5_pass"
+        outcome_note = (
+            f"1k-bootstrap CI lower bound at r_50 = {r50_ci_low:.4f} < 0.85 "
+            "AND AD-5 PASS at >= 10 pp margin -> below empirical reference "
+            f"at value {r50_ci_low:.4f} per [D-37]-ext rule 5 "
+            "symmetric-honesty; A_truth(r) is a probe-classifier "
+            "discriminability lower bound, the IGM-feedback "
+            "discriminability ceiling may be higher under different "
+            "architectures or supervision regimes."
+        )
+    else:
+        # AD-5 fail with one baseline in the escalation band -> ceiling-disqualified.
+        outcome_branch = "ceiling_disqualified"
+        outcome_note = (
+            "AD-5 FAIL at >= 10 pp margin per [D-52] amendment 7 "
+            "ceiling-disqualification routing. Substantive null result, "
+            "sec 4 follow-on caveat only."
+        )
+    print(f"[sprint4] [D-52] outcome routing: {outcome_branch}")
+    print(f"[sprint4] {outcome_note}")
+
+    # ----- 7c) Power calibration block ---------------------------------
+    # Per [D-52] amendment 5: pre-committed MDE / Wilson-score
+    # CI half-width / indistinguishable-from-bar band, documented
+    # alongside the empirical results.
+    power_calibration = {
+        "mde_at_80pct_power": 0.05,
+        "wilson_score_ci_halfwidth_per_quintile": 0.035,
+        "indistinguishable_from_bar_band": [0.85, 0.87],
+        "test_set_n_per_physics": int(args.n_crops_test),
+        "test_set_n_total": int(crops_test.shape[0]),
+        "note": (
+            "Per [D-52] amendment 5: at test-set n ~= 2k crops/physics x "
+            "4 physics ~= 8k total in the [D-49] axis=0 held-out region, "
+            "MDE on A_truth(r) at 80% power ~= 0.05; the gate "
+            "'lower bound > 0.85' is detectable above-or-below only when "
+            "p_hat >= 0.87, leaving a 2-pp band where the result reports "
+            "as 'indistinguishable from the 0.85 bar at this n'. "
+            "Per-quintile (n ~= 400) the Wilson-score 95% CI half-width "
+            "is ~3.5 pp on a binary classifier at p=0.85."
+        ),
+    }
+
     # ----- 8) Write headline.json --------------------------------------
+    # [D-52] amendment 3: probe-classifier discriminability lower-bound
+    # framing in field names (NOT "ceiling"). Per Alain & Bengio 2017 +
+    # Theunissen 2003, classifier accuracy is a lower bound on task
+    # discriminability, not a ceiling on it.
     headline = {
         "run_id": run_id,
-        "spec": "Sprint-4 [D-51] truth-baseline 3D ResNet per design doc \xa7\xa71-12",
+        "spec": "Sprint-4 [D-51] truth-baseline 3D ResNet per design doc "
+                "\xa7\xa71-12 + [D-52] post-pre-review amendments (2026-05-13b)",
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "training_seconds": t_train_total,
         "epochs_completed": ckpt["epoch"] + 1,
@@ -557,9 +767,44 @@ def main() -> int:
         "best_val_loss": best_val_loss,
         "best_val_acc": ckpt["val_acc"],
         "test_loss": test_loss,
+        # ---- [D-52] amendment 7: 4-branch outcome routing (top-level)
+        "outcome_branch": outcome_branch,
+        "outcome_note": outcome_note,
+        # ---- [D-52] amendment 3: framing fields (top-level)
+        "deliverable_framing": (
+            "probe-classifier discriminability lower bound on Sherwood "
+            "physics-recipe signature at z=0.3 in truth rho field at "
+            "crop=32^3"
+        ),
+        "scope_disclosure": (
+            "the 0.85 bar is project-internal per [D-36]; no external "
+            "observational anchor"
+        ),
+        "prior_work_cites": [
+            "bolton2017sherwood (1D flux-stat scale)",
+            "irsic2017lyman (cross-physics P_F differential)",
+        ],
+        # ---- [D-52] amendment 5: power-calibration block
+        "power_calibration": power_calibration,
+        # ---- [D-52] amendment 8: side-by-side bootstrap CIs
+        "test_overall_ordinary_bootstrap": boot["overall"],
+        "test_per_bin_ordinary_bootstrap": boot["per_bin"],
+        "test_overall_block_bootstrap": block_boot["overall"],
+        "test_per_bin_block_bootstrap": block_boot["per_bin"],
+        "headline_triplet_ordinary_bootstrap": triplet,
+        "headline_triplet_block_bootstrap": block_triplet,
+        "block_bootstrap_metadata": {
+            "block_size_voxels": block_boot.get("block_size_voxels"),
+            "n_blocks": block_boot.get("n_blocks"),
+            "mean_crops_per_block": block_boot.get("mean_crops_per_block"),
+            "cite": "Politis & Romano 1994; Norberg et al. 2009",
+        },
+        "bootstrap_comparison": bootstrap_comparison,
+        # ---- legacy aliases retained for back-compat with sprint-4 readers
         "test_overall": boot["overall"],
         "test_per_bin": boot["per_bin"],
         "headline_triplet": triplet,
+        # ---- standard fields
         "r_bin_edges": [float(e) for e in edges],
         "r_bin_edges_sha256": edges_sha,
         "confusion_matrix": cm.tolist(),
@@ -579,12 +824,31 @@ def main() -> int:
                    "col_label": "predicted physics_id"}, fh, indent=2)
 
     # ----- 9) Summary print --------------------------------------------
-    print("\n[sprint4] HEADLINE Â(r) triplet:")
-    for k, v in triplet.items():
-        ci = f"[{v['ci_low']:.3f}, {v['ci_high']:.3f}]" if v.get("ci_low") is not None else "[n/a]"
-        print(f"  r_{k}: Â = {v['accuracy']:.4f} {ci}  (r_center = {v.get('r_center', float('nan')):.4f}, n_crops = {v['n_crops']})")
+    # ASCII-only ("A_hat" not "Â"); the Windows console cp949
+    # codepage cannot encode the Latin-1 hat.
+    print("\n[sprint4] HEADLINE A_hat(r) triplet "
+          "(probe-classifier discriminability lower bound, per [D-52] "
+          "amendment 3 -- Alain & Bengio 2017; Theunissen 2003):")
+    print("  ordinary 1k-bootstrap | block-bootstrap (block=64 vox)")
+    for k in ("25", "50", "75"):
+        v_ord = triplet[k]
+        v_blk = block_triplet[k]
+        ord_ci = (f"[{v_ord['ci_low']:.3f}, {v_ord['ci_high']:.3f}]"
+                  if v_ord.get("ci_low") is not None else "[n/a]")
+        blk_ci = (f"[{v_blk['ci_low']:.3f}, {v_blk['ci_high']:.3f}]"
+                  if v_blk.get("ci_low") is not None else "[n/a]")
+        print(f"  r_{k}: A_hat = {v_ord['accuracy']:.4f}  "
+              f"ord {ord_ci}  blk {blk_ci}  "
+              f"(r_center = {v_ord.get('r_center', float('nan')):.4f}, "
+              f"n_crops = {v_ord['n_crops']})")
     o = boot["overall"]
-    print(f"  overall: Â = {o['accuracy']:.4f}  CI [{o['ci_low']:.3f}, {o['ci_high']:.3f}]  (n_crops = {o['n_crops']})")
+    o_blk = block_boot["overall"]
+    print(f"  overall: A_hat = {o['accuracy']:.4f}  "
+          f"ord [{o['ci_low']:.3f}, {o['ci_high']:.3f}]  "
+          f"blk [{o_blk['ci_low']:.3f}, {o_blk['ci_high']:.3f}]  "
+          f"(n_crops = {o['n_crops']})")
+    print(f"\n[sprint4] [D-52] outcome routing: {outcome_branch}")
+    print(f"  {outcome_note}")
     print(f"\n[sprint4] 5-gate summary:")
     for name, g in gates.items():
         if g["pass"] is None:
@@ -600,6 +864,42 @@ def main() -> int:
     print(f"  confusion mat : {cm_path}")
     print(f"  training log  : {training_log_path}")
     print(f"  ckpt          : {ckpt_path}")
+
+    if args.smoke:
+        # Smoke marker — companion to the full headline.json, used by
+        # the wiring-smoke acceptance criterion: confirms the smoke
+        # path ran end-to-end through the [D-52] amendment fields.
+        smoke_summary = {
+            "run_id": run_id,
+            "mode": "smoke",
+            "smoke_steps_completed": True,
+            "no_oom": True,
+            "model_params": n_params,
+            "train_history": train_history,
+            "headline_path": str(out_path),
+            "outcome_branch": outcome_branch,
+            "new_fields_present": {
+                "outcome_branch": "outcome_branch" in headline,
+                "power_calibration": "power_calibration" in headline,
+                "deliverable_framing": "deliverable_framing" in headline,
+                "scope_disclosure": "scope_disclosure" in headline,
+                "prior_work_cites": "prior_work_cites" in headline,
+                "block_bootstrap_overall": (
+                    "test_overall_block_bootstrap" in headline
+                ),
+                "block_bootstrap_per_bin": (
+                    "test_per_bin_block_bootstrap" in headline
+                ),
+                "bootstrap_comparison": "bootstrap_comparison" in headline,
+            },
+        }
+        smoke_path = EVAL_DIR / f"{run_id}_smoke.json"
+        with open(smoke_path, "w", encoding="utf-8") as fh:
+            json.dump(smoke_summary, fh, indent=2, default=str)
+        print(f"[sprint4] smoke OK - wrote {smoke_path}")
+        # Smoke does not gate-fail (wiring is the only criterion).
+        return 0
+
     return 0 if all(g.get("pass") for g in gates.values() if g["pass"] is not None) else 1
 
 
