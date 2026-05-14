@@ -328,6 +328,39 @@
 \newcommand{\NHIcoreThreshold}{1.9 \times 10^{18}}   % cm^-2, our saturated-core threshold
 
 % ====================================================================
+% Sprint-4 substrate-discriminability probe (3D ResNet-18 on 32^3 rho crops)
+%   Run: Juno H100, sprint4_1778774878, 2026-05-14.
+%   PROCESS-FAILURE outcome routing: gate-(a) sanity-floor FAIL + gate-(e)
+%   AD-5 trivial-baseline backstop FAIL.  Numbers banked as substrate-scoping
+%   evidence; NOT a headline-claim accuracy.
+% ====================================================================
+
+\newcommand{\SubstrateProbeCropSize}{32}              % voxel cube edge
+\newcommand{\SubstrateProbeBoxMpc}{2.5}               % h^-1 Mpc cube edge at n_grid=768
+\newcommand{\SubstrateProbeVoxelKpc}{80}              % per-voxel comoving edge: 60000/768 ~ 78 kpc/h
+% Precision-tightened 2026-05-14 (B9) so displayed arithmetic is internally
+% consistent: 0.3794 - 0.3679 = 0.0115 = 1.15 pp (matches canonical macro).
+% Underlying eval JSON values: accuracy=0.379375; mean+variance baseline=0.367875.
+\newcommand{\SubstrateProbeAcc}{0.3794}               % 3D ResNet-18 4-class accuracy
+\newcommand{\SubstrateProbeMeanVarAcc}{0.3679}        % 2-scalar [mean, variance] MLP baseline
+\newcommand{\SubstrateProbeMarginPP}{1.15}            % pp gap, ResNet minus mean+var
+\newcommand{\SubstrateProbeADfiveBarPP}{10}           % AD-5 required margin
+\newcommand{\SubstrateProbeChance}{0.250}             % 4-class uniform
+\newcommand{\SubstrateProbeParams}{8.3M}              % 3D ResNet-18 (halved channels); per headline.json model_params=8298916
+% Block-bootstrap CI on Â_overall (block_size = 64 voxels, n_blocks = 144)
+\newcommand{\SubstrateProbeCIblockLo}{0.362}
+\newcommand{\SubstrateProbeCIblockHi}{0.396}
+\newcommand{\SubstrateProbeCIordLo}{0.369}
+\newcommand{\SubstrateProbeCIordHi}{0.390}
+% Per-quintile Â at r_25 / r_50 / r_75 (flat curve, range ~2 pp)
+\newcommand{\SubstrateProbeAccQone}{0.377}            % Â(r_25)
+\newcommand{\SubstrateProbeAccQtwo}{0.386}            % Â(r_50)
+\newcommand{\SubstrateProbeAccQthree}{0.383}          % Â(r_75)
+\newcommand{\SubstrateProbeAccRangePP}{2}             % cross-quintile range ~2 pp
+\newcommand{\SubstrateProbeBlockVoxels}{64}           % block-bootstrap block size
+\newcommand{\SubstrateProbeNcrops}{8000}              % test-set crop count
+
+% ====================================================================
 % Compute footprint
 % ====================================================================
 

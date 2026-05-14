@@ -402,7 +402,9 @@
 % reference replacing colloquial "invariance" verbs in paper text where multiple
 % loss-degenerate basins all reach the supervision target. arXiv:2011.03395 — preprint
 % only (no journal publication); the work has many authors, short-form D'Amour et al. used.
-% TODO: verify DOI (arXiv preprint, no Crossref DOI assigned).
+% VERIFIED 2026-05-14 via arxiv.org/abs/2011.03395: 40-author paper; first authors
+% D'Amour, Heller, Moldovan confirmed; arXiv preprint only, no Crossref DOI (only
+% arXiv DOI 10.48550/arXiv.2011.03395 — omitted as conventional for arXiv-only refs).
 @article{damour2020underspecification,
   title={Underspecification Presents Challenges for Credibility in Modern Machine Learning},
   author={D'Amour, Alexander and Heller, Katherine and Moldovan, Dan and others},
@@ -417,7 +419,8 @@
 % 2:665--673. Cited for the constant-field-collapse mechanism description
 % (loss-degenerate basin reached via a shortcut that satisfies the supervision
 % objective without learning the intended structure).
-% TODO: verify DOI 10.1038/s42256-020-00257-z against publisher record.
+% VERIFIED 2026-05-14 via Nature Mach Intell record: title, 7-author list, vol 2,
+% pp 665-673, year 2020, DOI 10.1038/s42256-020-00257-z all confirmed.
 @article{geirhos2020shortcut,
   title={Shortcut Learning in Deep Neural Networks},
   author={Geirhos, Robert and Jacobsen, Jörn-Henrik and Michaelis, Claudio and Zemel, Richard and Brendel, Wieland and Bethge, Matthias and Wichmann, Felix A.},
@@ -435,7 +438,9 @@
 % a cascade of failures through one filter does not foreclose that filter as
 % an open axis (the upstream-untested-axis acknowledgement for the [D-24]
 % supervision regime).
-% TODO: verify (arXiv preprint, no Crossref DOI assigned).
+% VERIFIED 2026-05-14 via arxiv.org/abs/1803.04585: title, 2-author list (Manheim,
+% Garrabrant), submission year 2018 (last revised 2019) all confirmed; arXiv preprint
+% only, no Crossref DOI.
 @article{manheim_garrabrant2018,
   title={Categorizing Variants of {G}oodhart's {L}aw},
   author={Manheim, David and Garrabrant, Scott},
@@ -457,6 +462,70 @@
   year={2001},
   doi={10.1046/j.1365-8711.2001.04595.x},
   publisher={Oxford University Press}
+}
+
+% Added 2026-05-14 (B9) for the §0 abstract contribution-(iii) sentence + §3
+% substrate-discriminability probe subsection. Iršič et al. 2017, "The Lyman-α
+% forest power spectrum from the XQ-100 Legacy Survey", MNRAS 466, 4332-4345.
+% Cite-context: published cross-physics P_F differential at the 1D Lyα-forest
+% flux-statistic scale, partner to bolton2017sherwood for the prior-art refinement
+% that the 3D-ρ-crop substrate at this scale carries no higher-order signal
+% beyond what two summary moments capture.
+% VERIFIED 2026-05-14 via academic.oup.com MNRAS record: title, 15-author list
+% (Iršič, Viel, Berg, D'Odorico, Haehnelt, Cristiani, Cupani, Kim, López, Ellison,
+% Becker, Christensen, Denney, Worseck, Bolton), vol 466 issue 4 pp 4332-4345
+% (year 2017), DOI 10.1093/mnras/stw3372 all confirmed. Author field kept as
+% short form ("and others") per project bib convention for 15+ author papers
+% (BibTeX renders as "et al." in CVPR ieeenat_fullname.bst format).
+@article{irsic2017xq100,
+  author  = {Ir{\v s}i{\v c}, V. and Viel, M. and Berg, T. A. M. and others},
+  title   = {The Lyman {$\alpha$} forest power spectrum from the {XQ-100} {L}egacy {S}urvey},
+  journal = {Monthly Notices of the Royal Astronomical Society},
+  volume  = {466},
+  number  = {4},
+  pages   = {4332--4345},
+  year    = {2017},
+  doi     = {10.1093/mnras/stw3372},
+  publisher={Oxford University Press}
+}
+
+% Added 2026-05-14 (B9) for the §3 substrate-discriminability probe subsection.
+% Alain & Bengio 2017, "Understanding intermediate layers using linear classifier
+% probes", ICLR 2017 Workshop Track / arXiv:1610.01644. Cite-context: methodology
+% precedent for using a downstream classifier as a discriminability-lower-bound
+% probe on a representation (here: the truth ρ field as the representation, the
+% 4-physics signature as the label).
+% VERIFIED 2026-05-14 via openreview.net/forum?id=HJ4-rAVtl: ICLR 2017 Workshop Track
+% publication confirmed; title and 2-author list (Alain, Bengio) confirmed; entry
+% kept as article-form with arXiv preprint reference per project convention for
+% workshop-track refs without Crossref DOIs.
+@article{alain_bengio2017probing,
+  title={Understanding intermediate layers using linear classifier probes},
+  author={Alain, Guillaume and Bengio, Yoshua},
+  journal={arXiv preprint arXiv:1610.01644},
+  year={2017},
+  eprint={1610.01644},
+  archivePrefix={arXiv}
+}
+
+% Added 2026-05-14 (B9) for the §3 substrate-discriminability probe subsection.
+% Politis & Romano 1994, "The stationary bootstrap", J. Am. Stat. Assoc. 89(428),
+% 1303-1313. Cite-context: block-bootstrap precedent for CI estimation on
+% spatially-autocorrelated data (here: the 3D ρ field; block size = 64 voxels
+% ~ 2x the [D-13] gate scale).
+% VERIFIED 2026-05-14 via tandfonline.com / WebSearch JASA record: title "The
+% Stationary Bootstrap", 2-author list (Politis, Romano), vol 89 issue 428 pp
+% 1303-1313, year 1994, DOI 10.1080/01621459.1994.10476870 all confirmed.
+@article{politis_romano1994,
+  title={The stationary bootstrap},
+  author={Politis, Dimitris N. and Romano, Joseph P.},
+  journal={Journal of the American Statistical Association},
+  volume={89},
+  number={428},
+  pages={1303--1313},
+  year={1994},
+  doi={10.1080/01621459.1994.10476870},
+  publisher={Taylor \& Francis}
 }
 
 % VERIFIED 2026-05-11 via ADS bibcode 2018ApJS..237...31L + IOP article page
