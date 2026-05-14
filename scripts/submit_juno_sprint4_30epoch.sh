@@ -157,6 +157,17 @@ echo "SherwoodIGM_gal/ → $(readlink SherwoodIGM_gal)"
 echo "IGM_gal hdf5 files: ${ACTUAL_HDF5}/${EXPECTED_HDF5} ✓"
 
 # --- 4. Compute ---------------------------------------------------------------
+# Defense-in-depth (2026-05-14 8th-gap fix): wrap the driver in `set +e` so a
+# non-zero exit (legitimate process-failure outcome under prior semantics, or
+# any other code path) does NOT skip the post-run MLflow tagging + PCV
+# copy-out. The driver itself now exits 0 on any successfully-completed
+# outcome routing per the [D-52] 4-branch table, but we keep this defensive
+# wrap so the submit-script invariant "if artifacts exist on disk, copy them
+# out" holds even if a future driver change re-introduces non-zero exits on
+# legitimate outcomes. PCV's own hard-fails (exit codes 2-8) still trigger
+# correctly because they're inside the `set -euo pipefail` region after the
+# `set -e` re-enable below.
+set +e
 python -u scripts/train_truth_baseline.py \
     --crop_size 32 \
     --n_grid 768 \
@@ -178,6 +189,12 @@ python -u scripts/train_truth_baseline.py \
     --redshift "${REDSHIFT}" \
     --device auto \
     --n_bootstrap "${N_BOOTSTRAP}"
+DRIVER_EXIT=$?
+echo "[submit] driver exit code: ${DRIVER_EXIT} (informational; PCV runs regardless)"
+# Re-enable strict-fail mode now that the driver is done. PCV's own
+# explicit exit codes (2-8) still trip the trap; legitimate non-zero from
+# the driver (under historical semantics) no longer skips PCV.
+set -e
 
 # --- 5. Post-run MLflow tag injection (mlflow-run skill contract) -------------
 # train_truth_baseline.py uses its own MLflow setup; we tag the run here so

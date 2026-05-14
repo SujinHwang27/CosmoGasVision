@@ -900,7 +900,20 @@ def main() -> int:
         # Smoke does not gate-fail (wiring is the only criterion).
         return 0
 
-    return 0 if all(g.get("pass") for g in gates.values() if g["pass"] is not None) else 1
+    # Exit-code semantics post-2026-05-14 (8th-gap fix from first-Juno-dispatch
+    # post-mortem): a successfully-completed driver run always exits 0,
+    # regardless of which [D-52] 4-branch outcome routing branch fired
+    # (above-bar / indistinguishable / below-bar-with-AD-5 / process-failure
+    # / ceiling-disqualified). The OUTCOME is tagged in headline.json's
+    # `outcome_branch` field; downstream consumers (paper-text disposition,
+    # MLflow tag injection, PCV) should read that field — NOT the exit code —
+    # to decide framing. The prior `return 0 if all gates pass else 1`
+    # semantics caused the first Juno dispatch's PCV section to skip via
+    # `set -e` even though the run was a legitimate process-failure-outcome
+    # success. Honest reporting: artifacts written ⟹ exit 0. Non-zero exits
+    # reserved for actual runtime exceptions (NaN/OOM/import) where
+    # headline.json would not have been written.
+    return 0
 
 
 if __name__ == "__main__":
