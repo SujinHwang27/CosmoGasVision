@@ -230,3 +230,59 @@ class MeanVarianceBaseline(nn.Module):
         var = flat.var(dim=2, unbiased=False)  # (B, 1)
         feat = torch.cat([mean, var], dim=1)  # (B, 2)
         return self.fc(feat)
+
+
+class MeanVarSkewKurtBaseline(nn.Module):
+    """Sprint-5 (c′) gate (e₂) AD-5 expansion: 4-scalar
+    ``[mean(ρ), var(ρ), skew(ρ), kurtosis_excess(ρ)]``
+    -> FC(4 -> 64 -> 4) with ReLU. Sprint-4 baseline was
+    `[mean, var]`; this 4-scalar baseline preserves the per-voxel
+    information ratio across the 32³ → 48³ substrate transition
+    per design doc v4 \xa78.5 + \xa76 gate-(e) (S3 absorption).
+
+    The four moments are computed per crop on the input tensor; backward
+    pass is fully autograd-compatible (no detached NumPy). Skew + excess
+    kurtosis follow the central-moments definition:
+
+        μ_n = E[(x - μ)^n]
+        skew = μ_3 / σ^3
+        kurt_excess = μ_4 / σ^4 - 3
+    """
+
+    _EPS = 1e-8
+
+    def __init__(self, num_classes: int = 4, hidden_dim: int = 64) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(4, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, num_classes)
+        self.relu = nn.ReLU(inplace=False)
+        for layer in (self.fc1, self.fc2):
+            nn.init.kaiming_normal_(layer.weight, mode="fan_out", nonlinearity="relu")
+            nn.init.constant_(layer.bias, 0.0)
+
+    @staticmethod
+    def _moments(x: torch.Tensor) -> torch.Tensor:
+        """Compute per-crop 4-scalar moment vector.
+
+        ``x`` shape ``(B, 1, D, H, W)`` -> features ``(B, 4)`` with
+        columns ``[mean, var, skew, kurt_excess]``. All ops are
+        torch-native so autograd flows through. ``σ`` is floor-clamped
+        to ``_EPS`` to guard divide-by-zero on a perfectly-constant
+        input (synthetic edge case only).
+        """
+        flat = x.flatten(2)                       # (B, 1, N)
+        mean = flat.mean(dim=2)                   # (B, 1)
+        diff = flat - mean.unsqueeze(2)           # (B, 1, N)
+        var = (diff * diff).mean(dim=2)           # (B, 1)
+        std = torch.sqrt(var.clamp_min(MeanVarSkewKurtBaseline._EPS))
+        mu3 = (diff ** 3).mean(dim=2)             # (B, 1)
+        mu4 = (diff ** 4).mean(dim=2)             # (B, 1)
+        skew = mu3 / (std ** 3)                   # (B, 1)
+        kurt_excess = mu4 / (var.clamp_min(MeanVarSkewKurtBaseline._EPS) ** 2) - 3.0
+        return torch.cat([mean, var, skew, kurt_excess], dim=1)  # (B, 4)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """``x`` shape ``(B, 1, D, H, W)`` -> logits ``(B, num_classes)``."""
+        feat = self._moments(x)                   # (B, 4)
+        h = self.relu(self.fc1(feat))             # (B, hidden)
+        return self.fc2(h)                        # (B, num_classes)

@@ -60,6 +60,7 @@ from src.data.loader import (
 from src.models.cnn3d import (
     MeanOverdensityBaseline,
     MeanVarianceBaseline,
+    MeanVarSkewKurtBaseline,
     resnet18_3d_4class,
 )
 
@@ -115,6 +116,19 @@ def parse_args() -> argparse.Namespace:
                     help="Disable augmentation (e.g., for the determinism gate-(c) check).")
     ap.add_argument("--n_bootstrap", type=int, default=1000)
     ap.add_argument("--alpha", type=float, default=0.05)
+    # ---- Sprint-5 (c′) extensions (design doc v4 §5.1) ----
+    # --crop_size already declared above; default stays 32 for backward
+    # compatibility with the sprint-4 entry. Sprint-5 (c′) sets --crop_size 48.
+    ap.add_argument("--n_seeds", type=int, default=1,
+                    help="Sprint-5 (c') multi-seed protocol. n_seeds > 1 "
+                         "routes through run_sprint5_cprime_substrate_extension.")
+    ap.add_argument("--baseline", type=str, default="mv", choices=["mv", "mvsk"],
+                    help="AD-5 gate-(e2) baseline. 'mv' = [mean, var] sprint-4 "
+                         "(default, backward-compat). 'mvsk' = [mean, var, skew, "
+                         "kurtosis] sprint-5 (c') 4-scalar expansion (S3).")
+    ap.add_argument("--run_tag", type=str, default=None,
+                    help="Optional cloud_runs/<run_tag>/ directory for B2 "
+                         "per-crop JSONL emission. Defaults to run_id.")
     return ap.parse_args()
 
 
@@ -299,8 +313,430 @@ def train_trivial_baseline(
     return model
 
 
+# ---------------------------------------------------------------------------
+# Sprint-5 (c') extension entry — design doc v4 §5.1 (B2 + B3 + A4)
+# ---------------------------------------------------------------------------
+#
+# NAMING-GAP DISCLOSURE: design doc v4 §5.1 table prescribes that the entry
+# point live at ``experiments/nerf/pipeline.py::run_sprint5_cprime_substrate_extension``.
+# In the current code layout ``experiments/nerf/pipeline.py`` is the
+# unrelated NeRF MLP trainer (D-10/D-11/D-13 stage 2b); the sprint-4
+# truth-baseline driver — the legitimate predecessor — lives in this
+# file (``scripts/train_truth_baseline.py``). Per the principle of least
+# disruption (the design doc anchors the predecessor on `main()` here),
+# the (c') entry is defined here alongside the sprint-4 entry rather
+# than migrated cross-module. Backward compat preserved.
+
+@torch.no_grad()
+def _eval_predictions_with_indices(
+    model: nn.Module,
+    crops: torch.Tensor,
+    labels: torch.Tensor,
+    batch_size: int,
+    device: torch.device,
+) -> tuple[np.ndarray, np.ndarray]:
+    """B2 helper: per-crop predictions for the per-crop JSONL log.
+
+    Returns (predictions, ground_truth) ordered by crop index 0..N-1.
+    """
+    model.eval()
+    n = crops.shape[0]
+    preds, truths = [], []
+    for start in range(0, n, batch_size):
+        batch = crops[start : start + batch_size].to(device)
+        y = labels[start : start + batch_size].to(device)
+        logits = model(batch)
+        preds.append(logits.argmax(dim=1).cpu().numpy())
+        truths.append(y.cpu().numpy())
+    return np.concatenate(preds), np.concatenate(truths)
+
+
+def _emit_per_crop_jsonl(
+    out_path: Path,
+    *,
+    resnet_pred: np.ndarray,
+    mvsk_pred: np.ndarray,
+    m1_pred: np.ndarray,
+    truths: np.ndarray,
+) -> None:
+    """B2 (R23-compliance): emit per-crop correctness JSONL per seed.
+
+    Schema (one line per test crop, ordered by crop_idx 0..N-1):
+        {crop_idx: int, true_label: int, resnet_pred: int,
+         mvsk_pred: int, m1_pred: int,
+         resnet_correct: bool, mvsk_correct: bool, m1_correct: bool}
+
+    Required for §4.3 B1 ρ_emp re-routing at (c') eval close.
+    """
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        for i in range(int(truths.shape[0])):
+            row = {
+                "crop_idx": int(i),
+                "true_label": int(truths[i]),
+                "resnet_pred": int(resnet_pred[i]),
+                "mvsk_pred": int(mvsk_pred[i]),
+                "m1_pred": int(m1_pred[i]),
+                "resnet_correct": bool(resnet_pred[i] == truths[i]),
+                "mvsk_correct": bool(mvsk_pred[i] == truths[i]),
+                "m1_correct": bool(m1_pred[i] == truths[i]),
+            }
+            fh.write(json.dumps(row) + "\n")
+
+
+def _run_single_seed(
+    args, *,
+    seed_train: int, seed_val: int, seed_test: int,
+    seed_model: int, seed_aug: int,
+    device: torch.device,
+    loader: SherwoodLoader,
+    run_id: str, seed_label: int,
+    run_tag_dir: Path,
+) -> dict:
+    """One (c') seed end-to-end: draw crops, train ResNet, train
+    [mean] + MVSK trivial baselines, eval on (c') test set, emit B2
+    per-crop JSONL, compute B3 MVSK-at-32cube cross-substrate, write
+    headline_seed_<N>.json.
+
+    Returns a dict containing the headline for this seed. Reuses the
+    sprint-4 helpers (``draw_split_crops``, ``train_one_epoch``,
+    ``eval_predictions``, ``train_trivial_baseline``).
+    """
+    print(f"[sprint5cprime] seed={seed_label} starting "
+          f"(crop_size={args.crop_size}, baseline={args.baseline})")
+    t_seed_start = time.perf_counter()
+
+    # --- data ---
+    crops_train, labels_train, _ = draw_split_crops(
+        loader, region="train", n_per_physics=args.n_crops_train,
+        crop_size=args.crop_size, n_grid=args.n_grid, seed=seed_train,
+    )
+    crops_val, labels_val, _ = draw_split_crops(
+        loader, region="val", n_per_physics=args.n_crops_val,
+        crop_size=args.crop_size, n_grid=args.n_grid, seed=seed_val,
+    )
+    crops_test, labels_test, _, _ = draw_split_crops(
+        loader, region="test", n_per_physics=args.n_crops_test,
+        crop_size=args.crop_size, n_grid=args.n_grid, seed=seed_test,
+        return_positions=True,
+    )
+
+    # --- input rho positivity guard (CLAUDE.md astrophysical conventions) ---
+    for name, c in (("train", crops_train), ("val", crops_val), ("test", crops_test)):
+        if torch.any(c < 0):
+            raise ValueError(f"[sprint5cprime] seed={seed_label}: ρ < 0 in {name} crops")
+
+    # --- model + opt ---
+    torch.manual_seed(seed_model)
+    model = resnet18_3d_4class(in_channels=1, num_classes=4).to(device)
+    optimizer = torch.optim.AdamW(
+        model.parameters(), lr=args.lr_max,
+        betas=(0.9, 0.999), weight_decay=args.weight_decay,
+    )
+    criterion = nn.CrossEntropyLoss()
+    batches_per_epoch = (crops_train.shape[0] + args.batch_size - 1) // args.batch_size
+    total_steps = batches_per_epoch * args.epochs
+    warmup_steps = batches_per_epoch * args.warmup_epochs
+    scheduler = build_lr_schedule(
+        optimizer, args.lr_max, args.lr_min, warmup_steps, total_steps,
+    )
+    augment_cfg = AugmentConfig(enabled=not args.no_augment)
+    rng = np.random.default_rng(seed_train + 7777)
+
+    # --- train ---
+    for epoch in range(args.epochs):
+        train_loss = train_one_epoch(
+            model, crops_train, labels_train, optimizer, scheduler,
+            criterion, epoch=epoch, batch_size=args.batch_size,
+            device=device, augment_cfg=augment_cfg,
+            aug_base_seed=seed_aug, rng=rng,
+        )
+        if epoch == 0 or (epoch + 1) % max(1, args.epochs // 5) == 0:
+            val_preds, val_truths, val_loss = eval_predictions(
+                model, crops_val, labels_val, args.batch_size, device,
+            )
+            val_acc = float((val_preds == val_truths).mean())
+            print(f"[sprint5cprime] seed={seed_label} epoch {epoch+1}/{args.epochs} "
+                  f"train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
+                  f"val_acc={val_acc:.4f}")
+
+    # --- trivial baselines (mean-only + MVSK) ---
+    mean_baseline = train_trivial_baseline(
+        MeanOverdensityBaseline,
+        crops_train, labels_train, crops_val, labels_val,
+        epochs=max(5, args.epochs // 3), batch_size=args.batch_size,
+        lr=1e-3, device=device, seed=seed_model + 1,
+    )
+    mvsk_baseline = train_trivial_baseline(
+        MeanVarSkewKurtBaseline,
+        crops_train, labels_train, crops_val, labels_val,
+        epochs=max(5, args.epochs // 3), batch_size=args.batch_size,
+        lr=1e-3, device=device, seed=seed_model + 2,
+    )
+
+    # --- eval (predictions per crop, ordered) ---
+    resnet_pred, truths = _eval_predictions_with_indices(
+        model, crops_test, labels_test, args.batch_size, device,
+    )
+    mvsk_pred, _ = _eval_predictions_with_indices(
+        mvsk_baseline, crops_test, labels_test, args.batch_size, device,
+    )
+    m1_pred, _ = _eval_predictions_with_indices(
+        mean_baseline, crops_test, labels_test, args.batch_size, device,
+    )
+    resnet_acc = float((resnet_pred == truths).mean())
+    mvsk_acc_48 = float((mvsk_pred == truths).mean())
+    m1_acc = float((m1_pred == truths).mean())
+
+    # --- B2: emit per-crop JSONL ---
+    jsonl_path = run_tag_dir / "eval" / f"per_crop_seed_{seed_label}.jsonl"
+    _emit_per_crop_jsonl(
+        jsonl_path,
+        resnet_pred=resnet_pred, mvsk_pred=mvsk_pred,
+        m1_pred=m1_pred, truths=truths,
+    )
+    print(f"[sprint5cprime] seed={seed_label} B2 JSONL: {jsonl_path}")
+
+    # --- B3: MVSK accuracy at sprint-4 32^3 test set (A4 disclosure) ---
+    # Re-extract sprint-4 32³ crops from Sherwood ρ at n_grid=768 on
+    # [D-49] split with seed=42 (sprint-4's anchor; design doc v4 §5.1
+    # B3 row). Train an MVSK FC(4→64→4) classifier on sprint-4 32³ train
+    # crops, eval on sprint-4 32³ test crops.
+    #
+    # B3 requires crop_size=32 on the same n_grid; in SMOKE mode the
+    # clamp shrinks n_grid below the val/test region width for a 32³
+    # crop, so B3 is skipped (the production n_grid=768 path is the
+    # binding spec). The skipped run flags ``mvsk_at_32cube=None`` and
+    # the A4 disclosure becomes "B3 deferred (smoke)".
+    # Skip B3 in SMOKE mode (the clamped n_grid cannot host 32³ crops
+    # on the val/test region; the binding spec is at production
+    # n_grid=768).
+    skip_b3 = bool(args.smoke)
+    if skip_b3:
+        print(f"[sprint5cprime] seed={seed_label} B3: SKIPPED (smoke mode)")
+        mvsk_acc_32 = None
+        mvsk_threshold_tightened = False
+    else:
+        print(f"[sprint5cprime] seed={seed_label} B3: MVSK-at-32cube cross-substrate")
+        s4_seed_train = 42
+        s4_seed_val = 142
+        s4_seed_test = 242
+        s4_crops_train, s4_labels_train, _ = draw_split_crops(
+            loader, region="train", n_per_physics=args.n_crops_train,
+            crop_size=32, n_grid=args.n_grid, seed=s4_seed_train,
+        )
+        s4_crops_val, s4_labels_val, _ = draw_split_crops(
+            loader, region="val", n_per_physics=args.n_crops_val,
+            crop_size=32, n_grid=args.n_grid, seed=s4_seed_val,
+        )
+        s4_crops_test, s4_labels_test, _ = draw_split_crops(
+            loader, region="test", n_per_physics=args.n_crops_test,
+            crop_size=32, n_grid=args.n_grid, seed=s4_seed_test,
+        )
+        mvsk_at_32 = train_trivial_baseline(
+            MeanVarSkewKurtBaseline,
+            s4_crops_train, s4_labels_train, s4_crops_val, s4_labels_val,
+            epochs=max(5, args.epochs // 3), batch_size=args.batch_size,
+            lr=1e-3, device=device, seed=seed_model + 3,
+        )
+        s4_mvsk_pred, _ = _eval_predictions_with_indices(
+            mvsk_at_32, s4_crops_test, s4_labels_test, args.batch_size, device,
+        )
+        mvsk_acc_32 = float((s4_mvsk_pred == s4_labels_test.numpy()).mean())
+        # A4 disclosure logic (design doc v4 §6 gate-(e) footnote)
+        mvsk_threshold_tightened = bool(mvsk_acc_32 >= 0.42)
+
+    # --- AD-5 gate-(e) margins ---
+    ad5_margin_pp = resnet_acc - mvsk_acc_48   # 4-scalar baseline at 48³
+    gate_e_pass = bool(ad5_margin_pp >= 0.10)
+
+    headline_seed = {
+        "run_id": run_id,
+        "seed_label": int(seed_label),
+        "crop_size": int(args.crop_size),
+        "baseline": args.baseline,
+        "spec": "Sprint-5 (c') substrate extension; design doc v4 §5.1",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "seed_train": int(seed_train),
+        "seed_val": int(seed_val),
+        "seed_test": int(seed_test),
+        "seed_model": int(seed_model),
+        "seed_aug": int(seed_aug),
+        "epochs_completed": int(args.epochs),
+        "training_seconds": float(time.perf_counter() - t_seed_start),
+        "resnet_overall_accuracy": resnet_acc,
+        "mvsk_at_48cube": mvsk_acc_48,
+        "mvsk_at_32cube": mvsk_acc_32,
+        "mvsk_threshold_tightened": mvsk_threshold_tightened,
+        "mvsk_at_32cube_threshold": 0.42,
+        "mean_only_baseline_at_48cube": m1_acc,
+        "ad5_margin_resnet_minus_mvsk_pp": float(ad5_margin_pp),
+        "ad5_gate_e_pass": gate_e_pass,
+        "per_crop_jsonl_path": str(jsonl_path),
+        "n_test_crops": int(truths.shape[0]),
+        "a4_disclosure": (
+            "MVSK-at-32cube >= 0.42 -> 10pp AD-5 threshold silently tightened "
+            "relative to sprint-4 [mean, var]=0.368 baseline (S3 absorption; "
+            "design doc v4 §6 gate-(e))."
+            if mvsk_threshold_tightened else
+            "MVSK-at-32cube < 0.42 -> 10pp AD-5 threshold not tightened "
+            "relative to sprint-4 baseline (design doc v4 §6 gate-(e))."
+        ),
+    }
+    out_path = run_tag_dir / "eval" / f"headline_seed_{seed_label}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(headline_seed, fh, indent=2, default=str)
+    mvsk_at_32_str = f"{mvsk_acc_32:.4f}" if mvsk_acc_32 is not None else "skipped"
+    print(f"[sprint5cprime] seed={seed_label} done in "
+          f"{time.perf_counter()-t_seed_start:.1f}s "
+          f"A_resnet={resnet_acc:.4f} MVSK@48={mvsk_acc_48:.4f} "
+          f"MVSK@32={mvsk_at_32_str} margin={ad5_margin_pp*100:.2f}pp "
+          f"tightened={mvsk_threshold_tightened}")
+    return headline_seed
+
+
+def run_sprint5_cprime_substrate_extension(
+    crop_size: int = 48,
+    n_seeds: int = 5,
+    baseline: str = "mvsk",
+    args=None,
+) -> dict:
+    """Sprint-5 (c') substrate-extension entry per design doc v4 §5.1.
+
+    Loops over k=5 seeds (42, 142, 242, 342, 442), emits per-seed
+    headlines + per-seed B2 per-crop JSONLs, and a top-level
+    headline.json with seed-averaged Â_overall and AD-5 margins.
+
+    Backward-compat: when ``crop_size=32, n_seeds=1, baseline='mv'``
+    the function should NOT be invoked — the sprint-4 path in
+    ``main()`` is the entry. The function asserts these are not the
+    sprint-4 defaults to prevent accidental misroute.
+    """
+    if args is None:
+        raise ValueError("run_sprint5_cprime_substrate_extension requires "
+                         "args (parsed CLI namespace) — call via main().")
+    if baseline != "mvsk":
+        print(f"[sprint5cprime] WARNING: baseline={baseline} but design "
+              "doc v4 §6 specifies MVSK 4-scalar AD-5 expansion.")
+
+    device = pick_device(args.device)
+    run_id = f"sprint5cprime_{int(time.time())}"
+    run_tag = args.run_tag if args.run_tag else run_id
+    run_tag_dir = Path(_REPO) / "cloud_runs" / run_tag
+    print(f"[sprint5cprime] run_id={run_id} run_tag={run_tag} device={device}")
+    print(f"[sprint5cprime] crop_size={crop_size} n_seeds={n_seeds} "
+          f"baseline={baseline}")
+
+    if args.smoke:
+        # Smoke clamp for wiring — synthetic per-physics fields, tiny
+        # crop count, single epoch — but exercises B2 + B3 end-to-end.
+        args.n_crops_train = 16
+        args.n_crops_val = 8
+        args.n_crops_test = 12
+        args.epochs = 1
+        args.batch_size = 4
+        args.crop_size = max(8, min(crop_size, 16))
+        args.n_grid = 128
+        _inject_synthetic_rho_fields(n_grid=args.n_grid, redshift=args.redshift)
+        print(f"[sprint5cprime] SMOKE clamp: crop_size={args.crop_size} "
+              f"n_grid={args.n_grid}")
+    else:
+        args.crop_size = crop_size
+
+    loader = SherwoodLoader(data_root=str(Path(_REPO) / "Sherwood"))
+
+    SEED_SCHEDULE = [42, 142, 242, 342, 442][:n_seeds]
+    seed_headlines: list[dict] = []
+    for k, seed_base in enumerate(SEED_SCHEDULE):
+        seed_headlines.append(_run_single_seed(
+            args,
+            seed_train=seed_base, seed_val=seed_base + 100,
+            seed_test=seed_base + 200, seed_model=seed_base,
+            seed_aug=seed_base,
+            device=device, loader=loader,
+            run_id=run_id, seed_label=seed_base,
+            run_tag_dir=run_tag_dir,
+        ))
+
+    # ---- seed-averaged top-level headline ----
+    A_resnet = float(np.mean([h["resnet_overall_accuracy"] for h in seed_headlines]))
+    A_mvsk_48 = float(np.mean([h["mvsk_at_48cube"] for h in seed_headlines]))
+    mvsk_32_vals = [h["mvsk_at_32cube"] for h in seed_headlines
+                    if h["mvsk_at_32cube"] is not None]
+    A_mvsk_32 = float(np.mean(mvsk_32_vals)) if mvsk_32_vals else None
+    margin_avg = A_resnet - A_mvsk_48
+    headline = {
+        "run_id": run_id,
+        "run_tag": run_tag,
+        "spec": "Sprint-5 (c') 48³ substrate extension per design doc v4 §5.1",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "crop_size": int(crop_size),
+        "n_seeds": int(n_seeds),
+        "baseline": baseline,
+        "seed_schedule": SEED_SCHEDULE,
+        "seed_averaged_resnet_accuracy": A_resnet,
+        "seed_averaged_mvsk_at_48cube": A_mvsk_48,
+        "seed_averaged_mvsk_at_32cube": A_mvsk_32,
+        "seed_averaged_ad5_margin_pp": float(margin_avg),
+        "ad5_gate_e_pass_seed_averaged": bool(margin_avg >= 0.10),
+        "mvsk_threshold_tightened_any_seed": bool(
+            any(h["mvsk_threshold_tightened"] for h in seed_headlines)
+        ),
+        "per_seed_summaries": [
+            {
+                "seed_label": h["seed_label"],
+                "resnet_overall_accuracy": h["resnet_overall_accuracy"],
+                "mvsk_at_48cube": h["mvsk_at_48cube"],
+                "mvsk_at_32cube": h["mvsk_at_32cube"],
+                "ad5_margin_pp": h["ad5_margin_resnet_minus_mvsk_pp"],
+                "ad5_gate_e_pass": h["ad5_gate_e_pass"],
+                "mvsk_threshold_tightened": h["mvsk_threshold_tightened"],
+            }
+            for h in seed_headlines
+        ],
+    }
+    out_path = run_tag_dir / "eval" / "headline.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        json.dump(headline, fh, indent=2, default=str)
+    print(f"[sprint5cprime] DONE. Seed-averaged: "
+          f"A_resnet={A_resnet:.4f} A_mvsk@48={A_mvsk_48:.4f} "
+          f"margin={margin_avg*100:.2f}pp "
+          f"gate_e_pass={headline['ad5_gate_e_pass_seed_averaged']}")
+    print(f"[sprint5cprime] headline: {out_path}")
+    return headline
+
+
+def run_sprint4_truth_baseline() -> int:
+    """Sprint-4 backward-compat entry. Identical to legacy ``main()``."""
+    return _legacy_sprint4_main()
+
+
 def main() -> int:
     args = parse_args()
+    # Route: sprint-5 (c') if any sprint-5 flag is set, else sprint-4 legacy.
+    is_sprint5 = (
+        args.n_seeds > 1 or args.baseline == "mvsk" or args.crop_size != 32
+    )
+    if is_sprint5:
+        run_sprint5_cprime_substrate_extension(
+            crop_size=args.crop_size,
+            n_seeds=args.n_seeds,
+            baseline=args.baseline,
+            args=args,
+        )
+        return 0
+    return _legacy_sprint4_main(args)
+
+
+def _legacy_sprint4_main(args=None) -> int:
+    """Sprint-4 [D-51] driver — legacy entry preserved verbatim from the
+    pre-sprint-5 main() (D-52 amendments + block-bootstrap CI intact).
+    Routed through when crop_size=32, n_seeds=1, baseline='mv'.
+    """
+    if args is None:
+        args = parse_args()
     device = pick_device(args.device)
     run_id = f"sprint4_{int(time.time())}"
     print(f"[sprint4] run_id={run_id} device={device}")

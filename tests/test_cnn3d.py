@@ -15,6 +15,7 @@ from src.models.cnn3d import (
     BasicBlock3D,
     MeanOverdensityBaseline,
     MeanVarianceBaseline,
+    MeanVarSkewKurtBaseline,
     ResNet3D,
     resnet18_3d_4class,
 )
@@ -122,6 +123,71 @@ def test_mean_variance_baseline_two_scalar_features():
     out = net(x)
     assert out.shape == (8, 4)
     assert net.fc.in_features == 2
+
+
+# -------------------- sprint-5 (c') 48³ + MVSK contracts --------------------
+
+def test_resnet3d_forward_48cube():
+    """Sprint-5 (c') design doc v4 §5.1: input (B=2, 1, 48, 48, 48) ->
+    output (B=2, 4); param count matches sprint-4 architecture (the
+    architecture is crop-size-invariant — same parameters used).
+    """
+    net = resnet18_3d_4class(in_channels=1, num_classes=4)
+    net.eval()
+    x = torch.randn(2, 1, 48, 48, 48)
+    out = net(x)
+    assert out.shape == (2, 4), f"expected (2, 4), got {tuple(out.shape)}"
+    assert torch.isfinite(out).all()
+    # Param count: same as sprint-4 (~8.3M canonical).
+    n_params = sum(p.numel() for p in net.parameters())
+    assert 5_000_000 <= n_params <= 25_000_000, (
+        f"param count {n_params:,} outside expected 5M-25M envelope"
+    )
+
+
+def test_mvsk_baseline_forward():
+    """Sprint-5 (c') design doc v4 §5.1: MVSK baseline at both 32³ + 48³,
+    and verify moment computation is correct on synthetic fields.
+    """
+    # Shape contract at 32³ and 48³.
+    for D in (32, 48):
+        net = MeanVarSkewKurtBaseline(num_classes=4)
+        x = torch.randn(2, 1, D, D, D) + 1.0
+        out = net(x)
+        assert out.shape == (2, 4), f"D={D}: shape {tuple(out.shape)}"
+        assert torch.isfinite(out).all()
+        assert net.fc1.in_features == 4
+
+    # Moment correctness on a synthetic Gaussian field
+    # (mean ~ 0, var ~ 1, skew ~ 0, kurt_excess ~ 0).
+    torch.manual_seed(20260515)
+    x_gauss = torch.randn(1, 1, 48, 48, 48)  # ~ N(0, 1)
+    moments_gauss = MeanVarSkewKurtBaseline._moments(x_gauss)
+    m, v, s, k = moments_gauss[0].tolist()
+    assert abs(m) < 0.05, f"gaussian mean expected ~0, got {m}"
+    assert abs(v - 1.0) < 0.05, f"gaussian var expected ~1, got {v}"
+    assert abs(s) < 0.10, f"gaussian skew expected ~0, got {s}"
+    assert abs(k) < 0.20, f"gaussian kurt_excess expected ~0, got {k}"
+
+    # Synthetic right-skewed field (lognormal -> positive skew).
+    torch.manual_seed(20260515)
+    x_skew = torch.exp(torch.randn(1, 1, 48, 48, 48))  # lognormal
+    moments_skew = MeanVarSkewKurtBaseline._moments(x_skew)
+    s_skew = moments_skew[0, 2].item()
+    assert s_skew > 0.5, f"lognormal skew expected > 0.5, got {s_skew}"
+
+
+def test_mvsk_baseline_autograd_compatible():
+    """Differentiability contract: gradients must flow through the
+    moment computation (no detached NumPy in the forward path).
+    """
+    net = MeanVarSkewKurtBaseline(num_classes=4)
+    x = torch.randn(2, 1, 32, 32, 32, requires_grad=True)
+    out = net(x).sum()
+    out.backward()
+    assert x.grad is not None
+    assert torch.isfinite(x.grad).all()
+    assert x.grad.abs().sum() > 0  # gradients actually flowed
 
 
 def test_mean_baseline_invariant_to_voxel_permutation():
