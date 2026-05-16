@@ -124,7 +124,11 @@ fi
 
 # --- 4. GPU + torch sanity ----------------------------------------------------
 echo "=== GPU diagnostics ==="
-nvidia-smi | head -10
+# `nvidia-smi | head -10` under `pipefail` triggers SIGPIPE (exit 141) because
+# `head` closes the pipe early. Run `nvidia-smi` unpiped (it's already concise);
+# capture full output to log + echo first 10 lines via shell-only ops.
+nvidia_smi_out=$(nvidia-smi 2>&1 || true)
+printf '%s\n' "${nvidia_smi_out}" | awk 'NR<=10'
 python -c "import torch; assert torch.cuda.is_available(), 'CUDA required'; \
 print(f'torch={torch.__version__} cuda={torch.version.cuda} device={torch.cuda.get_device_name(0)}')"
 
