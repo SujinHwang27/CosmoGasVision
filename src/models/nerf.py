@@ -219,7 +219,10 @@ def volume_render_physics(mlp, ray_points, vel_axis, tau_amp=None, window=64, z=
 
     # Thermal Doppler width and damping parameter (per source bin)
     b = 12.85 * torch.sqrt(temp / 10000.0)   # km/s
-    a = 4.7e-4 / b                            # dimensionless
+    # a = Gamma * lambda / (4 * pi * b); 6.063e-3 km/s = (6.2649e8 s^-1)(1.21567e-5 cm)/(4 pi)
+    # Yields a = 4.72e-4 at T=1e4 K (b=12.85 km/s), matching standard tables (Tepper-Garcia 2006).
+    # The prior coefficient 4.7e-4 produced a 12.9x under-estimate; audited + fixed [D-57], 2026-05-16.
+    a = 6.063e-3 / b                          # dimensionless
 
     # n_HI proxy: rho/<rho> * X_HI (mean column n_bar_H absorbed into tau_amp)
     n_hi = density * h1_frac                  # (n_rays, n_src)

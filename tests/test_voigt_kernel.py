@@ -16,7 +16,9 @@ from src.models.nerf import tepper_garcia_voigt
 
 
 # Typical Lyman-alpha damping parameter at b = 12.85 km/s (T = 10^4 K).
-_A_LYA = 4.7e-4 / 12.85
+# Standard tabulated value: a = Gamma * lambda / (4 pi b) = 4.72e-4 (Tepper-Garcia 2006).
+# Prior value 4.7e-4 / 12.85 was a 12.9x under-estimate; fixed alongside nerf.py:222 per [D-57].
+_A_LYA = 4.7182e-4
 
 
 def test_line_center_returns_one_minus_2a_over_sqrtpi():
@@ -37,7 +39,7 @@ def test_taylor_branch_matches_main_branch_at_handoff():
 
     Evaluating *both* formulas at the *same* x near the threshold tests
     branch continuity. The leading-order disagreement is O(a*x^2),
-    i.e. ~4e-9 at x^2 = 1e-4 with a ~ 4e-5.
+    i.e. ~5e-8 at x^2 = 1e-4 with a ~ 4.7e-4 (post-[D-57] fix).
     """
     a = torch.tensor(_A_LYA, dtype=torch.float64)
     x2 = torch.tensor(1.0e-4, dtype=torch.float64)
@@ -53,7 +55,9 @@ def test_taylor_branch_matches_main_branch_at_handoff():
     # Taylor branch
     H_small = (torch.exp(-x2) - 2.0 * a / math.sqrt(math.pi)).item()
 
-    assert abs(H_main - H_small) < 1e-7, (
+    # Bar 5e-7 gives ~5x headroom over the empirical 1.06e-7 disagreement at the
+    # physical a = 4.72e-4; the disagreement is O(a*x^2), so the bar scales with a.
+    assert abs(H_main - H_small) < 5e-7, (
         f"Branch discontinuity at x^2 = 1e-4: H_main = {H_main}, "
         f"H_small = {H_small}, diff = {H_main - H_small}"
     )
