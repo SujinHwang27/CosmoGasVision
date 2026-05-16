@@ -361,6 +361,65 @@
 \newcommand{\SubstrateProbeNcrops}{8000}              % test-set crop count
 
 % ====================================================================
+% Sprint-5 (c') substrate-extension probe at 48^3 (5-seed, fixed pitch)
+%   Run: Juno H100 g-06-01, sprint5cprime_1778947953, 2026-05-16.
+%   Pre-committed branch routing per design v4 §5.1 ([D-55] v4 + [D-52]
+%   amendment 7).  Outcome: branch-(iii-a) ALL-PASS + gate-(e) AD-5
+%   self-anchored bar cleared at 5/5 seeds; result complementary to the
+%   sprint-4 32^3 reading at fixed pitch n_grid=768 (the (32^3, 48^3)
+%   pair is a single-pair contrast, NOT a curve).
+%   Source: cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/headline.json
+%   LEDGER reference: [D-56].
+% ====================================================================
+
+\newcommand{\SubstrateProbeCpCropSize}{48}            % voxel cube edge
+\newcommand{\SubstrateProbeCpBoxMpc}{3.75}            % h^-1 Mpc cube edge at n_grid=768; 60/768*48 = 3.75
+\newcommand{\SubstrateProbeCpVoxelKpc}{78}            % per-voxel comoving edge: 60000/768 ~ 78 kpc/h (unchanged from sprint-4)
+\newcommand{\SubstrateProbeCpNseeds}{5}               % seeds {42, 142, 242, 342, 442}
+\newcommand{\SubstrateProbeCpNcrops}{8000}            % test-set crop count per seed (40000 total indicators)
+\newcommand{\SubstrateProbeCpNcropsTotal}{40000}      % 5 seeds x 8000 indicators
+
+% 3D ResNet-18 (channels-halved, 8.3M params; same architecture as sprint-4)
+\newcommand{\SubstrateProbeCpResnetAcc}{0.5805}       % 5-seed mean overall accuracy
+\newcommand{\SubstrateProbeCpResnetSigma}{0.0746}     % between-seed sample std (n=5, ddof=1)
+
+% MVSK 4-scalar baseline (mean / variance / skewness / kurtosis MLP)
+\newcommand{\SubstrateProbeCpMvskAcc}{0.3371}         % 5-seed mean at 48^3
+\newcommand{\SubstrateProbeCpMvskSigma}{0.0320}       % 5-seed std at 48^3
+\newcommand{\SubstrateProbeCpMvskAt32cube}{0.3400}    % nested A4 baseline inside (c') pipeline at 32^3 crop, fixed pitch
+
+% AD-5 margin (3D ResNet - MVSK at 48^3), self-anchored project-side reference
+\newcommand{\SubstrateProbeCpMarginPP}{24.34}         % point estimate, percentage points
+\newcommand{\SubstrateProbeCpCIlow}{18.80}            % 95% bootstrap CI lower
+\newcommand{\SubstrateProbeCpCIhigh}{28.88}           % 95% bootstrap CI upper
+\newcommand{\SubstrateProbeCpBootB}{10000}            % bootstrap resamples
+\newcommand{\SubstrateProbeCpBootRng}{20260516}       % bootstrap RNG seed
+
+% Per-seed AD-5 margins (pp)
+\newcommand{\SubstrateProbeCpMarginSeedFortytwo}{24.75}
+\newcommand{\SubstrateProbeCpMarginSeedOnefortytwo}{26.45}
+\newcommand{\SubstrateProbeCpMarginSeedTwofortytwo}{14.28}     % closest-to-bar (1.43x the 10 pp self-anchored reference)
+\newcommand{\SubstrateProbeCpMarginSeedThreefortytwo}{31.64}
+\newcommand{\SubstrateProbeCpMarginSeedFourfortytwo}{24.59}
+\newcommand{\SubstrateProbeCpClosestSeedFactor}{1.43} % seed 242: 14.28 / 10.0
+
+% Empirical correlation diagnostics (R20 / R21 disclosure)
+\newcommand{\SubstrateProbeCpRhoEmp}{0.195}           % within-seed paired-classifier corr, mean across seeds
+\newcommand{\SubstrateProbeCpRhoSeedEmp}{0.162}       % between-seed correlation of per-crop ResNet correctness
+\newcommand{\SubstrateProbeCpSeedBudget}{0.05}        % design v4 seed-variance budget
+\newcommand{\SubstrateProbeCpSeedFactor}{1.49}        % 0.0746 / 0.05 = 1.49x
+
+% Project-side self-anchored reference (NOT an external published threshold)
+\newcommand{\SubstrateProbeCpRefPP}{10}               % 10 pp self-anchored reference, per [D-15] post-[D-36] retraction
+
+% Configuration provenance
+\newcommand{\SubstrateProbeCpRunId}{sprint5cprime\_1778947953}
+\newcommand{\SubstrateProbeCpRunTag}{Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b}
+\newcommand{\SubstrateProbeCpJunoJob}{199430}
+\newcommand{\SubstrateProbeCpWallclock}{19{:}50}      % minutes:seconds
+\newcommand{\SubstrateProbeCpResnetParams}{8.3M}      % same as sprint-4 (channels-halved 3D ResNet-18)
+
+% ====================================================================
 % Compute footprint
 % ====================================================================
 
