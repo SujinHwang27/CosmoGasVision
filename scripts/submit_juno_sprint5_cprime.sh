@@ -105,6 +105,33 @@ fi
 cd "${JUNO_WORK}"
 git pull origin exp/nerf || echo "[submit] git pull non-fatal warning (continuing on local HEAD ${SHORTHASH})"
 
+# --- 3a. Data symlinks (inherit from sprint-4 [D-51] precedent) ----------------
+# Loaders default to relative paths `Sherwood/` and `SherwoodIGM_gal/` from cwd;
+# the actual data lives on scratch. Sprint-4 used a per-run-dir staging pattern
+# with `ln -s` into the staging dir; sprint-5 (c′) runs from ${JUNO_WORK} directly
+# so we set the symlinks in ${JUNO_WORK} idempotently. Job 199429 failed here:
+# FileNotFoundError: SherwoodIGM_gal/extracted/planck1_60_768_z0.300/snapdir_012.
+if [[ ! -e "${JUNO_WORK}/Sherwood" ]]; then
+  ln -s "${JUNO_SCRATCH}/sherwood" "${JUNO_WORK}/Sherwood"
+  echo "[submit] symlinked ${JUNO_WORK}/Sherwood -> ${JUNO_SCRATCH}/sherwood"
+fi
+if [[ ! -e "${JUNO_WORK}/SherwoodIGM_gal" ]]; then
+  ln -s "${JUNO_SCRATCH}/SherwoodIGM_gal" "${JUNO_WORK}/SherwoodIGM_gal"
+  echo "[submit] symlinked ${JUNO_WORK}/SherwoodIGM_gal -> ${JUNO_SCRATCH}/SherwoodIGM_gal"
+fi
+# Verify the IGM_gal mirror has all 4 physics × 16 hdf5 = 64 files (sprint-4 invariant).
+EXPECTED_HDF5=64
+ACTUAL_HDF5=$(find "${JUNO_WORK}/SherwoodIGM_gal/extracted" -name "snap_012.*.hdf5" 2>/dev/null | wc -l)
+if [[ "${ACTUAL_HDF5}" -ne "${EXPECTED_HDF5}" ]]; then
+  echo "FATAL: SherwoodIGM_gal mirror has ${ACTUAL_HDF5}/${EXPECTED_HDF5} hdf5 files." >&2
+  echo "  Expected 4 physics × 16 sub-files at:" >&2
+  echo "  ${JUNO_SCRATCH}/SherwoodIGM_gal/extracted/{planck1_60_768_z0.300," >&2
+  echo "    planck1_60_768_ps13_z0.300, planck1_60_768_ps13agn_z0.300," >&2
+  echo "    planck1_60_768_ps13agn_strong_z0.300}/snapdir_012/snap_012.*.hdf5" >&2
+  exit 5
+fi
+echo "[submit] data symlinks verified (${ACTUAL_HDF5}/${EXPECTED_HDF5} hdf5 files present)"
+
 source "${JUNO_WORK}/.venv/bin/activate"
 export PYTHONPATH=.
 export PYTHONUNBUFFERED=1
