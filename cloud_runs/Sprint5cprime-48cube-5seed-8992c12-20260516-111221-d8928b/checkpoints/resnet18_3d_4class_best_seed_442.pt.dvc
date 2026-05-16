@@ -1,0 +1,5 @@
+outs:
+- md5: 7d176f7cc9b34f1f201a5f24c16c29ee
+  size: 33258700
+  hash: md5
+  path: resnet18_3d_4class_best_seed_442.pt

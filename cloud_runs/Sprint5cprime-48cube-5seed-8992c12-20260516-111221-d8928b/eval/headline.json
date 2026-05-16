@@ -1,0 +1,80 @@
+{
+  "run_id": "sprint5cprime_1778947953",
+  "run_tag": "Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b",
+  "spec": "Sprint-5 (c') 48\u00b3 substrate extension per design doc v4 \u00a75.1",
+  "timestamp_utc": "2026-05-16T16:32:00.019512+00:00",
+  "crop_size": 48,
+  "n_seeds": 5,
+  "baseline": "mvsk",
+  "seed_schedule": [
+    42,
+    142,
+    242,
+    342,
+    442
+  ],
+  "seed_averaged_resnet_accuracy": 0.580525,
+  "seed_averaged_mvsk_at_48cube": 0.337125,
+  "seed_averaged_mvsk_at_32cube": 0.34002499999999997,
+  "seed_averaged_ad5_margin_pp": 0.24339999999999995,
+  "ad5_gate_e_pass_seed_averaged": true,
+  "mvsk_threshold_tightened_any_seed": false,
+  "per_seed_summaries": [
+    {
+      "seed_label": 42,
+      "resnet_overall_accuracy": 0.62825,
+      "mvsk_at_48cube": 0.38075,
+      "mvsk_at_32cube": 0.396875,
+      "ad5_margin_pp": 0.2475,
+      "ad5_gate_e_pass": true,
+      "mvsk_threshold_tightened": false
+    },
+    {
+      "seed_label": 142,
+      "resnet_overall_accuracy": 0.55775,
+      "mvsk_at_48cube": 0.29325,
+      "mvsk_at_32cube": 0.311625,
+      "ad5_margin_pp": 0.26449999999999996,
+      "ad5_gate_e_pass": true,
+      "mvsk_threshold_tightened": false
+    },
+    {
+      "seed_label": 242,
+      "resnet_overall_accuracy": 0.4705,
+      "mvsk_at_48cube": 0.32775,
+      "mvsk_at_32cube": 0.363,
+      "ad5_margin_pp": 0.14275,
+      "ad5_gate_e_pass": true,
+      "mvsk_threshold_tightened": false
+    },
+    {
+      "seed_label": 342,
+      "resnet_overall_accuracy": 0.66625,
+      "mvsk_at_48cube": 0.349875,
+      "mvsk_at_32cube": 0.27875,
+      "ad5_margin_pp": 0.316375,
+      "ad5_gate_e_pass": true,
+      "mvsk_threshold_tightened": false
+    },
+    {
+      "seed_label": 442,
+      "resnet_overall_accuracy": 0.579875,
+      "mvsk_at_48cube": 0.334,
+      "mvsk_at_32cube": 0.349875,
+      "ad5_margin_pp": 0.245875,
+      "ad5_gate_e_pass": true,
+      "mvsk_threshold_tightened": false
+    }
+  ],
+  "gate_a_sanity_pass": true,
+  "gate_b_pass": true,
+  "gate_c_determinism_pass": true,
+  "gate_c_deferred_to_juno": true,
+  "gate_d_pass": true,
+  "ad1_fail": false,
+  "training_divergence": false,
+  "confusion_matrix_path": "/work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/confusion_matrix.json",
+  "r_bin_edges_path": "/work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/r_bin_edges.json",
+  "training_log_path": "/work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/training_log.csv",
+  "outcome_branch": "iii"
+}

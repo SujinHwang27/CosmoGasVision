@@ -1,0 +1,120 @@
+{
+  "run_id": "sprint5cprime_1778947953",
+  "seed_label": 142,
+  "crop_size": 48,
+  "baseline": "mvsk",
+  "spec": "Sprint-5 (c') substrate extension; design doc v4 \u00a75.1",
+  "timestamp_utc": "2026-05-16T16:22:17.264283+00:00",
+  "seed_train": 142,
+  "seed_val": 242,
+  "seed_test": 342,
+  "seed_model": 142,
+  "seed_aug": 142,
+  "epochs_completed": 30,
+  "training_seconds": 182.1925218629185,
+  "resnet_overall_accuracy": 0.55775,
+  "mvsk_at_48cube": 0.29325,
+  "mvsk_at_32cube": 0.311625,
+  "mvsk_threshold_tightened": false,
+  "mvsk_at_32cube_threshold": 0.42,
+  "mean_only_baseline_at_48cube": 0.249,
+  "ad5_margin_resnet_minus_mvsk_pp": 0.26449999999999996,
+  "ad5_gate_e_pass": true,
+  "per_crop_jsonl_path": "/work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_142.jsonl",
+  "n_test_crops": 8000,
+  "a4_disclosure": "MVSK-at-32cube < 0.42 -> 10pp AD-5 threshold not tightened relative to sprint-4 baseline (design doc v4 \u00a76 gate-(e)).",
+  "confusion_matrix": [
+    [
+      1419,
+      39,
+      98,
+      444
+    ],
+    [
+      620,
+      965,
+      118,
+      297
+    ],
+    [
+      838,
+      46,
+      659,
+      457
+    ],
+    [
+      495,
+      14,
+      72,
+      1419
+    ]
+  ],
+  "training_history": [
+    {
+      "seed": 142,
+      "epoch": 0,
+      "train_loss": 2.0579549689262437,
+      "val_loss": 1.1688310664797585,
+      "val_acc": 0.47175,
+      "lr": 0.0003,
+      "wall_time_s": 20.558818829944357
+    },
+    {
+      "seed": 142,
+      "epoch": 1,
+      "train_loss": 0.870984832318827,
+      "val_loss": 9.683132813563423,
+      "val_acc": 0.27725,
+      "lr": 0.0002991294866374224,
+      "wall_time_s": 41.1182247470133
+    },
+    {
+      "seed": 142,
+      "epoch": 2,
+      "train_loss": 0.6718418629596028,
+      "val_loss": 3.0232543673307175,
+      "val_acc": 0.4055,
+      "lr": 0.00029652815252294783,
+      "wall_time_s": 61.67609193501994
+    },
+    {
+      "seed": 142,
+      "epoch": 3,
+      "train_loss": 0.5915394596779309,
+      "val_loss": 3.722380248593196,
+      "val_acc": 0.34325,
+      "lr": 0.00029222649592064616,
+      "wall_time_s": 82.19295797590166
+    },
+    {
+      "seed": 142,
+      "epoch": 4,
+      "train_loss": 0.45606771454262657,
+      "val_loss": 4.684718770640237,
+      "val_acc": 0.40475,
+      "lr": 0.0002862749498211371,
+      "wall_time_s": 102.67576316604391
+    },
+    {
+      "seed": 142,
+      "epoch": 5,
+      "train_loss": 0.42209242450924345,
+      "val_loss": 7.301768124103546,
+      "val_acc": 0.36025,
+      "lr": 0.000278743290660887,
+      "wall_time_s": 123.15891024610028
+    }
+  ],
+  "r_bin_edges_val_seed": [
+    0.02981770783662796,
+    0.04414062574505806,
+    0.06236978992819786,
+    0.08059895783662796,
+    0.09882812201976776,
+    0.11705742681709452
+  ],
+  "best_val_loss": 1.1688310664797585,
+  "best_val_acc": 0.47175,
+  "best_epoch": 0,
+  "checkpoint_path": "/work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_142.pt"
+}

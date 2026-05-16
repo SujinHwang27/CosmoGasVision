@@ -1,0 +1,47 @@
+[sprint5cprime] run_id=sprint5cprime_1778947953 run_tag=Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b device=cuda
+[sprint5cprime] crop_size=48 n_seeds=5 baseline=mvsk
+[sprint5cprime] seed=42 starting (crop_size=48, baseline=mvsk)
+[sprint5cprime] seed=42 epoch 1/30 train_loss=2.0336 val_loss=1.6011 val_acc=0.4022
+[sprint5cprime] seed=42 epoch 6/30 train_loss=0.5042 val_loss=5.8810 val_acc=0.4753
+[sprint5cprime] seed=42 early-stop at epoch 7
+[sprint5cprime] seed=42 ckpt: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_42.pt
+[sprint5cprime] seed=42 B2 JSONL: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_42.jsonl
+[sprint5cprime] seed=42 B3: MVSK-at-32cube cross-substrate
+[sprint5cprime] seed=42 done in 401.8s A_resnet=0.6282 MVSK@48=0.3807 MVSK@32=0.3969 margin=24.75pp tightened=False
+[sprint5cprime] seed=142 starting (crop_size=48, baseline=mvsk)
+[sprint5cprime] seed=142 epoch 1/30 train_loss=2.0580 val_loss=1.1688 val_acc=0.4718
+[sprint5cprime] seed=142 epoch 6/30 train_loss=0.4221 val_loss=7.3018 val_acc=0.3603
+[sprint5cprime] seed=142 early-stop at epoch 6
+[sprint5cprime] seed=142 ckpt: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_142.pt
+[sprint5cprime] seed=142 B2 JSONL: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_142.jsonl
+[sprint5cprime] seed=142 B3: MVSK-at-32cube cross-substrate
+[sprint5cprime] seed=142 done in 182.2s A_resnet=0.5577 MVSK@48=0.2933 MVSK@32=0.3116 margin=26.45pp tightened=False
+[sprint5cprime] seed=242 starting (crop_size=48, baseline=mvsk)
+[sprint5cprime] seed=242 epoch 1/30 train_loss=1.8276 val_loss=1.5205 val_acc=0.4273
+[sprint5cprime] seed=242 epoch 6/30 train_loss=0.6082 val_loss=6.5952 val_acc=0.3795
+[sprint5cprime] seed=242 early-stop at epoch 6
+[sprint5cprime] seed=242 ckpt: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_242.pt
+[sprint5cprime] seed=242 B2 JSONL: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_242.jsonl
+[sprint5cprime] seed=242 B3: MVSK-at-32cube cross-substrate
+[sprint5cprime] seed=242 done in 178.2s A_resnet=0.4705 MVSK@48=0.3277 MVSK@32=0.3630 margin=14.27pp tightened=False
+[sprint5cprime] seed=342 starting (crop_size=48, baseline=mvsk)
+[sprint5cprime] seed=342 epoch 1/30 train_loss=1.9478 val_loss=1.6075 val_acc=0.4178
+[sprint5cprime] seed=342 epoch 6/30 train_loss=0.6235 val_loss=2.1301 val_acc=0.4612
+[sprint5cprime] seed=342 early-stop at epoch 7
+[sprint5cprime] seed=342 ckpt: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_342.pt
+[sprint5cprime] seed=342 B2 JSONL: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_342.jsonl
+[sprint5cprime] seed=342 B3: MVSK-at-32cube cross-substrate
+[sprint5cprime] seed=342 done in 202.2s A_resnet=0.6663 MVSK@48=0.3499 MVSK@32=0.2787 margin=31.64pp tightened=False
+[sprint5cprime] seed=442 starting (crop_size=48, baseline=mvsk)
+[sprint5cprime] seed=442 epoch 1/30 train_loss=2.3694 val_loss=1.2415 val_acc=0.4830
+[sprint5cprime] seed=442 epoch 6/30 train_loss=0.5226 val_loss=5.6001 val_acc=0.3270
+[sprint5cprime] seed=442 early-stop at epoch 7
+[sprint5cprime] seed=442 ckpt: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/checkpoints/resnet18_3d_4class_best_seed_442.pt
+[sprint5cprime] seed=442 B2 JSONL: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/per_crop_seed_442.jsonl
+[sprint5cprime] seed=442 B3: MVSK-at-32cube cross-substrate
+[sprint5cprime] seed=442 done in 202.2s A_resnet=0.5799 MVSK@48=0.3340 MVSK@32=0.3499 margin=24.59pp tightened=False
+[sprint5cprime] DONE. Seed-averaged: A_resnet=0.5805 A_mvsk@48=0.3371 margin=24.34pp gate_e_pass=True outcome_branch=iii
+[sprint5cprime] headline: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/headline.json
+[sprint5cprime] confusion_matrix: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/confusion_matrix.json
+[sprint5cprime] r_bin_edges: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/r_bin_edges.json
+[sprint5cprime] training_log: /work/sxh240010/CosmoGasVision/cloud_runs/Sprint5cprime-48cube-5seed-8992c12-20260516-111221-d8928b/eval/training_log.csv
