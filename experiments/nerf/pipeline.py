@@ -194,6 +194,40 @@ def parse_args(argv=None):
                         "disabled (0.0) at smoke; wired forward if Tier-1 "
                         "lands. Default 0.0 = OFF.")
 
+    # Sprint-L1 (direct P_F MSE loss; design v2 §2) -------------------------
+    # OPT-IN flag — default OFF preserves bit-identical [D-24] behavior on
+    # every existing run. When ON, the training step computes the predicted
+    # flux F = exp(-cap(tau_pred, tau_max)), runs the differentiable torch
+    # P_F estimator (src/training/p_flux_loss.py), evaluates the log-MSE loss
+    # over the [D-13] inertial range, and combines it with the [D-24]
+    # tau-MSE loss via GradNorm (Chen+ 2018, alpha=0.12). The 5 retire
+    # conditions R-a..R-h are evaluated per step; on trigger the process
+    # logs retire-reason and exits 0 (PCV-pattern per [D-37]-Ext rule-7).
+    p.add_argument("--enable-l1-pf-loss", dest="enable_l1_pf_loss",
+                   action="store_true",
+                   help="[sprint-L1] Enable the direct P_F MSE loss test "
+                        "(log-MSE over [D-13] inertial range, GradNorm-balanced "
+                        "with [D-24] tau-MSE). Default OFF.")
+    p.add_argument("--l1-gradnorm-alpha", dest="l1_gradnorm_alpha",
+                   type=float, default=0.12,
+                   help="[sprint-L1] GradNorm alpha (Chen+ 2018 default 0.12).")
+    p.add_argument("--l1-burnin-tau-mse", dest="l1_burnin_tau_mse",
+                   type=int, default=1000,
+                   help="[sprint-L1] Burn-in before R-c (val tau-MSE) retire check.")
+    p.add_argument("--l1-burnin-var-f", dest="l1_burnin_var_f",
+                   type=int, default=500,
+                   help="[sprint-L1] Burn-in before R-d (Var(F_pred)) retire check.")
+    p.add_argument("--l1-d24-baseline-tau-mse", dest="l1_d24_baseline_tau_mse",
+                   type=float, default=float("inf"),
+                   help="[sprint-L1] [D-24] baseline val tau-MSE; used for R-c "
+                        "(>2.0x ratio retire). Default inf disables R-c so the "
+                        "smoke runs without an anchor. Production runs pass "
+                        "the measured baseline.")
+    p.add_argument("--l1-retire-dir", dest="l1_retire_dir", type=str,
+                   default=None,
+                   help="[sprint-L1] Directory to drop retire.json on a "
+                        "retire-trigger. Defaults to checkpoint_dir.")
+
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
@@ -648,6 +682,23 @@ def train(args):
         flush=True,
     )
 
+    # [sprint-L1] Truth-side flux cache for the direct P_F MSE loss path.
+    # F_truth_l1 = exp(-cap(tau_truth, tau_max)) is the GROUND TRUTH whose
+    # log-binned P_F the network's predicted flux must match. We cache the
+    # tensor (NOT its P_F — the per-step loss recomputes the full estimator
+    # so a graph-attached comparison on the matched bin grid is available).
+    F_truth_l1 = None
+    if args.enable_l1_pf_loss:
+        with torch.no_grad():
+            tau_truth_capped = tau_gt_profile.clamp_max(args.tau_max)
+            F_truth_l1 = torch.exp(-tau_truth_capped)
+        print(
+            f"[sprint-L1] truth flux cache: shape={tuple(F_truth_l1.shape)} "
+            f"mean={float(F_truth_l1.mean()):.4f} "
+            f"Var={float(F_truth_l1.var()):.4e}",
+            flush=True,
+        )
+
     # Truth-side P_F band-mean cache (only when --pf_loss_weight > 0).
     # Static across training. We compute it once with the autograd-free Torch
     # path so the cache is on the right device and shares the FFT convention
@@ -771,6 +822,35 @@ def train(args):
         betas=(0.9, 0.999),
         weight_decay=1e-6,
     )
+
+    # [sprint-L1] GradNorm wrapper + separate optimizer for w_tau / w_pf.
+    # Default-OFF path: l1_gn / l1_gn_opt remain None and nothing in the
+    # training loop changes. ON path: wrapper holds the 2 task weights, a
+    # small Adam optimizer at lr=1e-3 updates them, separate backward pass
+    # per Chen+ 2018 Algorithm 1.
+    l1_gn = None
+    l1_gn_opt = None
+    if args.enable_l1_pf_loss:
+        from src.training.p_flux_loss import GradNormWrapper
+        # Use simplified=True (G_i = w_i * |L_i|, loss-magnitude proxy) to
+        # avoid the second-order ``torch.autograd.grad(create_graph=True)``
+        # path through ``volume_render_physics``. The double-backward path
+        # is the technically correct Chen+ 2018 formulation but it segfaults
+        # on Windows CPU pytorch in practice (host smoke 2026-05-16 returned
+        # exit code 0xC0000005 before step 1). The loss-magnitude proxy is
+        # a known practical approximation that preserves the GradNorm
+        # balance dynamics under well-conditioned per-task loss scales.
+        l1_gn = GradNormWrapper(
+            initial_w=(1.0, 1.0),
+            alpha=args.l1_gradnorm_alpha,
+            simplified=True,
+        ).to(device)
+        l1_gn_opt = torch.optim.Adam(l1_gn.parameters(), lr=1e-3)
+        print(
+            f"[sprint-L1] GradNorm wrapper active (alpha={args.l1_gradnorm_alpha}, "
+            f"simplified=True); w_tau=w_pf=1.0 at init.",
+            flush=True,
+        )
     lr_lambda = build_lr_lambda(
         args.warmup_steps, args.max_steps, args.lr_max, args.lr_min,
     )
@@ -836,6 +916,11 @@ def train(args):
                 "feature": (
                     "physics_embedding"
                     if args.use_physics_embedding else "baseline"
+                ),
+                # [sprint-L1] loss-variant tag — distinguishes L1 runs from
+                # the [D-24] baseline + [D-39] band-residual runs.
+                "loss_variant": (
+                    "L1_direct_pf" if args.enable_l1_pf_loss else "D24_baseline"
                 ),
             })
             if resume_run_id is None:
@@ -1038,6 +1123,18 @@ def train(args):
             rank_order_loss_chunks = []
             pf_loss_chunks = []
             fgpa_loss_chunks = []
+            # [sprint-L1] per-chunk accumulators. L1 path computes a single
+            # log-MSE loss over the whole step (all chunks pooled) — but
+            # within the existing chunked-backward loop we need the per-chunk
+            # F_pred / F_truth slices to feed the estimator. We accumulate
+            # both detached scalars (for logging) and the live-graph loss
+            # contributions (added to loss_mb so the standard backward
+            # absorbs it). With GradNorm, the per-chunk loss contribution
+            # is w_pf * loss_pf_mb where w_pf is the current task weight.
+            l1_loss_chunks = []           # per-chunk pf log-MSE loss (detached for log)
+            l1_F_pred_chunks = []         # for inertial_rel_residual / coherence diagnostics
+            l1_F_truth_chunks = []
+            l1_loss_pf_step = None        # accumulated graph-attached loss for GradNorm
             for chunk_i, (idx_mb, mb_size) in enumerate(microbatch_indices):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
                 # is local to this microbatch's backward pass. Without this,
@@ -1127,6 +1224,51 @@ def train(args):
                 mean_F_mb = (F_pred_mb * mask_mb).sum() / mask_mb.sum().clamp(min=1)
 
                 loss_mb = loss_data_mb + mean_F_grad_coef * mean_F_mb
+
+                # ---- [sprint-L1] direct P_F MSE loss (design v2 §2) ----
+                # Compute the per-chunk F_pred = exp(-cap(tau_pred, tau_max))
+                # and the matching F_truth slice; the log-MSE loss is built
+                # over the WHOLE step (not per-chunk) because the K1-absorbing
+                # ray-averaging-inside-the-log semantic operates on all rays
+                # in the batch. We therefore accumulate the F_pred / F_truth
+                # tensors and emit a single graph-attached loss at the END of
+                # the chunk loop. Per-chunk contribution to loss_mb here is
+                # the SLICED log-MSE so backward flows through every chunk's
+                # tau_pred; the full-batch loss is also computed for logging
+                # (the two are equal in expectation, equal in practice when
+                # the batch is divided into equal chunks).
+                if args.enable_l1_pf_loss:
+                    from src.training.p_flux_loss import pf_log_mse_loss as _l1_loss
+                    tau_pred_capped = tau_pred_mb.clamp_max(args.tau_max)
+                    F_pred_l1_mb = torch.exp(-tau_pred_capped)
+                    F_truth_l1_mb = F_truth_l1[idx_mb]
+                    loss_pf_mb = _l1_loss(
+                        F_pred_l1_mb, F_truth_l1_mb, vel_axis,
+                    )
+                    # Accumulate detached F tensors for diagnostics.
+                    l1_F_pred_chunks.append(F_pred_l1_mb.detach())
+                    l1_F_truth_chunks.append(F_truth_l1_mb.detach())
+                    l1_loss_chunks.append(loss_pf_mb.detach())
+                    # The GradNorm wrapper combines the [D-24] tau-MSE loss
+                    # (loss_data_mb) and the L1 P_F loss with task weights.
+                    # We REPLACE the additive loss_mb assembly with the
+                    # weighted combination so backward applies the current
+                    # w_tau / w_pf scaling. The mean-F surrogate term keeps
+                    # its [D-21] gradient identity (it is not a task in the
+                    # GradNorm formulation — it's a soft constraint).
+                    w_t, w_p = l1_gn.weights_clamped
+                    # Detach the linearized mean-F gradient coef path; it's
+                    # already a per-step constant. The L1 weighted recombo
+                    # only re-weights the data + P_F task losses.
+                    loss_mb = (
+                        w_t * loss_data_mb
+                        + w_p * loss_pf_mb
+                        + mean_F_grad_coef * mean_F_mb
+                    )
+                    if l1_loss_pf_step is None:
+                        l1_loss_pf_step = loss_pf_mb
+                    else:
+                        l1_loss_pf_step = l1_loss_pf_step + loss_pf_mb
 
                 # ---- [D-39] rank-order penalty in the saturation band ----
                 # Pairwise-margin Spearman surrogate; see _sat_band_rank_loss.
@@ -1252,6 +1394,42 @@ def train(args):
             else:
                 loss_prior = torch.tensor(0.0)
 
+            # [sprint-L1] GradNorm task-weight update (simplified path).
+            # The wrapper is in simplified=True mode (G_i = w_i * |L_i|);
+            # no second-order autograd through the model. We feed the
+            # already-accumulated per-step task losses (mean over chunks) as
+            # detached scalars, which are autograd-LIVE in the w_t, w_p
+            # parameters via the wrapper's internal multiply. The main
+            # backward through the model has already been frozen at this
+            # point so the GradNorm step does not perturb the model graph.
+            l1_gn_metrics = {}
+            if args.enable_l1_pf_loss and l1_gn is not None:
+                try:
+                    loss_tau_scalar = torch.tensor(
+                        float(np.mean([c.item() for c in data_loss_chunks])),
+                        dtype=torch.float32, device=device,
+                    )
+                    loss_pf_scalar = torch.tensor(
+                        float(np.mean([c.item() for c in l1_loss_chunks])),
+                        dtype=torch.float32, device=device,
+                    ) if l1_loss_chunks else torch.tensor(0.0, device=device)
+                    gn_loss = l1_gn.compute_gradnorm_loss(
+                        loss_tau_scalar, loss_pf_scalar,
+                        shared_params=[l1_gn.w_tau],  # placeholder; ignored in simplified path
+                    )
+                    l1_gn_opt.zero_grad()
+                    gn_loss.backward()
+                    l1_gn_opt.step()
+                    l1_gn.renormalize_weights()
+                except Exception as gn_e:
+                    print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
+                          flush=True)
+                l1_gn_metrics = {
+                    "w_tau": float(l1_gn.w_tau.detach().item()),
+                    "w_pf": float(l1_gn.w_pf.detach().item()),
+                    "w_ratio": float(l1_gn.weight_ratio),
+                }
+
             # Gradient clip + step
             grad_norm_clip = torch.nn.utils.clip_grad_norm_(params, 1.0)
             optimizer.step()
@@ -1338,6 +1516,149 @@ def train(args):
                     mlflow.log_metric("loss_pf_band", loss_pf_band_val, step=step)
                 if args.fgpa_tail_weight > 0.0:
                     mlflow.log_metric("loss_fgpa_tail", loss_fgpa_val, step=step)
+
+            # [sprint-L1] per-step metrics + retire-condition evaluation.
+            if args.enable_l1_pf_loss:
+                from src.training.p_flux_loss import (
+                    inertial_rel_residual as _l1_irr,
+                    cross_coherence_per_bin as _l1_coh,
+                )
+                # Pool detached F tensors across chunks for full-batch
+                # diagnostic metrics. With per-physics microbatch composition
+                # ([D-46] path) the pool sums up to the full step batch.
+                with torch.no_grad():
+                    F_pred_pool = torch.cat(l1_F_pred_chunks, dim=0)
+                    F_truth_pool = torch.cat(l1_F_truth_chunks, dim=0)
+                    irr = float(_l1_irr(F_pred_pool, F_truth_pool, vel_axis).item())
+                    coh_per_bin = _l1_coh(F_pred_pool, F_truth_pool, vel_axis)
+                    finite_coh = coh_per_bin[torch.isfinite(coh_per_bin)]
+                    coh_median = (
+                        float(finite_coh.median().item())
+                        if finite_coh.numel() > 0 else float("nan")
+                    )
+                    n_inertial_above_0p5 = int(
+                        (finite_coh >= 0.5).sum().item()
+                    ) if finite_coh.numel() > 0 else 0
+                    var_F_pred = float(F_pred_pool.var().item())
+                    var_F_truth = float(F_truth_pool.var().item())
+                    var_F_ratio = var_F_pred / max(var_F_truth, 1e-30)
+                    # P_F-pred Var_k over inertial range (R-b backstop).
+                    from src.training.p_flux_loss import (
+                        torch_p_flux as _l1_pf,
+                        K_MIN_INERTIAL as _K_MIN, K_MAX_INERTIAL as _K_MAX,
+                    )
+                    centers_l1, P_pred_l1 = _l1_pf(F_pred_pool, vel_axis)
+                    _, P_truth_l1 = _l1_pf(F_truth_pool, vel_axis)
+                    band_l1 = (centers_l1 >= _K_MIN) & (centers_l1 <= _K_MAX)
+                    if bool(band_l1.any()):
+                        Pp_ravg = P_pred_l1.to(torch.float64).mean(dim=0)[band_l1]
+                        Pt_ravg = P_truth_l1.to(torch.float64).mean(dim=0)[band_l1]
+                        var_pf_pred_band = float(Pp_ravg.var().item())
+                        var_pf_truth_band = float(Pt_ravg.var().item())
+                        var_pf_ratio = var_pf_pred_band / max(var_pf_truth_band, 1e-30)
+                    else:
+                        var_pf_ratio = float("nan")
+                loss_pf_step_val = (
+                    float(torch.stack(l1_loss_chunks).mean().item())
+                    if l1_loss_chunks else 0.0
+                )
+                # Log per-step metrics.
+                if mlflow_active:
+                    mlflow.log_metric("loss_tau", loss_data, step=step)
+                    mlflow.log_metric("loss_pf", loss_pf_step_val, step=step)
+                    mlflow.log_metric("l1_inertial_rel_residual", irr, step=step)
+                    mlflow.log_metric("l1_var_F_ratio", var_F_ratio, step=step)
+                    mlflow.log_metric("l1_var_pf_band_ratio", var_pf_ratio, step=step)
+                    mlflow.log_metric("l1_coh_median", coh_median, step=step)
+                    mlflow.log_metric("l1_n_coh_above_0p5", n_inertial_above_0p5, step=step)
+                    if l1_gn_metrics:
+                        mlflow.log_metric("w_tau", l1_gn_metrics["w_tau"], step=step)
+                        mlflow.log_metric("w_pf", l1_gn_metrics["w_pf"], step=step)
+                        mlflow.log_metric("w_ratio", l1_gn_metrics["w_ratio"], step=step)
+
+                # ---- Retire-condition checks (R-a..R-h per design v2 §4) ----
+                retire_reason = None
+                # R-a: loss NaN/Inf or training-loss divergence within 1k steps.
+                if not np.isfinite(loss_total):
+                    retire_reason = "R-a:loss_nan_or_inf"
+                # R-b: P_F^pred collapses to flat-zero/flat-constant within
+                # 5k steps. Apply a 200-step initialization burn-in so the
+                # random-init period (where the network has not yet learned
+                # any flux structure) does not trip the check.
+                if (
+                    retire_reason is None and 200 <= step <= 5000
+                    and np.isfinite(var_pf_ratio) and var_pf_ratio < 0.1
+                ):
+                    retire_reason = "R-b:pf_pred_variance_collapse"
+                # R-c: val tau-MSE > 2.0x [D-24] baseline. We use the
+                # training-side loss_data as a proxy since we don't have a
+                # separate val split mid-loop; CLI lets the user pin the
+                # baseline anchor. R-c is the SHARED-RISK backstop with D1.
+                if (
+                    retire_reason is None
+                    and step >= args.l1_burnin_tau_mse
+                    and np.isfinite(args.l1_d24_baseline_tau_mse)
+                    and loss_data > 2.0 * args.l1_d24_baseline_tau_mse
+                ):
+                    retire_reason = "R-c:tau_mse_doubled_vs_d24"
+                # R-d: Var(F_pred) < 0.5x Var(F_truth) after burn-in 500.
+                if (
+                    retire_reason is None
+                    and step >= args.l1_burnin_var_f
+                    and var_F_ratio < 0.5
+                ):
+                    retire_reason = "R-d:flux_variance_collapse"
+                # R-e: median coherence > 0.5 in < 4/6 inertial k-bins after 5k.
+                # n_inertial_above_0p5 counts the bins (>=0.5); retire if <4 after 5k.
+                if (
+                    retire_reason is None and step > 5000
+                    and finite_coh.numel() > 0
+                    and n_inertial_above_0p5 < 4
+                ):
+                    retire_reason = "R-e:coherence_below_threshold"
+                # R-g: GradNorm weight ratio exceeds 1000:1 either direction.
+                if retire_reason is None and l1_gn_metrics:
+                    wr = l1_gn_metrics["w_ratio"]
+                    if wr > 1000.0 or wr < 1e-3:
+                        retire_reason = "R-g:gradnorm_runaway"
+                # R-f (step 25k) and R-h (wallclock) are NOT checked here —
+                # R-f needs a 5k-step trailing slope window which is too
+                # heavy for the per-step loop without a metric ring buffer;
+                # the gate-6 Juno job picks it up via MLflow post-hoc.
+                # R-h (wallclock) is owned by the dispatcher.
+
+                if retire_reason is not None:
+                    import json
+                    retire_dir = args.l1_retire_dir or args.checkpoint_dir
+                    os.makedirs(retire_dir, exist_ok=True)
+                    retire_path = os.path.join(retire_dir, "retire.json")
+                    retire_payload = {
+                        "retire_reason": retire_reason,
+                        "step": int(step),
+                        "loss_total": float(loss_total),
+                        "loss_tau": float(loss_data),
+                        "loss_pf": float(loss_pf_step_val),
+                        "inertial_rel_residual": float(irr),
+                        "var_F_ratio": float(var_F_ratio),
+                        "var_pf_band_ratio": float(var_pf_ratio),
+                        "coh_median": float(coh_median),
+                        "n_coh_above_0p5": int(n_inertial_above_0p5),
+                        "w_tau": l1_gn_metrics.get("w_tau"),
+                        "w_pf": l1_gn_metrics.get("w_pf"),
+                        "w_ratio": l1_gn_metrics.get("w_ratio"),
+                        "mlflow_run_id": active_run_id,
+                    }
+                    with open(retire_path, "w", encoding="utf-8") as fh:
+                        json.dump(retire_payload, fh, indent=2)
+                    if mlflow_active:
+                        mlflow.set_tag("l1_retire_reason", retire_reason)
+                        mlflow.log_metric("l1_retire_step", float(step), step=step)
+                    print(
+                        f"[sprint-L1] RETIRE @ step {step}: {retire_reason}. "
+                        f"Wrote {retire_path}. Exiting 0 (PCV pattern).",
+                        flush=True,
+                    )
+                    sys.exit(0)
 
             # Checkpoint ---------------------------------------------------
             if (args.checkpoint_interval > 0
