@@ -39,6 +39,7 @@ RUN pip install --no-cache-dir \
 # Source layout. Keep narrow — only what training needs.
 COPY src/data/ ./src/data/
 COPY src/models/ ./src/models/
+COPY src/training/ ./src/training/
 COPY experiments/nerf/ ./experiments/nerf/
 COPY pyproject.toml ./pyproject.toml
 
