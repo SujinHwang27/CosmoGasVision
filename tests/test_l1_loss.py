@@ -248,3 +248,103 @@ def test_gradnorm_weight_ratio_logged():
     w_t, w_p = gn.weights_clamped
     assert torch.isfinite(w_t).all() and torch.isfinite(w_p).all()
     assert float(w_t.item()) > 0.0 and float(w_p.item()) > 0.0
+
+
+# ---------------------------------------------------------------------------
+# 7. [D-60 revised Attempt 2] reduction='sum' vs 'mean' equivalence.
+# ---------------------------------------------------------------------------
+
+
+def _count_inertial_bins():
+    """Recompute the number of inertial-band log-k bins under defaults.
+
+    Mirrors the band selection inside ``pf_log_mse_loss`` so the test does
+    not over-couple to internal constants beyond the public module API.
+    """
+    from src.training.p_flux_loss import (
+        K_MAX_INERTIAL, K_MIN_INERTIAL,
+    )
+    n_kbins = 20
+    k_min, k_max = 1e-3, 1e-1
+    edges = np.logspace(np.log10(k_min), np.log10(k_max), n_kbins + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    return int(((centers >= K_MIN_INERTIAL) & (centers <= K_MAX_INERTIAL)).sum())
+
+
+def test_pf_loss_reduction_sum_vs_mean_relation():
+    """sum_value ~= mean_value * n_inertial_bins on a perturbed synthetic case."""
+    F_truth, vel = _toy_flux(n_rays=64, n_bins=512, seed=7)
+    rng = np.random.default_rng(7)
+    perturb = torch.from_numpy(
+        1.0 + 0.08 * rng.standard_normal(F_truth.shape)
+    ).to(F_truth.dtype)
+    F_pred = (F_truth * perturb).clamp(min=1e-4, max=1.0)
+    loss_sum = float(pf_log_mse_loss(F_pred, F_truth, vel, reduction="sum").item())
+    loss_mean = float(pf_log_mse_loss(F_pred, F_truth, vel, reduction="mean").item())
+    n_bins_inertial = _count_inertial_bins()
+    assert n_bins_inertial > 0, "inertial-band bin count must be positive."
+    # mean * n == sum exactly under float64 ray-reduction; allow a tiny
+    # rtol for any cast back to F_pred.dtype.
+    expected_sum = loss_mean * n_bins_inertial
+    assert loss_sum == pytest.approx(expected_sum, rel=1e-6, abs=1e-12), (
+        f"sum vs mean*n inconsistency: sum={loss_sum:.6e}, "
+        f"mean*n={expected_sum:.6e}, n={n_bins_inertial}"
+    )
+
+
+def test_pf_loss_reduction_gradient_finite_both():
+    """Gradient is finite + autograd-live under both reductions."""
+    F_truth, vel = _toy_flux(n_rays=64, n_bins=512, seed=8)
+    rng = np.random.default_rng(8)
+    perturb = torch.from_numpy(
+        1.0 + 0.05 * rng.standard_normal(F_truth.shape)
+    ).to(F_truth.dtype)
+    for reduction in ("sum", "mean"):
+        F_pred = F_truth.clone().detach().requires_grad_(True)
+        F_pred_actual = (F_pred * perturb).clamp(min=1e-4, max=1.0)
+        loss = pf_log_mse_loss(F_pred_actual, F_truth, vel, reduction=reduction)
+        assert loss.requires_grad, f"loss lost autograd under reduction={reduction!r}"
+        loss.backward()
+        assert F_pred.grad is not None, (
+            f"F_pred.grad is None under reduction={reduction!r}"
+        )
+        assert torch.isfinite(F_pred.grad).all(), (
+            f"non-finite F_pred.grad under reduction={reduction!r}"
+        )
+        assert float(F_pred.grad.abs().max().item()) > 0.0, (
+            f"F_pred.grad is identically zero under reduction={reduction!r}"
+        )
+
+
+def test_pf_loss_reduction_rejects_invalid():
+    """Unsupported reduction string raises ValueError."""
+    F_truth, vel = _toy_flux(n_rays=16, n_bins=256, seed=9)
+    with pytest.raises(ValueError):
+        pf_log_mse_loss(F_truth, F_truth, vel, reduction="median")
+
+
+def test_pf_log_reduction_cli_flag_default_sum():
+    """argparse exposes --pf-log-reduction; default 'sum'; 'mean' toggles."""
+    import os
+    import sys
+    _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+    from experiments.nerf.pipeline import parse_args
+    base = [
+        "--n_rays", "64", "--physics", "1", "--seed", "42",
+        "--enable-l1-pf-loss",
+    ]
+    args_default = parse_args(base)
+    assert hasattr(args_default, "pf_log_reduction"), (
+        "parse_args must expose pf_log_reduction"
+    )
+    assert args_default.pf_log_reduction == "sum", (
+        "default --pf-log-reduction must be 'sum' (backward-compat with "
+        "R15 PROVISIONAL -> NON-PROVISIONAL baseline)"
+    )
+    args_mean = parse_args(base + ["--pf-log-reduction", "mean"])
+    assert args_mean.pf_log_reduction == "mean"
+    # Rejection of unsupported strings via argparse 'choices'.
+    with pytest.raises(SystemExit):
+        parse_args(base + ["--pf-log-reduction", "median"])

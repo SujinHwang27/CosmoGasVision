@@ -227,6 +227,14 @@ def parse_args(argv=None):
                    default=None,
                    help="[sprint-L1] Directory to drop retire.json on a "
                         "retire-trigger. Defaults to checkpoint_dir.")
+    p.add_argument("--pf-log-reduction", dest="pf_log_reduction",
+                   type=str, default="sum", choices=["sum", "mean"],
+                   help="[sprint-L1 D-60 revised Attempt 2] Reduction over "
+                        "inertial-band k bins in pf_log_mse_loss. Default 'sum' "
+                        "preserves prior R15 PROVISIONAL -> NON-PROVISIONAL "
+                        "behavior; 'mean' divides by n_inertial_bins to expose "
+                        "the per-task-scale lever for the R15(c) live P_F "
+                        "gradient sanity-check (Option R, 2026-05-22 PI).")
     p.add_argument("--gradnorm-full", dest="gradnorm_full",
                    action="store_true",
                    help="[sprint-L1 gate-8 Option A(b) rescue] Instantiate the "
@@ -974,6 +982,10 @@ def train(args):
         # at 1.998), falsifying the simplified proxy at T3 scale per Chen+ 2018
         # §3 motivation. Default remains simplified=True (NON-PROVISIONAL).
         simplified_flag = not bool(args.gradnorm_full)
+        # Re-init re-derived per [D-60] revised Attempt 2 (2026-05-22 PI
+        # re-derivation): post-reduction-change task weights remain (1.0, 1.0);
+        # the reduction lever does not require a different init under R15(c)
+        # re-verification.
         l1_gn = GradNormWrapper(
             initial_w=(1.0, 1.0),
             alpha=args.l1_gradnorm_alpha,
@@ -1392,6 +1404,7 @@ def train(args):
                     F_truth_l1_mb = F_truth_l1[idx_mb]
                     loss_pf_mb = _l1_loss(
                         F_pred_l1_mb, F_truth_l1_mb, vel_axis,
+                        reduction=args.pf_log_reduction,
                     )
                     # Accumulate detached F tensors for diagnostics.
                     l1_F_pred_chunks.append(F_pred_l1_mb.detach())
@@ -1555,6 +1568,82 @@ def train(args):
                 loss_prior = (log_tau_amp ** 2) / (2 * sigma_log ** 2)
             else:
                 loss_prior = torch.tensor(0.0)
+
+            # ---- [D-60 revised Attempt 2] Option R per-task grad-norm ----
+            # Post-chunk-loop, full-batch live P_F gradient sanity-check at
+            # the checkpoint step set {100, 200, 500, 1000, 2000, 5000}. This
+            # is the falsification probe for R15(c): if pf/tau < 0.05 at step
+            # 500 the direct-P_F path is not contributing meaningfully to
+            # parameter updates relative to the [D-24] tau-MSE task. We must
+            # run this BEFORE ``_assemble_step_losses_and_gradnorm`` since
+            # the wrapper's own ``autograd.grad`` under simplified=False may
+            # consume / free the graph. Per [D-37]-ext rule 14: apples-to-
+            # apples on the full-batch live aggregation, NOT per-chunk
+            # subset (Option Q was rejected as incommensurate with the
+            # falsification criterion).
+            _l1_gn_diag_steps = {100, 200, 500, 1000, 2000, 5000}
+            _l1_gn_diag = {}
+            if (
+                args.enable_l1_pf_loss
+                and l1_gn is not None
+                and step in _l1_gn_diag_steps
+                and data_loss_chunks_live
+                and l1_loss_chunks_live
+            ):
+                try:
+                    _params = list(model.parameters())
+                    # Full-batch live scalars via the same stack-and-mean
+                    # recipe the wrapper consumes. retain_graph=True so the
+                    # downstream wrapper backward still has the graph.
+                    _loss_tau_live = torch.stack(data_loss_chunks_live).mean()
+                    _loss_pf_live = torch.stack(l1_loss_chunks_live).mean()
+                    _g_tau = torch.autograd.grad(
+                        _loss_tau_live, _params,
+                        retain_graph=True, create_graph=False,
+                        allow_unused=True,
+                    )
+                    _g_pf = torch.autograd.grad(
+                        _loss_pf_live, _params,
+                        retain_graph=True, create_graph=False,
+                        allow_unused=True,
+                    )
+                    # Replace any None entries (params not in either graph)
+                    # with zero-tensors of matching shape so parameters_to_vector
+                    # gets a complete list. The norm is unchanged by zero
+                    # entries — they were "no gradient" by construction.
+                    _g_tau_f = [
+                        g if g is not None else torch.zeros_like(p)
+                        for g, p in zip(_g_tau, _params)
+                    ]
+                    _g_pf_f = [
+                        g if g is not None else torch.zeros_like(p)
+                        for g, p in zip(_g_pf, _params)
+                    ]
+                    from torch.nn.utils import parameters_to_vector as _p2v
+                    _tau_norm = float(_p2v(_g_tau_f).norm().item())
+                    _pf_norm = float(_p2v(_g_pf_f).norm().item())
+                    _ratio = _pf_norm / max(_tau_norm, 1e-30)
+                    print(
+                        f"[sprint-L1] per-task grad-norm @ step {step}: "
+                        f"tau={_tau_norm:.6f}, pf={_pf_norm:.6f}, "
+                        f"ratio={_ratio:.6f}",
+                        flush=True,
+                    )
+                    _l1_gn_diag = {
+                        "l1_grad_tau_norm": _tau_norm,
+                        "l1_grad_pf_norm": _pf_norm,
+                        "l1_grad_pf_over_tau": _ratio,
+                    }
+                except RuntimeError as _diag_e:
+                    # Mirrors the wrapper's narrowed-except policy: only the
+                    # autograd-double-backward family is expected; everything
+                    # else (ValueError, TypeError) is a programmer bug and
+                    # must surface. Surface to log, do NOT abort the step.
+                    print(
+                        f"[sprint-L1] per-task grad-norm diag skipped @ "
+                        f"step {step}: {_diag_e}",
+                        flush=True,
+                    )
 
             # [D1 refactor 2026-05-22] Per-step GradNorm task-weight update
             # is now in ``_assemble_step_losses_and_gradnorm`` above. NO
@@ -1734,6 +1823,20 @@ def train(args):
                         mlflow.log_metric("w_tau", l1_gn_metrics["w_tau"], step=step)
                         mlflow.log_metric("w_pf", l1_gn_metrics["w_pf"], step=step)
                         mlflow.log_metric("w_ratio", l1_gn_metrics["w_ratio"], step=step)
+                    # [D-60 revised Attempt 2] Option R diag scrape.
+                    if _l1_gn_diag:
+                        mlflow.log_metric(
+                            "l1_grad_tau_norm",
+                            _l1_gn_diag["l1_grad_tau_norm"], step=step,
+                        )
+                        mlflow.log_metric(
+                            "l1_grad_pf_norm",
+                            _l1_gn_diag["l1_grad_pf_norm"], step=step,
+                        )
+                        mlflow.log_metric(
+                            "l1_grad_pf_over_tau",
+                            _l1_gn_diag["l1_grad_pf_over_tau"], step=step,
+                        )
 
                 # ---- Retire-condition checks (R-a..R-h per design v2 §4) ----
                 retire_reason = None

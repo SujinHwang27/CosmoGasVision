@@ -269,6 +269,7 @@ def pf_log_mse_loss(
     k_min: float = _DEFAULT_K_MIN,
     k_max: float = _DEFAULT_K_MAX,
     eps: float = 1e-30,
+    reduction: str = "sum",
 ) -> torch.Tensor:
     """Log-MSE loss over the [D-13] inertial-range k bins, ray-averaged INSIDE the log.
 
@@ -347,7 +348,22 @@ def pf_log_mse_loss(
     log_pred = torch.log10(P_pred_band)
     log_truth = torch.log10(P_truth_band)
 
-    loss = ((log_pred - log_truth) ** 2).sum()
+    sq = (log_pred - log_truth) ** 2
+    # [D-60 revised Attempt 2, 2026-05-22] ``reduction`` lever per PI R15
+    # NON-PROVISIONAL. Default 'sum' preserves prior numerical behavior
+    # (backward-compat for every existing call site / test). 'mean' divides
+    # by the inertial-bin count so the per-task scale is independent of
+    # ``n_kbins`` * inertial-band-fraction; this is the lever the live
+    # P_F gradient sanity-check (Option R) consumes.
+    if reduction == "sum":
+        loss = sq.sum()
+    elif reduction == "mean":
+        loss = sq.mean()
+    else:
+        raise ValueError(
+            f"pf_log_mse_loss: unsupported reduction={reduction!r}; "
+            f"expected one of {{'sum', 'mean'}}."
+        )
     return loss.to(F_pred.dtype)
 
 
