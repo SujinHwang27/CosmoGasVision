@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=sprint-L1-retune2-sum-to-mean
+#SBATCH --job-name=sprint-L1-retune2-OptionA-lr3e-5-warmup2000
 #SBATCH --partition=a30
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -10,37 +10,47 @@
 #SBATCH --mail-type=END
 #SBATCH --output=sprint-L1-retune2-juno-%j.out
 #SBATCH --error=sprint-L1-retune2-juno-%j.err
+#SBATCH --comment="D-60 retune2 Option-alpha (lr=3e-5, warmup=2000); LEDGER v3 amendment 2026-05-22"
 
-# Sprint-L1 [D-60] gate-retune-1 absorption — Retune Attempt 2 (Path-gamma)
+# Sprint-L1 [D-60] gate-retune-1 absorption v3 — Retune Attempt 2 (Option alpha)
 # on Juno A30. Design doc: experiments/nerf/design/sprint_L1_direct_pf_loss.md.
-# Parent decision: PI R15 NON-PROVISIONAL (clause (c)), 2026-05-22, Atom A
-# revised post-self-correction.
+# Parent decision: LEDGER §3 [D-60] gate-retune-1 absorption amendment v3
+# (2026-05-22, post-panel), R15 NON-PROVISIONAL per clause (b).
 #
-# Why this retune exists
-# ----------------------
-# Retune Attempt 1 (--lr_max 1e-4) was authored on the hypothesis that the
-# gradient-magnitude shock from pilot 201712 was an LR-conditioning issue.
-# The revised Attempt 2 (Path-gamma) absorbs the PI re-derivation: the lever
-# is the inertial-band REDUCTION in pf_log_mse_loss, NOT the log-domain
-# switch (RETRACTED by core-implementer grep audit — the code already
-# operates in log10-space inside pf_log_mse_loss). Switching reduction
-# 'sum' -> 'mean' divides loss_pf by n_inertial_bins (~6 under default
-# log-k binning), shrinking its raw scale to commensurate with loss_tau
-# so GradNorm operates in a well-conditioned regime from step 0.
+# Why this retune exists (v3 post-panel narrative)
+# ------------------------------------------------
+# Retune Attempt 1 (--lr_max 1e-4, --warmup_steps 1000) FAILed on Juno by
+# frozen-network mechanism (effective LR ~2e-5 at step 200 under warmup
+# taper; no learning). PI amendment v1 mischaracterized Attempt 1 as a
+# no-op vs gate-6b; host-orchestrator LEDGER-verification caught the
+# conflation. v2 corrected: Attempt 1 is a legitimate LR-narrower-at-1e-4
+# falsification; the log-domain no-op concern applies to Attempt 2's
+# ORIGINAL bundled pre-commit (lr=3e-5/warmup=2000 + log-domain switch).
 #
-# Single lever vs retune1
-# -----------------------
-#   --pf-log-reduction mean    (NEW Attempt-2 lever; default 'sum' retained
-#                              elsewhere for backward-compat)
-# All other knobs match retune1 verbatim per R13 / [D-37] symmetric-
-# disclosure (single-axis change so any improvement is attributable to
-# the reduction change alone).
+# Defense-panel pre-review on v2 returned APPROVE-with-5-disclosures.
+# Option alpha (this sbatch) is the panel-approved single-axis
+# continuation: continue the LR-axis probe to its TERMINAL point
+# (lr=3e-5/warmup=2000), drop the no-op log-domain piece. Reduction-flip
+# is reserved for L2 escalation if Attempt 3 (per-task clip) also FAILs.
 #
-# Pinned configuration (PI pre-committed grid)
-# --------------------------------------------
-#   --lr_max 1e-4                    (kept from retune1)
-#   --warmup_steps 1000              (kept from retune1)
-#   --pf-log-reduction mean          (RETUNE LEVER — sum -> mean)
+# Single-axis vs Attempt 1 (with KILLER-1 disclosure)
+# ---------------------------------------------------
+#   --lr_max 3e-5         (5x lower than retune1; LR-axis terminal probe)
+#   --warmup_steps 2000   (2x longer than retune1 to keep peak-LR adoption
+#                          monotone vs prior point)
+# KILLER-1 disclosure (LEDGER §3 v3): Option alpha changes BOTH warmup-
+# length AND peak-LR; effective LR at step 200 is ~7x lower than Attempt
+# 1's at the same step (3e-5 * 200/2000 = 3e-6 vs 1e-4 * 200/1000 = 2e-5),
+# not 0.3x lower. Any FAIL observed at step < 2000 is logged as a
+# WARMUP-ZONE diagnostic, not a peak-LR falsification.
+#
+# Pinned configuration (Option alpha)
+# -----------------------------------
+#   --lr_max 3e-5                    (Option alpha LEVER: LR-axis terminal)
+#   --warmup_steps 2000              (Option alpha LEVER: warmup extended)
+#   --pf-log-reduction sum           (DEFAULT; log-domain no-op piece dropped
+#                                     per v3 retraction; reduction='mean'
+#                                     reserved for L2 escalation)
 #   --gradnorm-full                  (full Chen+ 2018 path)
 #   --enable-l1-pf-loss
 #   --physics 1                      (P1, K1-absorbing tier)
@@ -52,13 +62,21 @@
 #   --l1-d24-baseline-tau-mse 0.01   (R-a backstop)
 #   --checkpoint_interval 5000       (end-state checkpoint only)
 #
-# Pre-committed falsification criterion (Attempt 2 -> Attempt 3 escalation)
-# -------------------------------------------------------------------------
-# Per PI 2026-05-22 spec: ``pf/tau < 0.05 at step 500`` (the Option R live
-# per-task grad-norm diagnostic ratio) is the trigger for Attempt 3
-# dispatch (per-task gradient clipping path). The sbatch trailer greps the
-# step-500 per-task grad-norm log line and surfaces a banner so the user's
-# next-step authorization is unambiguous.
+# Falsification criterion (KILLER-2 absorption — POST-HOC, NOT in-sbatch)
+# ----------------------------------------------------------------------
+# Per LEDGER v3 KILLER-2: the original in-sbatch step-500 pf/tau falsification
+# trailer is REMOVED. Reason: step-500 sits inside the GradNorm-init transient
+# (Chen+ 2018 §3.3/§4 Fig. 3 — task weights stabilize at ~1000-2000 steps).
+# Replacement criterion (POST-HOC evaluation against MLflow run, not in sbatch):
+#   - Locate step_stab = first step where |dw/dstep| < 5e-5 for both tasks
+#     over a 100-step trailing window (hard floor step_stab >= 1000).
+#   - Compute EMA-smoothed (decay 0.95) ratio w_pf/w_tau over the window
+#     [step_stab, step_stab + 500].
+#   - Gate: EMA-ratio in [0.5, 2.0] = PASS; outside = FAIL.
+#   - Window-incomplete at job timeout = INCONCLUSIVE, not FAIL.
+# Implementation: PI gate-retune-2 absorption runs the EMA evaluation in
+# the absorption pass; sbatch trailer only emits the diagnostic-line tail
+# so the absorption has the raw signal.
 
 set -euo pipefail
 
@@ -79,10 +97,10 @@ MEAN_FLUX_OBS=0.979
 L1_D24_BASELINE_TAU_MSE=0.01
 CHECKPOINT_INTERVAL=5000
 
-# Retune levers (single change vs retune1):
-LR_MAX=1e-4                # kept from retune1
-WARMUP_STEPS=1000          # kept from retune1
-PF_LOG_REDUCTION=mean      # *** NEW LEVER *** sum -> mean
+# Retune levers (Option alpha — LR-axis terminal probe):
+LR_MAX=3e-5                # *** OPTION ALPHA LEVER *** 5x lower than retune1
+WARMUP_STEPS=2000          # *** OPTION ALPHA LEVER *** 2x longer than retune1
+PF_LOG_REDUCTION=sum       # DEFAULT; log-domain no-op piece dropped per v3
 
 # Abort-guard tunables (same relaxation as retune1 per
 # feedback-no-cost-gate-on-juno):
@@ -95,8 +113,8 @@ SHORTHASH=$(cd "${JUNO_WORK}" && git rev-parse --short HEAD 2>/dev/null || echo 
 UUID_SUFFIX=$(uuidgen 2>/dev/null | cut -c1-6 \
               || head -c 6 /dev/urandom | base32 | tr '[:upper:]' '[:lower:]' | head -c 6 \
               || openssl rand -hex 3)
-RUN_TAG="SprintL1-Retune2-MeanRed-P${PHYSICS}-N${N_RAYS}-S${SEED}-lr${LR_MAX}-${SHORTHASH}-${TIMESTAMP}-${UUID_SUFFIX}"
-RUN_NAME="Sprint-L1-retune2-P1T1-lr1e-4-meanreduction-fullgradnorm-5k"
+RUN_TAG="SprintL1-Retune2-OptionA-P${PHYSICS}-N${N_RAYS}-S${SEED}-lr${LR_MAX}-wu${WARMUP_STEPS}-${SHORTHASH}-${TIMESTAMP}-${UUID_SUFFIX}"
+RUN_NAME="Sprint-L1-retune2-OptionA-P1T1-lr3e-5-warmup2000-fullgradnorm-5k"
 
 if [[ "${RUN_TAG}" =~ [[:space:]] ]] || [[ "${RUN_TAG}" == *[\$\`\;\&\|]* ]]; then
   echo "FATAL: RUN_TAG '${RUN_TAG}' contains forbidden characters." >&2
@@ -104,10 +122,12 @@ if [[ "${RUN_TAG}" =~ [[:space:]] ]] || [[ "${RUN_TAG}" == *[\$\`\;\&\|]* ]]; th
 fi
 
 echo "================================================================="
-echo "  Sprint-L1 [D-60] gate-retune-1 absorption — Retune Attempt 2"
+echo "  Sprint-L1 [D-60] gate-retune-1 absorption v3 — Retune Attempt 2 (Option alpha)"
 echo "  RUN_TAG=${RUN_TAG}"
 echo "  RUN_NAME=${RUN_NAME}"
-echo "  Retune lever: --pf-log-reduction ${PF_LOG_REDUCTION} (sum -> mean)"
+echo "  Option alpha levers: --lr_max ${LR_MAX} (LR-axis terminal),"
+echo "                       --warmup_steps ${WARMUP_STEPS} (extended)"
+echo "  Reduction: ${PF_LOG_REDUCTION} (default; log-domain no-op piece dropped)"
 echo "  Juno A30 partition, 24:00:00 wallclock"
 echo "================================================================="
 
@@ -308,32 +328,22 @@ echo "=== grep: per-task grad-norm + var_pf_band_ratio trail ==="
 grep -E "(var_pf_band_ratio|w_ratio|w_tau|w_pf|loss_pf|loss_tau|per-task grad-norm)" "${LOG}" | tail -n 80 || \
   echo "[retune2] WARN: no diagnostic lines matched."
 
-# --- 9a. Attempt-2 falsification criterion baked into trailer -----------------
-# Per PI: ``pf/tau < 0.05 at step 500`` (Option R live ratio at the freeze
-# boundary) triggers Attempt-3 escalation. We grep the step-500 per-task
-# grad-norm line and surface a non-fatal banner.
-echo "=== Attempt-2 falsification criterion (step 500 pf/tau) ==="
-STEP500_LINE=$(grep -E "per-task grad-norm @ step 500:" "${LOG}" | tail -n 1 || true)
-if [[ -n "${STEP500_LINE}" ]]; then
-  echo "[retune2] step-500 line: ${STEP500_LINE}"
-  # Extract the ratio= field with awk; tolerate trailing punctuation.
-  STEP500_RATIO=$(echo "${STEP500_LINE}" | awk -F'ratio=' '{print $2}' | awk '{print $1}' | tr -d ',')
-  echo "[retune2] step-500 pf/tau ratio = ${STEP500_RATIO}"
-  RATIO_FREEZE_FAIL=$(awk -v r="${STEP500_RATIO}" 'BEGIN { print (r+0 < 0.05) ? 1 : 0 }')
-  if [[ "${RATIO_FREEZE_FAIL}" -eq 1 ]]; then
-    echo "============================================================"
-    echo "  Attempt 2 falsification criterion: pf/tau < 0.05 at step 500"
-    echo "  observed ratio = ${STEP500_RATIO}"
-    echo "  -> Attempt 3 dispatch path activated"
-    echo "  (next-step: scripts/submit_juno_sprint_L1_retune3.sh)"
-    echo "============================================================"
-  else
-    echo "[retune2] step-500 pf/tau >= 0.05 (no Attempt-3 escalation trigger)."
-  fi
-else
-  echo "[retune2] WARN: no 'per-task grad-norm @ step 500' line found in log."
-  echo "[retune2] Cannot evaluate Attempt-2 falsification criterion; surface to PI."
-fi
+# --- 9a. Falsification criterion: POST-HOC (not in-sbatch) per LEDGER v3 KILLER-2
+# The original in-sbatch step-500 pf/tau check is REMOVED per LEDGER §3 [D-60]
+# gate-retune-1 absorption amendment v3 KILLER-2: step-500 sits inside the
+# GradNorm-init transient (Chen+ 2018 §3.3/§4 Fig. 3), so a step-500 gate is
+# mis-targeted. Replacement evaluation (PI gate-retune-2 absorption pass,
+# against MLflow run):
+#   - step_stab = first step where |dw/dstep| < 5e-5 for both tasks over a
+#     100-step trailing window (hard floor step_stab >= 1000).
+#   - EMA-smoothed (decay 0.95) ratio w_pf/w_tau over [step_stab, step_stab+500].
+#   - Gate: EMA-ratio in [0.5, 2.0] = PASS; outside = FAIL; window-incomplete = INCONCLUSIVE.
+# This trailer block only emits the raw diagnostic-line tail so the absorption
+# has the signal; it does NOT make a pass/fail call.
+echo "=== diagnostic tail for PI gate-retune-2 absorption (POST-HOC EMA eval) ==="
+echo "[retune2] per-task grad-norm + w_ratio lines (full trail, capped):"
+grep -E "(per-task grad-norm|w_ratio|w_tau|w_pf)" "${LOG}" | tail -n 200 || \
+  echo "[retune2] WARN: no diagnostic lines matched; surface to PI."
 
 # --- 10. Artifact PCV ---------------------------------------------------------
 echo "=== artifact PCV ==="
@@ -379,9 +389,11 @@ for k, v in [
     ("loss_variant", "l1_direct_pf_mse"),
     ("gradnorm_variant", "full"),
     ("sprint_kind", "retune"),
-    ("retune_attempt", "2"),
+    ("retune_attempt", "2-OptionA"),
     ("lr", "${LR_MAX}"),
+    ("warmup_steps", "${WARMUP_STEPS}"),
     ("pf_log_reduction", "${PF_LOG_REDUCTION}"),
+    ("ledger_amendment", "v3-post-panel-2026-05-22"),
     ("compute", "juno"),
     ("juno_job_id", "${SLURM_JOB_ID}"),
     ("juno_run_tag", "${RUN_TAG}"),
@@ -395,13 +407,13 @@ PYEOF
 
 # --- 12. Final summary banner -------------------------------------------------
 echo "================================================================="
-echo "  Sprint-L1 Retune Attempt 2 summary"
+echo "  Sprint-L1 Retune Attempt 2 (Option alpha) summary"
 echo "================================================================="
 echo "  RUN_TAG                    = ${RUN_TAG}"
 echo "  RUN_NAME                   = ${RUN_NAME}"
-echo "  LR_MAX                     = ${LR_MAX}"
-echo "  WARMUP_STEPS               = ${WARMUP_STEPS}"
-echo "  PF_LOG_REDUCTION (lever)   = ${PF_LOG_REDUCTION}"
+echo "  LR_MAX (Option alpha)      = ${LR_MAX}      [LR-axis terminal]"
+echo "  WARMUP_STEPS (Option alpha)= ${WARMUP_STEPS}     [extended]"
+echo "  PF_LOG_REDUCTION           = ${PF_LOG_REDUCTION}       [default; log-domain piece dropped]"
 echo "  DRIVER_EXIT                = ${DRIVER_EXIT}"
 echo "  RETIRE_FIRED               = ${RETIRE_FIRED}"
 echo "  DRIVER_KILLED_BY_WATCHER   = ${DRIVER_KILLED_BY_WATCHER}"

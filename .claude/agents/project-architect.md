@@ -355,6 +355,49 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     against wiring failure modes confirmed). Cite: LEDGER §3 [D-60] gate-pilot
     REOPEN block, sub-items 2026-05-21 through 2026-05-22.
 
+**Extension 2 update (added 2026-05-22 per [D-60] gate-retune-1 amendment v2 → v3 panel-overturn — in-session re-verification of inherited code-state claims):**
+
+26. **In-session re-verification of inherited code-state claims (BANKED candidate, 2026-05-22).**
+    Any PI amendment, design spec, or stage-gate sign-off that load-bears
+    on a code-state claim (grep result, function semantics, default flag
+    value, call-path reduction, default code path, etc.) inherited from a
+    prior session, a prior amendment version, a prior agent report, or a
+    prior code-grep made before the relevant code landed, must include
+    an in-session re-verification block citing exact file paths and line
+    numbers re-read THIS session before R15-PROVISIONAL sign-off is issued.
+    Inherited claims are PROVISIONAL by R15 default; explicit in-session
+    re-verification is one of the three R15 lift mechanisms (per the (c)
+    clause). The re-verification block must (i) name the inherited claim,
+    (ii) cite the file path and line range freshly read this session,
+    (iii) state whether the claim survives, is partially stale, or is
+    falsified, and (iv) if partially stale, restate the claim with the
+    new lever-conditionality made explicit.
+
+    Trigger pattern: amendment vN+1 catches a code-state drift that vN
+    missed because vN's grep was performed in a prior session window, or
+    because vN inherited a code-state claim from a §7 history paragraph,
+    or because vN read the file but the relevant lever landed via a
+    commit between two amendment versions. Failing to re-verify is
+    itself a [D-37]-rule-(a) framing-vs-observation violation: the
+    framing "X is a no-op" inherits from an observation made before the
+    relevant lever landed.
+
+    Banking evidence: [D-60] gate-retune-1 amendment v2 → v3 panel-
+    overturn 2026-05-22. v2 inherited the "log-domain is a no-op" grep
+    claim from amendment v1; the `reduction='sum'|'mean'` switch landed
+    in `src/training/p_flux_loss.py:348-367` via commits 3f0383d /
+    99a9126 BETWEEN v1 grep and v2 re-grep, making the no-op claim
+    lever-conditional in a way v2 did not register. Defense-panel
+    KILLER-3-follow-up caught this; PI in-session re-verification
+    confirmed live reduction is `'sum'` for the dispatched config,
+    making the claim survive-but-lever-conditional. The procedural rule
+    is the structural fix that generalizes the catch beyond this one
+    instance. R-rule promotion path: candidate banked at v3 close; lift
+    to BANKED on second sighting per R12 precedent template. Cite:
+    LEDGER §3 [D-60] gate-retune-1 absorption amendment v3 block,
+    KILLER-3-follow-up sub-bullet, 2026-05-22; LEDGER §7 history
+    paragraph 2026-05-22.
+
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
 The user has authorized the near-term mission as: **complete the first
