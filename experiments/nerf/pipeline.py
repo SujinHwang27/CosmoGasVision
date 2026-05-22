@@ -1432,7 +1432,17 @@ def train(args):
                     ) if l1_loss_chunks else torch.tensor(0.0, device=device)
                     gn_loss = l1_gn.compute_gradnorm_loss(
                         loss_tau_scalar, loss_pf_scalar,
-                        shared_params=[l1_gn.w_tau],  # placeholder; ignored in simplified path
+                        # [sprint-L1 commit-B fix] Pass the full model param
+                        # list — the wrapper's identity-filter at
+                        # ``p_flux_loss.py:662`` excludes ``w_tau``/``w_pf``,
+                        # so this is safe for the simplified=False second-order
+                        # path and a no-op for simplified=True (params unused).
+                        # The prior ``[l1_gn.w_tau]`` placeholder filtered to
+                        # an empty list, raising ValueError on the full path
+                        # and pinning weights at init when simplified=True
+                        # (gate-pilot null-test + Commit A red dispatch
+                        # job 201607 confirmed RED).
+                        shared_params=list(model.parameters()),
                     )
                     l1_gn_opt.zero_grad()
                     gn_loss.backward()
