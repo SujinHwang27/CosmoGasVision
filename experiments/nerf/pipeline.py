@@ -1441,6 +1441,12 @@ def train(args):
                 except Exception as gn_e:
                     print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
                           flush=True)
+                if step == 100 and args.enable_l1_pf_loss and l1_gn is not None:
+                    assert abs(l1_gn.w_tau.item() - 1.0) >= 0.01 and abs(l1_gn.w_pf.item() - 1.0) >= 0.01, (
+                        f"[sprint-L1] GradNorm degeneracy contract violated at step 100: "
+                        f"w_tau={l1_gn.w_tau.item():.6f}, w_pf={l1_gn.w_pf.item():.6f}. "
+                        f"Weights pinned at init -> GradNorm dead. See gate-pilot-bug-prevention contract."
+                    )
                 l1_gn_metrics = {
                     "w_tau": float(l1_gn.w_tau.detach().item()),
                     "w_pf": float(l1_gn.w_pf.detach().item()),
