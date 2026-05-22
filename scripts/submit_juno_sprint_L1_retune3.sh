@@ -11,19 +11,64 @@
 #SBATCH --output=sprint-L1-retune3-juno-%j.out
 #SBATCH --error=sprint-L1-retune3-juno-%j.err
 
-# Sprint-L1 [D-60] gate-retune-1 absorption — Retune Attempt 3 (per-task
-# gradient clipping path) on Juno A30. Design: PI Attempt 3 spec 2026-05-22
-# with Amendments A + B.
+# Sprint-L1 [D-60] gate-retune-2 v2 absorption (post-panel-HOLD) — Retune
+# Attempt 3 (per-task gradient clipping path) on Juno A30. Design: PI
+# Attempt 3 spec 2026-05-22 with Amendments A + B; sbatch comment block
+# corrected 2026-05-22 per PI v2 absorption + panel HOLD on D-WRONG-AXIS.
 #
-# Why this retune exists
-# ----------------------
-# Activated ONLY when Attempt 2's falsification criterion fires:
-# ``pf/tau < 0.05 at step 500`` in the Option R live per-task grad-norm
-# diagnostic. Indicates the GradNorm composition is unable to keep the
-# P_F path from being washed out by the tau-MSE path even under mean
-# reduction. Attempt 3 imposes per-task gradient clipping BEFORE GradNorm
-# composition, so each task's contribution to the assembled gradient is
-# norm-bounded.
+# WHY THIS RETUNE EXISTS (post gate-retune-2 v2 absorption, 2026-05-22)
+# --------------------------------------------------------------------
+# Retune-2 Option α (lr=3e-5/warmup=2000) R-b retired at step 200 with
+# var_pf_band_ratio=6.9e-7. Combined with retune-1's step-200 retire at
+# var_pf_band_ratio=6.3e-3 (a 4-decade log10 drop along the LR-narrower
+# direction), the LR-narrower-as-rescue direction is abandoned under PI
+# verdict D-WRONG-DIRECTION-ON-RATIO-AXIS (post panel HOLD). Both retires
+# are formally warmup-zone diagnostics per v3 KILLER-1 pre-commit; this
+# is NOT an axis-family falsification (R13 sweep-discipline: ≥1 decade
+# × ≥4 points required per Smith 2018 / Wilson+ 2017). The rejected
+# direction is abandoned on combined warmup-zone evidence + ratio-
+# invariance prior: the observed pf:tau gradient ratio of 20806.954328:1
+# at step 200 (driver.log:27 re-verified in-session, R26 DISCHARGED) is
+# INVARIANT under uniform LR rescaling — lower LR scales both gradients
+# equally and preserves the ratio. Chen+ 2018 arXiv:1711.02257 Sec 3.2
+# documents GradNorm's ~100× rescuability bound; observed ratio is 2 OOM
+# beyond that bound. LR scaling cannot rescue ratio-invariant pathology
+# by construction.
+#
+# Routing per v3 KILLER-3 (i): per-task gradient clipping pre-GradNorm
+# composition. Justification for (i) over (ii) reduction='mean':
+# K2 estimator-equivalence (1.021e-14 abs / 2.914e-15 rel) was certified
+# at gate-4 under --pf-log-reduction='sum'; switching to 'mean' invalidates
+# K2 and requires re-test before dispatch (real procedural cost). Per-task
+# clip preserves the reduction lever and so K2 stays certified —
+# admissible without re-test. K2-preservation is the binding justification,
+# NOT "narrowness" (per-task-clip adds a clip-magnitude hyperparameter,
+# strictly less narrow than reduction='mean' which adds none; panel
+# SERIOUS-5 correction).
+#
+# PRIOR SIMILAR-CONFIDENCE CLAIMS FALSIFIED IN THIS TRACK
+# -------------------------------------------------------
+#   - retune-1 (lr=1e-4, warmup=1000): R-b retire @ step 200, var_pf_band_ratio=6.3e-3
+#   - retune-2 Option α (lr=3e-5, warmup=2000): R-b retire @ step 200, var_pf_band_ratio=6.9e-7
+#   - Combined verdict: D-WRONG-DIRECTION-ON-RATIO-AXIS (LEDGER §3 v2 absorption)
+# Per [D-37]-Ext rule 2 (falsified-prior cascade): this retune-3 spec
+# inherits ONE-LEVEL-DOWNGRADED confidence verbs. Retune-3 is "first
+# test of the per-task gradient-discipline hypothesis given the
+# LR-narrower-direction abandonment," NOT "the right axis" or
+# "ratio-discipline by design."
+#
+# KILLER-1 WARMUP-ZONE DISCLOSURE (carried from v3, status updated post-HOLD)
+# --------------------------------------------------------------------------
+# Retune-1 and Retune-2 step-200 retires are formally WARMUP-ZONE
+# diagnostics. The joint-claim posture is CORRECTED post-panel: prior-
+# session absorption called the joint pattern an "axis-family
+# falsification"; that claim is RETRACTED (R13 sweep-discipline). The
+# joint pattern supports the narrower claim "LR-narrower-direction
+# abandoned on combined warmup-zone evidence + ratio-invariance prior +
+# Chen+ 2018 §3.2 rescuability literature." Retune-3 carries the
+# per-task gradient-discipline hypothesis FORWARD into a warmup-zone-
+# clean test regime via the per-task-clip pre-GradNorm-composition
+# discipline — distinct hypothesis space, not a continuation of the LR sweep.
 #
 # Amendment A (empirical clip threshold)
 # --------------------------------------
@@ -44,14 +89,15 @@
 # Single lever vs retune2
 # -----------------------
 #   --per-task-grad-clip auto   (NEW Attempt-3 lever; default '0.0' = OFF)
-# All other knobs carry over from Atom A's revised Attempt 2 verbatim per
+# All other knobs carry over from retune-2 Option α verbatim per
 # R13 / [D-37] symmetric-disclosure.
 #
 # Pinned configuration (PI pre-committed grid)
 # --------------------------------------------
 #   --lr_max 1e-4                    (kept from retune1/retune2)
 #   --warmup_steps 1000              (kept from retune1/retune2)
-#   --pf-log-reduction mean          (kept from retune2 — Atom A lever)
+#   --pf-log-reduction sum           (DEFAULT; K2-certified at gate-4;
+#                                     'mean' reserved for L2 escalation)
 #   --per-task-grad-clip auto        (RETUNE LEVER — EMA-derived threshold)
 #   --gradnorm-full                  (full Chen+ 2018 path)
 #   --enable-l1-pf-loss
@@ -83,10 +129,11 @@ MEAN_FLUX_OBS=0.979
 L1_D24_BASELINE_TAU_MSE=0.01
 CHECKPOINT_INTERVAL=5000
 
-# Knobs carried from retune2 (Atom A):
+# Knobs carried from retune-2 Option α (post-D-WRONG-DIRECTION-ON-RATIO-AXIS):
+# pf_log_reduction=sum is the K2-certified default; 'mean' reserved for L2.
 LR_MAX=1e-4
 WARMUP_STEPS=1000
-PF_LOG_REDUCTION=mean
+PF_LOG_REDUCTION=sum
 
 # *** NEW Attempt-3 lever ***
 PER_TASK_GRAD_CLIP=auto    # EMA-derived threshold (PerTaskClipState dataclass)
@@ -101,8 +148,8 @@ SHORTHASH=$(cd "${JUNO_WORK}" && git rev-parse --short HEAD 2>/dev/null || echo 
 UUID_SUFFIX=$(uuidgen 2>/dev/null | cut -c1-6 \
               || head -c 6 /dev/urandom | base32 | tr '[:upper:]' '[:lower:]' | head -c 6 \
               || openssl rand -hex 3)
-RUN_TAG="SprintL1-Retune3-GradClip-P${PHYSICS}-N${N_RAYS}-S${SEED}-lr${LR_MAX}-${SHORTHASH}-${TIMESTAMP}-${UUID_SUFFIX}"
-RUN_NAME="Sprint-L1-retune3-P1T1-lr1e-4-pftau-clip-fullgradnorm-5k"
+RUN_TAG="SprintL1-Retune3-PerTaskClip-P${PHYSICS}-N${N_RAYS}-S${SEED}-lr${LR_MAX}-${SHORTHASH}-${TIMESTAMP}-${UUID_SUFFIX}"
+RUN_NAME="Sprint-L1-retune3-P1T1-lr1e-4-pertask-clip-auto-fullgradnorm-5k"
 
 if [[ "${RUN_TAG}" =~ [[:space:]] ]] || [[ "${RUN_TAG}" == *[\$\`\;\&\|]* ]]; then
   echo "FATAL: RUN_TAG '${RUN_TAG}' contains forbidden characters." >&2
