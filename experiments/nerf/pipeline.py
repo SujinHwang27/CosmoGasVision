@@ -608,6 +608,101 @@ def load_checkpoint(path, *, model, optimizer, scheduler, log_tau_amp):
 
 
 # ---------------------------------------------------------------------------
+# Per-step loss-assembly + GradNorm helper
+# ---------------------------------------------------------------------------
+#
+# [D1 of PI 3-atom split for bug-#2 fix, 2026-05-22]
+# Pure-refactor extraction of the per-step GradNorm task-weight update block
+# from ``train()``. NO BEHAVIOR CHANGE in D1; the ``.item() -> np.mean ->
+# float -> torch.tensor`` graph-break at the original
+# ``pipeline.py:1425-1432`` is preserved verbatim. D2 will land the actual
+# loss-construction fix + integration test; D3 will do governance bookkeeping.
+# Signature is explicit (no hidden closure over outer locals) per PI guidance
+# so the D2 test fixture is trivial to construct.
+def _assemble_step_losses_and_gradnorm(
+    model,
+    l1_gn,           # GradNormWrapper or None
+    l1_gn_opt,       # optimizer for GradNorm task weights or None
+    args,            # argparse.Namespace
+    device,          # torch.device
+    *,
+    data_loss_chunks,
+    l1_loss_chunks,
+    step,
+):
+    """Per-step GradNorm task-weight update.
+
+    Returns a dict with:
+        - ``l1_gn_metrics``: dict[str, float] (empty if GradNorm inactive).
+
+    Preserves the original control-flow exactly: when
+    ``args.enable_l1_pf_loss and l1_gn is not None`` is False the helper is
+    effectively a no-op returning an empty ``l1_gn_metrics``.
+    """
+    # [sprint-L1] GradNorm task-weight update (simplified path).
+    # The wrapper is in simplified=True mode (G_i = w_i * |L_i|);
+    # no second-order autograd through the model. We feed the
+    # already-accumulated per-step task losses (mean over chunks) as
+    # detached scalars, which are autograd-LIVE in the w_t, w_p
+    # parameters via the wrapper's internal multiply. The main
+    # backward through the model has already been frozen at this
+    # point so the GradNorm step does not perturb the model graph.
+    l1_gn_metrics = {}
+    if args.enable_l1_pf_loss and l1_gn is not None:
+        try:
+            loss_tau_scalar = torch.tensor(
+                float(np.mean([c.item() for c in data_loss_chunks])),
+                dtype=torch.float32, device=device,
+            )
+            loss_pf_scalar = torch.tensor(
+                float(np.mean([c.item() for c in l1_loss_chunks])),
+                dtype=torch.float32, device=device,
+            ) if l1_loss_chunks else torch.tensor(0.0, device=device)
+            gn_loss = l1_gn.compute_gradnorm_loss(
+                loss_tau_scalar, loss_pf_scalar,
+                # [sprint-L1 commit-B fix] Pass the full model param
+                # list — the wrapper's identity-filter at
+                # ``p_flux_loss.py:662`` excludes ``w_tau``/``w_pf``,
+                # so this is safe for the simplified=False second-order
+                # path and a no-op for simplified=True (params unused).
+                # The prior ``[l1_gn.w_tau]`` placeholder filtered to
+                # an empty list, raising ValueError on the full path
+                # and pinning weights at init when simplified=True
+                # (gate-pilot null-test + Commit A red dispatch
+                # job 201607 confirmed RED).
+                shared_params=list(model.parameters()),
+            )
+            l1_gn_opt.zero_grad()
+            gn_loss.backward()
+            l1_gn_opt.step()
+            l1_gn.renormalize_weights()
+        except RuntimeError as gn_e:
+            # [sprint-L1 commit-C] Narrowed from bare Exception per PI
+            # gate-pilot ruling. The legitimate runtime fault to catch
+            # is the autograd double-backward instability under the
+            # full Chen+ 2018 path (raises plain ``RuntimeError``).
+            # ValueError, TypeError, and other programmer-error
+            # subclasses must propagate — silent 5000-step degradation
+            # under the prior bare ``except Exception`` (gate-pilot
+            # null-test, job 201602) is the failure mode this narrows
+            # to prevent recurrence.
+            print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
+                  flush=True)
+        if step == 100 and args.enable_l1_pf_loss and l1_gn is not None:
+            assert abs(l1_gn.w_tau.item() - 1.0) >= 0.01 and abs(l1_gn.w_pf.item() - 1.0) >= 0.01, (
+                f"[sprint-L1] GradNorm degeneracy contract violated at step 100: "
+                f"w_tau={l1_gn.w_tau.item():.6f}, w_pf={l1_gn.w_pf.item():.6f}. "
+                f"Weights pinned at init -> GradNorm dead. See gate-pilot-bug-prevention contract."
+            )
+        l1_gn_metrics = {
+            "w_tau": float(l1_gn.w_tau.detach().item()),
+            "w_pf": float(l1_gn.w_pf.detach().item()),
+            "w_ratio": float(l1_gn.weight_ratio),
+        }
+    return {"l1_gn_metrics": l1_gn_metrics}
+
+
+# ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
 
@@ -1411,66 +1506,22 @@ def train(args):
             else:
                 loss_prior = torch.tensor(0.0)
 
-            # [sprint-L1] GradNorm task-weight update (simplified path).
-            # The wrapper is in simplified=True mode (G_i = w_i * |L_i|);
-            # no second-order autograd through the model. We feed the
-            # already-accumulated per-step task losses (mean over chunks) as
-            # detached scalars, which are autograd-LIVE in the w_t, w_p
-            # parameters via the wrapper's internal multiply. The main
-            # backward through the model has already been frozen at this
-            # point so the GradNorm step does not perturb the model graph.
-            l1_gn_metrics = {}
-            if args.enable_l1_pf_loss and l1_gn is not None:
-                try:
-                    loss_tau_scalar = torch.tensor(
-                        float(np.mean([c.item() for c in data_loss_chunks])),
-                        dtype=torch.float32, device=device,
-                    )
-                    loss_pf_scalar = torch.tensor(
-                        float(np.mean([c.item() for c in l1_loss_chunks])),
-                        dtype=torch.float32, device=device,
-                    ) if l1_loss_chunks else torch.tensor(0.0, device=device)
-                    gn_loss = l1_gn.compute_gradnorm_loss(
-                        loss_tau_scalar, loss_pf_scalar,
-                        # [sprint-L1 commit-B fix] Pass the full model param
-                        # list — the wrapper's identity-filter at
-                        # ``p_flux_loss.py:662`` excludes ``w_tau``/``w_pf``,
-                        # so this is safe for the simplified=False second-order
-                        # path and a no-op for simplified=True (params unused).
-                        # The prior ``[l1_gn.w_tau]`` placeholder filtered to
-                        # an empty list, raising ValueError on the full path
-                        # and pinning weights at init when simplified=True
-                        # (gate-pilot null-test + Commit A red dispatch
-                        # job 201607 confirmed RED).
-                        shared_params=list(model.parameters()),
-                    )
-                    l1_gn_opt.zero_grad()
-                    gn_loss.backward()
-                    l1_gn_opt.step()
-                    l1_gn.renormalize_weights()
-                except RuntimeError as gn_e:
-                    # [sprint-L1 commit-C] Narrowed from bare Exception per PI
-                    # gate-pilot ruling. The legitimate runtime fault to catch
-                    # is the autograd double-backward instability under the
-                    # full Chen+ 2018 path (raises plain ``RuntimeError``).
-                    # ValueError, TypeError, and other programmer-error
-                    # subclasses must propagate — silent 5000-step degradation
-                    # under the prior bare ``except Exception`` (gate-pilot
-                    # null-test, job 201602) is the failure mode this narrows
-                    # to prevent recurrence.
-                    print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
-                          flush=True)
-                if step == 100 and args.enable_l1_pf_loss and l1_gn is not None:
-                    assert abs(l1_gn.w_tau.item() - 1.0) >= 0.01 and abs(l1_gn.w_pf.item() - 1.0) >= 0.01, (
-                        f"[sprint-L1] GradNorm degeneracy contract violated at step 100: "
-                        f"w_tau={l1_gn.w_tau.item():.6f}, w_pf={l1_gn.w_pf.item():.6f}. "
-                        f"Weights pinned at init -> GradNorm dead. See gate-pilot-bug-prevention contract."
-                    )
-                l1_gn_metrics = {
-                    "w_tau": float(l1_gn.w_tau.detach().item()),
-                    "w_pf": float(l1_gn.w_pf.detach().item()),
-                    "w_ratio": float(l1_gn.weight_ratio),
-                }
+            # [D1 refactor 2026-05-22] Per-step GradNorm task-weight update
+            # is now in ``_assemble_step_losses_and_gradnorm`` above. NO
+            # BEHAVIOR CHANGE; bug at original pipeline.py:1425-1432
+            # (``.item() -> np.mean -> float -> torch.tensor`` graph-break)
+            # is preserved verbatim inside the helper. D2 fixes it.
+            _step_assembly = _assemble_step_losses_and_gradnorm(
+                model,
+                l1_gn,
+                l1_gn_opt,
+                args,
+                device,
+                data_loss_chunks=data_loss_chunks,
+                l1_loss_chunks=l1_loss_chunks,
+                step=step,
+            )
+            l1_gn_metrics = _step_assembly["l1_gn_metrics"]
 
             # Gradient clip + step
             grad_norm_clip = torch.nn.utils.clip_grad_norm_(params, 1.0)
