@@ -235,6 +235,16 @@ def parse_args(argv=None):
                         "behavior; 'mean' divides by n_inertial_bins to expose "
                         "the per-task-scale lever for the R15(c) live P_F "
                         "gradient sanity-check (Option R, 2026-05-22 PI).")
+    p.add_argument("--per-task-grad-clip", dest="per_task_grad_clip",
+                   type=str, default="0.0",
+                   help="[sprint-L1 D-60 Attempt 3] Per-task gradient clipping "
+                        "BEFORE GradNorm composition. Accepts a positive float "
+                        "(explicit threshold in L2-norm units), 'auto' (compute "
+                        "the threshold as the lower-norm task's running EMA "
+                        "(decay 0.95) over steps 100-500, freeze at step 500), "
+                        "or 0.0 (DISABLED — default, full backward-compat with "
+                        "revised Attempt 2). Amendments A+B per PI Attempt 3 "
+                        "spec 2026-05-22.")
     p.add_argument("--gradnorm-full", dest="gradnorm_full",
                    action="store_true",
                    help="[sprint-L1 gate-8 Option A(b) rescue] Instantiate the "
@@ -997,6 +1007,38 @@ def train(args):
             f"simplified={simplified_flag}); w_tau=w_pf=1.0 at init.",
             flush=True,
         )
+
+    # ---- [D-60 Attempt 3] Per-task gradient clipping state init ----
+    # Parse the --per-task-grad-clip CLI value. Three modes:
+    #   - "0.0" (default)  -> DISABLED. ``ptc_mode`` is "off".
+    #   - "auto"           -> EMA-derived threshold per Amendment A.
+    #   - "<float>"        -> Explicit threshold; activated immediately at
+    #                         the first step >= EMA freeze boundary (step 501).
+    # Backward-compat: when ``per_task_grad_clip == "0.0"`` (the argparse
+    # default), no Attempt-3 code path executes — every clip block is gated
+    # on ``ptc_mode != "off"``. Confirmed by ``test_per_task_clip_off_is_noop``.
+    from src.training.per_task_clip import PerTaskClipState, clip_grad_to_norm
+    ptc_raw = str(getattr(args, "per_task_grad_clip", "0.0"))
+    ptc_mode: str
+    ptc_explicit: float = 0.0
+    if ptc_raw.lower() == "auto":
+        ptc_mode = "auto"
+    else:
+        try:
+            ptc_explicit = float(ptc_raw)
+        except ValueError as _e:
+            raise ValueError(
+                f"--per-task-grad-clip expects 'auto' or a float; got {ptc_raw!r}"
+            ) from _e
+        ptc_mode = "explicit" if ptc_explicit > 0.0 else "off"
+    ptc_state = PerTaskClipState() if ptc_mode != "off" else None
+    if ptc_mode != "off":
+        print(
+            f"[sprint-L1 Attempt 3] Per-task grad-clip ACTIVE: mode={ptc_mode}, "
+            f"explicit_thr={ptc_explicit}, EMA-decay=0.95, "
+            f"window=[100, 500] (freeze@501).",
+            flush=True,
+        )
     # [D2 2026-05-22] Counter for guarded-step frequency. PI ruling: if
     # this exceeds ~1% of steps in pilot, that's its own diagnostic signal
     # (the task had no observable data and GradNorm could not update).
@@ -1582,11 +1624,22 @@ def train(args):
             # subset (Option Q was rejected as incommensurate with the
             # falsification criterion).
             _l1_gn_diag_steps = {100, 200, 500, 1000, 2000, 5000}
+            _l1_gn_clip_log_steps = {600, 1000, 2000, 5000}
             _l1_gn_diag = {}
+            # [D-60 Attempt 3] Per-task grad-clip needs per-task norms EVERY
+            # step in [100, 500] (EMA window) and every step > 500 (clip
+            # applied). Otherwise fall back to the diag-only cadence so the
+            # baseline / Attempt 2 path keeps its O(2 backward passes per 500
+            # steps) cost.
+            _ptc_needs_grads = (
+                ptc_state is not None
+                and step >= 100
+            )
+            _diag_needs_grads = step in _l1_gn_diag_steps
             if (
                 args.enable_l1_pf_loss
                 and l1_gn is not None
-                and step in _l1_gn_diag_steps
+                and (_diag_needs_grads or _ptc_needs_grads)
                 and data_loss_chunks_live
                 and l1_loss_chunks_live
             ):
@@ -1623,17 +1676,90 @@ def train(args):
                     _tau_norm = float(_p2v(_g_tau_f).norm().item())
                     _pf_norm = float(_p2v(_g_pf_f).norm().item())
                     _ratio = _pf_norm / max(_tau_norm, 1e-30)
-                    print(
-                        f"[sprint-L1] per-task grad-norm @ step {step}: "
-                        f"tau={_tau_norm:.6f}, pf={_pf_norm:.6f}, "
-                        f"ratio={_ratio:.6f}",
-                        flush=True,
-                    )
-                    _l1_gn_diag = {
-                        "l1_grad_tau_norm": _tau_norm,
-                        "l1_grad_pf_norm": _pf_norm,
-                        "l1_grad_pf_over_tau": _ratio,
-                    }
+                    # Diagnostic log line only at the {100, 200, 500, 1000,
+                    # 2000, 5000} cadence — under Attempt 3 the per-task
+                    # grads are computed every step in [100, 500] for EMA
+                    # absorption, but spamming 400 lines of grad-norm into
+                    # the run log would drown the retire signal.
+                    if _diag_needs_grads:
+                        print(
+                            f"[sprint-L1] per-task grad-norm @ step {step}: "
+                            f"tau={_tau_norm:.6f}, pf={_pf_norm:.6f}, "
+                            f"ratio={_ratio:.6f}",
+                            flush=True,
+                        )
+                        _l1_gn_diag = {
+                            "l1_grad_tau_norm": _tau_norm,
+                            "l1_grad_pf_norm": _pf_norm,
+                            "l1_grad_pf_over_tau": _ratio,
+                        }
+
+                    # ---- [D-60 Attempt 3] EMA absorb + freeze + clip ----
+                    if ptc_state is not None:
+                        ptc_state.update(step, _tau_norm, _pf_norm)
+                        ptc_state.maybe_freeze(step)
+
+                        # Determine the live clip threshold for THIS step.
+                        # - mode 'auto': use ptc_state.clip_threshold()
+                        #   (None until step > 500 + EMAs populated).
+                        # - mode 'explicit': active immediately from step
+                        #   501 onward (mirrors auto's clock; keeps the
+                        #   sbatch-knob and EMA path on the same boundary).
+                        _live_thr = None
+                        if ptc_mode == "auto":
+                            _live_thr = ptc_state.clip_threshold()
+                        elif ptc_mode == "explicit" and step > 500:
+                            _live_thr = ptc_explicit
+
+                        if _live_thr is not None and _live_thr > 0.0:
+                            scale_tau = clip_grad_to_norm(_tau_norm, _live_thr)
+                            scale_pf = clip_grad_to_norm(_pf_norm, _live_thr)
+
+                            # Post-clip norms for the audit log.
+                            _tau_post = _tau_norm * scale_tau
+                            _pf_post = _pf_norm * scale_pf
+
+                            # Apply the per-task clip to the assembled .grad
+                            # left behind by the per-chunk backward passes.
+                            # The chunk-level backward computed
+                            #   .grad = w_t_chunk*grad_tau + w_p_chunk*grad_pf
+                            #         + grad_aux
+                            # where (w_t_chunk, w_p_chunk) were the GradNorm
+                            # weights at chunk-eval time. Mathematically
+                            # equivalent surgery: subtract the un-clipped
+                            # contributions, add back the clipped ones.
+                            # We use l1_gn.weights_clamped which are the
+                            # current pre-GradNorm-update values (the helper
+                            # below updates them AFTER the chunk loop). This
+                            # is the SAME (w_t, w_p) the chunk loop used.
+                            with torch.no_grad():
+                                _w_t, _w_p = l1_gn.weights_clamped
+                                _wt = float(_w_t.detach().item())
+                                _wp = float(_w_p.detach().item())
+                                # Per-task clip multiplier in the assembled
+                                # gradient = (scale - 1.0) * w_i; we add
+                                # delta = ((scale-1.0)*w_i) * g_i to .grad.
+                                _delta_tau = (scale_tau - 1.0) * _wt
+                                _delta_pf = (scale_pf - 1.0) * _wp
+                                for _p, _gt, _gp in zip(_params, _g_tau_f, _g_pf_f):
+                                    if _p.grad is None:
+                                        continue
+                                    _p.grad.add_(_delta_tau * _gt)
+                                    _p.grad.add_(_delta_pf * _gp)
+
+                            if step in _l1_gn_clip_log_steps:
+                                print(
+                                    f"[sprint-L1] clip @ step {step}: "
+                                    f"tau pre={_tau_norm:.4f} post={_tau_post:.4f}, "
+                                    f"pf pre={_pf_norm:.4f} post={_pf_post:.4f} "
+                                    f"(thr={_live_thr:.4f})",
+                                    flush=True,
+                                )
+                                _l1_gn_diag.setdefault("l1_clip_threshold", _live_thr)
+                                _l1_gn_diag["l1_clip_tau_pre"] = _tau_norm
+                                _l1_gn_diag["l1_clip_tau_post"] = _tau_post
+                                _l1_gn_diag["l1_clip_pf_pre"] = _pf_norm
+                                _l1_gn_diag["l1_clip_pf_post"] = _pf_post
                 except RuntimeError as _diag_e:
                     # Mirrors the wrapper's narrowed-except policy: only the
                     # autograd-double-backward family is expected; everything
@@ -1823,20 +1949,12 @@ def train(args):
                         mlflow.log_metric("w_tau", l1_gn_metrics["w_tau"], step=step)
                         mlflow.log_metric("w_pf", l1_gn_metrics["w_pf"], step=step)
                         mlflow.log_metric("w_ratio", l1_gn_metrics["w_ratio"], step=step)
-                    # [D-60 revised Attempt 2] Option R diag scrape.
-                    if _l1_gn_diag:
-                        mlflow.log_metric(
-                            "l1_grad_tau_norm",
-                            _l1_gn_diag["l1_grad_tau_norm"], step=step,
-                        )
-                        mlflow.log_metric(
-                            "l1_grad_pf_norm",
-                            _l1_gn_diag["l1_grad_pf_norm"], step=step,
-                        )
-                        mlflow.log_metric(
-                            "l1_grad_pf_over_tau",
-                            _l1_gn_diag["l1_grad_pf_over_tau"], step=step,
-                        )
+                    # [D-60 revised Attempt 2 + Attempt 3] Option R diag scrape
+                    # + clip-bite scrape. All keys are optional; we iterate so
+                    # adding a key under Attempt 3 doesn't require touching the
+                    # baseline scrape contract.
+                    for _k, _v in _l1_gn_diag.items():
+                        mlflow.log_metric(_k, _v, step=step)
 
                 # ---- Retire-condition checks (R-a..R-h per design v2 §4) ----
                 retire_reason = None
