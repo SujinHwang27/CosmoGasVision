@@ -1448,7 +1448,16 @@ def train(args):
                     gn_loss.backward()
                     l1_gn_opt.step()
                     l1_gn.renormalize_weights()
-                except Exception as gn_e:
+                except RuntimeError as gn_e:
+                    # [sprint-L1 commit-C] Narrowed from bare Exception per PI
+                    # gate-pilot ruling. The legitimate runtime fault to catch
+                    # is the autograd double-backward instability under the
+                    # full Chen+ 2018 path (raises plain ``RuntimeError``).
+                    # ValueError, TypeError, and other programmer-error
+                    # subclasses must propagate — silent 5000-step degradation
+                    # under the prior bare ``except Exception`` (gate-pilot
+                    # null-test, job 201602) is the failure mode this narrows
+                    # to prevent recurrence.
                     print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
                           flush=True)
                 if step == 100 and args.enable_l1_pf_loss and l1_gn is not None:
