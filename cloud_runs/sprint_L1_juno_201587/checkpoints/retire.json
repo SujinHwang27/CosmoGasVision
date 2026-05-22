@@ -1,0 +1,16 @@
+{
+  "retire_reason": "R-g:gradnorm_runaway",
+  "step": 2271,
+  "loss_total": 0.012449127223068847,
+  "loss_tau": 0.012417076155543327,
+  "loss_pf": 1.6508280964444566e-07,
+  "inertial_rel_residual": 0.00010493142166280961,
+  "var_F_ratio": 0.5546596395776304,
+  "var_pf_band_ratio": 0.9994552349150121,
+  "coh_median": 0.005016643553972244,
+  "n_coh_above_0p5": 0,
+  "w_tau": 0.001733486889861524,
+  "w_pf": 1.998266577720642,
+  "w_ratio": 0.0008674953132867813,
+  "mlflow_run_id": null
+}

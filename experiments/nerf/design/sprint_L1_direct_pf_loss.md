@@ -78,7 +78,7 @@ Retire if median per-ray $|\gamma(k)|^2 \geq 0.5$ does **not** hold for at least
 | R-d | Var($F_{\rm pred}$) < 0.5 × Var($F_{\rm truth}$) | any step after burn-in 500 |
 | R-e | **median per-ray $|\gamma(k)|^2 < 0.5$ in $<\!4/6$ inertial-range k-bins** | any step after 5k |
 | R-f | **$|\Delta P_F/P_F| > 0.20$ at step 25k, OR not monotone-decreasing over prior 5k steps (slope $\geq$ 0)** | step 25k |
-| R-g | GradNorm weight ratio $w_\tau / w_{P_F}$ exceeds 1000:1 in either direction | any step |
+| R-g | GradNorm weight ratio $w_\tau / w_{P_F}$ exceeds 1000:1 in either direction, OR any $w_i \geq 1.99$ (clamp ceiling within 1% epsilon), OR $w_{\min} \leq 0.001$ | any step |
 | R-h | total wallclock exceeds 1.5× design envelope | n/a |
 
 K3-tightened R-f: at step 25k the residual must be **below half the original 4× baseline** ($< 0.20$ absolute) **and trending in the right direction** (slope < 0 over the prior 5k-step window). A model stalled at 0.20 retires; a model that overshoots-and-stalls retires.

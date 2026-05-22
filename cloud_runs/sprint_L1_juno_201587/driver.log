@@ -1,0 +1,68 @@
+Using device: cuda
+Data sanity check passed.
+Loaded 16384 rays. Normalizing to box 60000.0 kpc/h
+Normalized coord range: [0.0000, 0.9997]
+Run scope: 1024 rays x 2048 bins (full grid).
+[D-24] DLA mask: 0/2097152 bins excluded (0.000%).
+[D-39] saturation band: 5166/2097152 non-DLA bins in F_gt in (0.05, 0.30) (0.246%).
+[sprint-L1] truth flux cache: shape=(1024, 2048) mean=0.9790 Var=5.9562e-03
+[sprint-L1] GradNorm wrapper active (alpha=0.12, simplified=True); w_tau=w_pf=1.0 at init.
+MLflow connection issue: API request to http://127.0.0.1:5000/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=CosmoGasVision%2FNeRF (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+Run id: None
+Model: 494084 params + log_tau_amp scalar.
+Step 1/50000 | loss=0.0337 (data=0.0215, meanF=1.2163e-02, prior=0.0000) | <F>=0.8687 | grad=0.5274 | clip=582.018 | lr=5.00e-07 | tau_amp=1.0000
+Step 2/50000 | loss=0.0337 (data=0.0215, meanF=1.2163e-02, prior=0.0000) | <F>=0.8687 | grad=0.5263 | clip=581.245 | lr=1.00e-06 | tau_amp=1.0000
+Step 3/50000 | loss=0.0337 (data=0.0215, meanF=1.2163e-02, prior=0.0000) | <F>=0.8687 | grad=0.5277 | clip=580.707 | lr=1.50e-06 | tau_amp=1.0000
+Step 4/50000 | loss=0.0337 (data=0.0215, meanF=1.2163e-02, prior=0.0000) | <F>=0.8687 | grad=0.5284 | clip=580.770 | lr=2.00e-06 | tau_amp=1.0000
+Step 5/50000 | loss=0.0337 (data=0.0215, meanF=1.2163e-02, prior=0.0000) | <F>=0.8687 | grad=0.5280 | clip=578.971 | lr=2.50e-06 | tau_amp=1.0000
+Step 6/50000 | loss=0.0337 (data=0.0215, meanF=1.2164e-02, prior=0.0000) | <F>=0.8687 | grad=0.5289 | clip=579.962 | lr=3.00e-06 | tau_amp=1.0000
+Step 7/50000 | loss=0.0337 (data=0.0215, meanF=1.2165e-02, prior=0.0000) | <F>=0.8687 | grad=0.5272 | clip=577.127 | lr=3.50e-06 | tau_amp=1.0000
+Step 8/50000 | loss=0.0337 (data=0.0215, meanF=1.2165e-02, prior=0.0000) | <F>=0.8687 | grad=0.5286 | clip=578.576 | lr=4.00e-06 | tau_amp=1.0000
+Step 9/50000 | loss=0.0337 (data=0.0215, meanF=1.2166e-02, prior=0.0000) | <F>=0.8687 | grad=0.5282 | clip=574.600 | lr=4.50e-06 | tau_amp=1.0000
+Step 10/50000 | loss=0.0337 (data=0.0215, meanF=1.2167e-02, prior=0.0000) | <F>=0.8687 | grad=0.5274 | clip=571.902 | lr=5.00e-06 | tau_amp=1.0000
+Step 50/50000 | loss=0.0341 (data=0.0218, meanF=1.2347e-02, prior=0.0000) | <F>=0.8679 | grad=0.5393 | clip=363.830 | lr=2.50e-05 | tau_amp=1.0006
+Step 100/50000 | loss=0.0378 (data=0.0242, meanF=1.3573e-02, prior=0.0000) | <F>=0.8625 | grad=0.6129 | clip=87.618 | lr=5.00e-05 | tau_amp=1.0028
+Step 150/50000 | loss=0.0421 (data=0.0293, meanF=1.2813e-02, prior=0.0000) | <F>=0.8658 | grad=0.2190 | clip=0.487 | lr=7.50e-05 | tau_amp=1.0039
+Step 200/50000 | loss=0.0325 (data=0.0238, meanF=8.6980e-03, prior=0.0000) | <F>=0.8857 | grad=0.0406 | clip=0.087 | lr=1.00e-04 | tau_amp=1.0031
+Step 250/50000 | loss=0.0206 (data=0.0172, meanF=3.3482e-03, prior=0.0000) | <F>=0.9211 | grad=0.1485 | clip=0.279 | lr=1.25e-04 | tau_amp=1.0026
+Step 300/50000 | loss=0.0186 (data=0.0162, meanF=2.3966e-03, prior=0.0000) | <F>=0.9300 | grad=0.1440 | clip=0.261 | lr=1.50e-04 | tau_amp=1.0025
+Step 350/50000 | loss=0.0176 (data=0.0156, meanF=1.9677e-03, prior=0.0000) | <F>=0.9346 | grad=0.1785 | clip=0.324 | lr=1.75e-04 | tau_amp=1.0024
+Step 400/50000 | loss=0.0168 (data=0.0151, meanF=1.7470e-03, prior=0.0000) | <F>=0.9372 | grad=0.6043 | clip=1.424 | lr=2.00e-04 | tau_amp=1.0022
+Step 450/50000 | loss=0.0172 (data=0.0154, meanF=1.8586e-03, prior=0.0000) | <F>=0.9359 | grad=0.3280 | clip=0.554 | lr=2.25e-04 | tau_amp=1.0020
+Step 500/50000 | loss=0.0155 (data=0.0143, meanF=1.2099e-03, prior=0.0000) | <F>=0.9442 | grad=0.5471 | clip=1.216 | lr=2.50e-04 | tau_amp=1.0020
+Step 550/50000 | loss=0.0154 (data=0.0142, meanF=1.1142e-03, prior=0.0000) | <F>=0.9456 | grad=0.1802 | clip=0.310 | lr=2.75e-04 | tau_amp=1.0020
+Step 600/50000 | loss=0.0163 (data=0.0149, meanF=1.4041e-03, prior=0.0000) | <F>=0.9415 | grad=0.6269 | clip=1.303 | lr=3.00e-04 | tau_amp=1.0018
+Step 650/50000 | loss=0.0149 (data=0.0140, meanF=9.3115e-04, prior=0.0000) | <F>=0.9485 | grad=0.0777 | clip=0.138 | lr=3.25e-04 | tau_amp=1.0017
+Step 700/50000 | loss=0.0144 (data=0.0137, meanF=7.3530e-04, prior=0.0000) | <F>=0.9519 | grad=0.0680 | clip=0.119 | lr=3.50e-04 | tau_amp=1.0017
+Step 750/50000 | loss=0.0146 (data=0.0138, meanF=8.0588e-04, prior=0.0000) | <F>=0.9506 | grad=0.1411 | clip=0.240 | lr=3.75e-04 | tau_amp=1.0013
+Step 800/50000 | loss=0.0142 (data=0.0136, meanF=6.1591e-04, prior=0.0000) | <F>=0.9542 | grad=0.2444 | clip=0.414 | lr=4.00e-04 | tau_amp=1.0015
+Step 850/50000 | loss=0.0140 (data=0.0135, meanF=5.5180e-04, prior=0.0000) | <F>=0.9555 | grad=0.4730 | clip=0.789 | lr=4.25e-04 | tau_amp=1.0015
+Step 900/50000 | loss=0.0137 (data=0.0133, meanF=4.4758e-04, prior=0.0000) | <F>=0.9578 | grad=0.1422 | clip=0.238 | lr=4.50e-04 | tau_amp=1.0014
+Step 950/50000 | loss=0.0142 (data=0.0136, meanF=5.9549e-04, prior=0.0000) | <F>=0.9546 | grad=0.4640 | clip=0.812 | lr=4.75e-04 | tau_amp=1.0008
+Step 1000/50000 | loss=0.0138 (data=0.0134, meanF=4.2348e-04, prior=0.0000) | <F>=0.9584 | grad=0.0347 | clip=0.064 | lr=5.00e-04 | tau_amp=1.0007
+Step 1050/50000 | loss=0.0136 (data=0.0133, meanF=3.5064e-04, prior=0.0000) | <F>=0.9603 | grad=0.5970 | clip=1.142 | lr=5.00e-04 | tau_amp=1.0011
+Step 1100/50000 | loss=0.0130 (data=0.0128, meanF=2.1333e-04, prior=0.0000) | <F>=0.9644 | grad=0.1142 | clip=0.191 | lr=5.00e-04 | tau_amp=1.0011
+Step 1150/50000 | loss=0.0130 (data=0.0128, meanF=1.8881e-04, prior=0.0000) | <F>=0.9653 | grad=0.0439 | clip=0.073 | lr=5.00e-04 | tau_amp=1.0011
+Step 1200/50000 | loss=0.0129 (data=0.0127, meanF=1.7582e-04, prior=0.0000) | <F>=0.9657 | grad=0.0102 | clip=0.018 | lr=5.00e-04 | tau_amp=1.0011
+Step 1250/50000 | loss=0.0127 (data=0.0126, meanF=1.3556e-04, prior=0.0000) | <F>=0.9674 | grad=0.3533 | clip=0.577 | lr=5.00e-04 | tau_amp=1.0011
+Step 1300/50000 | loss=0.0128 (data=0.0126, meanF=1.4211e-04, prior=0.0000) | <F>=0.9671 | grad=0.0959 | clip=0.155 | lr=5.00e-04 | tau_amp=1.0011
+Step 1350/50000 | loss=0.0127 (data=0.0126, meanF=1.2279e-04, prior=0.0000) | <F>=0.9679 | grad=0.0013 | clip=0.003 | lr=5.00e-04 | tau_amp=1.0010
+Step 1400/50000 | loss=0.0133 (data=0.0130, meanF=2.5280e-04, prior=0.0000) | <F>=0.9631 | grad=0.2946 | clip=0.458 | lr=5.00e-04 | tau_amp=1.0000
+Step 1450/50000 | loss=0.0129 (data=0.0127, meanF=1.5812e-04, prior=0.0000) | <F>=0.9664 | grad=0.0063 | clip=0.010 | lr=5.00e-04 | tau_amp=1.0002
+Step 1500/50000 | loss=0.0127 (data=0.0126, meanF=1.2119e-04, prior=0.0000) | <F>=0.9680 | grad=0.0169 | clip=0.032 | lr=5.00e-04 | tau_amp=1.0004
+Step 1550/50000 | loss=0.0126 (data=0.0125, meanF=9.0551e-05, prior=0.0000) | <F>=0.9695 | grad=0.0045 | clip=0.008 | lr=5.00e-04 | tau_amp=1.0005
+Step 1600/50000 | loss=0.0126 (data=0.0125, meanF=8.8654e-05, prior=0.0000) | <F>=0.9696 | grad=0.0708 | clip=0.114 | lr=5.00e-04 | tau_amp=1.0005
+Step 1650/50000 | loss=0.0125 (data=0.0124, meanF=7.7224e-05, prior=0.0000) | <F>=0.9702 | grad=0.1100 | clip=0.175 | lr=5.00e-04 | tau_amp=1.0004
+Step 1700/50000 | loss=0.0126 (data=0.0125, meanF=8.7997e-05, prior=0.0000) | <F>=0.9696 | grad=0.1480 | clip=0.230 | lr=5.00e-04 | tau_amp=1.0004
+Step 1750/50000 | loss=0.0125 (data=0.0124, meanF=7.9044e-05, prior=0.0000) | <F>=0.9701 | grad=0.0636 | clip=0.099 | lr=5.00e-04 | tau_amp=1.0004
+Step 1800/50000 | loss=0.0125 (data=0.0125, meanF=8.0953e-05, prior=0.0000) | <F>=0.9700 | grad=0.3637 | clip=0.540 | lr=5.00e-04 | tau_amp=1.0003
+Step 1850/50000 | loss=0.0124 (data=0.0123, meanF=5.4539e-05, prior=0.0000) | <F>=0.9716 | grad=0.0411 | clip=0.066 | lr=5.00e-04 | tau_amp=1.0003
+Step 1900/50000 | loss=0.0124 (data=0.0123, meanF=5.2498e-05, prior=0.0000) | <F>=0.9718 | grad=0.0542 | clip=0.085 | lr=5.00e-04 | tau_amp=1.0003
+Step 1950/50000 | loss=0.0124 (data=0.0123, meanF=5.2078e-05, prior=0.0000) | <F>=0.9718 | grad=0.0666 | clip=0.105 | lr=5.00e-04 | tau_amp=1.0002
+Step 2000/50000 | loss=0.0124 (data=0.0123, meanF=5.2197e-05, prior=0.0000) | <F>=0.9718 | grad=0.0806 | clip=0.125 | lr=4.99e-04 | tau_amp=1.0001
+Step 2050/50000 | loss=0.0125 (data=0.0124, meanF=6.1365e-05, prior=0.0000) | <F>=0.9712 | grad=0.1283 | clip=0.196 | lr=4.99e-04 | tau_amp=1.0001
+Step 2100/50000 | loss=0.0125 (data=0.0125, meanF=6.0282e-05, prior=0.0000) | <F>=0.9712 | grad=0.4412 | clip=0.669 | lr=4.99e-04 | tau_amp=1.0001
+Step 2150/50000 | loss=0.0125 (data=0.0124, meanF=4.7846e-05, prior=0.0000) | <F>=0.9721 | grad=0.0357 | clip=0.056 | lr=4.99e-04 | tau_amp=0.9999
+Step 2200/50000 | loss=0.0125 (data=0.0125, meanF=5.5479e-05, prior=0.0000) | <F>=0.9716 | grad=0.0136 | clip=0.030 | lr=4.99e-04 | tau_amp=0.9999
+Step 2250/50000 | loss=0.0125 (data=0.0124, meanF=4.0853e-05, prior=0.0000) | <F>=0.9726 | grad=0.0167 | clip=0.026 | lr=4.99e-04 | tau_amp=0.9999
+[sprint-L1] RETIRE @ step 2271: R-g:gradnorm_runaway. Wrote /work/sxh240010/CosmoGasVision/cloud_runs/sprint_L1_juno_201587/checkpoints/retire.json. Exiting 0 (PCV pattern).
