@@ -44,4 +44,5 @@ packages = []
 [tool.pytest.ini_options]
 markers = [
     "slow: marks tests as slow (production-scale CIC; deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration-tier (CPU-fast, <5s; deselect with '-m \"not integration\"')",
 ]

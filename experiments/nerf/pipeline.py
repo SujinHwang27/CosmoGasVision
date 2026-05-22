@@ -629,35 +629,57 @@ def _assemble_step_losses_and_gradnorm(
     data_loss_chunks,
     l1_loss_chunks,
     step,
+    data_loss_chunks_live=None,
+    l1_loss_chunks_live=None,
 ):
     """Per-step GradNorm task-weight update.
 
     Returns a dict with:
-        - ``l1_gn_metrics``: dict[str, float] (empty if GradNorm inactive).
+        - ``l1_gn_metrics``: dict[str, float] | None (None if guard skipped).
+        - ``gradnorm_guard_skipped``: bool — True iff the empty-branch guard
+          fired (no observable data this step for either task; the GradNorm
+          step is SKIPPED, no synthetic zero is forged — PI D2 spec).
 
     Preserves the original control-flow exactly: when
     ``args.enable_l1_pf_loss and l1_gn is not None`` is False the helper is
     effectively a no-op returning an empty ``l1_gn_metrics``.
+
+    [D2 2026-05-22] bug #2 fix. The previous ``.item() -> np.mean -> float ->
+    torch.tensor(float)`` cascade at lines 653-660 broke the autograd graph
+    between the per-chunk task losses and ``loss_tau_scalar`` /
+    ``loss_pf_scalar``; under ``simplified=False`` (full Chen+ 2018 path) the
+    wrapper's ``torch.autograd.grad(w_i * L_i, shared_params)`` then traversed
+    a graph-dead scalar and ``G_tau == G_pf == 0`` -> ``r_tau == r_pf == 1.0``
+    -> w_tau, w_pf pinned at init forever (gate-pilot iteration-2, job 201669,
+    AssertionError at step 100 with w_tau=w_pf=1.000000). Fix: feed
+    ``torch.stack(chunks_live).mean()`` so the scalar carries the model-param
+    graph; when the live-chunks list is empty for either task, SKIP the
+    GradNorm update entirely (do NOT forge a graph-live zero — PI explicit:
+    "``0.0 * sum(p.sum() ...)`` is semantically dishonest; it tells GradNorm
+    the task loss this step is zero when the truth is the task had no
+    observable data this step").
     """
-    # [sprint-L1] GradNorm task-weight update (simplified path).
-    # The wrapper is in simplified=True mode (G_i = w_i * |L_i|);
-    # no second-order autograd through the model. We feed the
-    # already-accumulated per-step task losses (mean over chunks) as
-    # detached scalars, which are autograd-LIVE in the w_t, w_p
-    # parameters via the wrapper's internal multiply. The main
-    # backward through the model has already been frozen at this
-    # point so the GradNorm step does not perturb the model graph.
     l1_gn_metrics = {}
     if args.enable_l1_pf_loss and l1_gn is not None:
+        # [D2 2026-05-22] empty-branch guard. SKIP GradNorm update entirely
+        # when the live-graph chunks are empty for either task; the caller
+        # increments a counter and propagates None metrics. PI explicit:
+        # no synthetic zero, no ``0.0 * sum(p.sum() ...)``.
+        if not data_loss_chunks_live or not l1_loss_chunks_live:
+            return {
+                "l1_gn_metrics": None,
+                "gradnorm_guard_skipped": True,
+            }
         try:
-            loss_tau_scalar = torch.tensor(
-                float(np.mean([c.item() for c in data_loss_chunks])),
-                dtype=torch.float32, device=device,
-            )
-            loss_pf_scalar = torch.tensor(
-                float(np.mean([c.item() for c in l1_loss_chunks])),
-                dtype=torch.float32, device=device,
-            ) if l1_loss_chunks else torch.tensor(0.0, device=device)
+            # [D2 2026-05-22] live-graph stack-and-mean replaces the
+            # graph-breaking .item()/np.mean/float/torch.tensor cascade.
+            # The resulting scalars carry the model-param graph, so the
+            # wrapper's ``torch.autograd.grad(w_i * L_i, shared_params)``
+            # under simplified=False produces a meaningful G_i. Under
+            # simplified=True, the wrapper internally .detach()'s these
+            # so the live graph is a no-op cost but keeps one code path.
+            loss_tau_scalar = torch.stack(data_loss_chunks_live).mean()
+            loss_pf_scalar = torch.stack(l1_loss_chunks_live).mean()
             gn_loss = l1_gn.compute_gradnorm_loss(
                 loss_tau_scalar, loss_pf_scalar,
                 # [sprint-L1 commit-B fix] Pass the full model param
@@ -699,7 +721,7 @@ def _assemble_step_losses_and_gradnorm(
             "w_pf": float(l1_gn.w_pf.detach().item()),
             "w_ratio": float(l1_gn.weight_ratio),
         }
-    return {"l1_gn_metrics": l1_gn_metrics}
+    return {"l1_gn_metrics": l1_gn_metrics, "gradnorm_guard_skipped": False}
 
 
 # ---------------------------------------------------------------------------
@@ -963,6 +985,10 @@ def train(args):
             f"simplified={simplified_flag}); w_tau=w_pf=1.0 at init.",
             flush=True,
         )
+    # [D2 2026-05-22] Counter for guarded-step frequency. PI ruling: if
+    # this exceeds ~1% of steps in pilot, that's its own diagnostic signal
+    # (the task had no observable data and GradNorm could not update).
+    gradnorm_guard_count = 0
     lr_lambda = build_lr_lambda(
         args.warmup_steps, args.max_steps, args.lr_max, args.lr_min,
     )
@@ -1247,6 +1273,16 @@ def train(args):
             l1_F_pred_chunks = []         # for inertial_rel_residual / coherence diagnostics
             l1_F_truth_chunks = []
             l1_loss_pf_step = None        # accumulated graph-attached loss for GradNorm
+            # [D2 2026-05-22] Live-graph accumulators for GradNorm ONLY (bug #2 fix).
+            # The 4 diagnostic accumulators (sat_band, rank_order, pf_band, fgpa)
+            # plus data_loss_chunks / l1_loss_chunks above stay .detach()'d per
+            # PI ruling — minimal blast radius. These two live-graph variants
+            # exist solely to feed GradNorm's wrapper, which requires graph-live
+            # tensors so the full Chen+ 2018 second-order path can compute
+            # ||grad_{shared_params} (w_i * L_i)||_2 (currently dead under the
+            # .item()/np.mean/float/torch.tensor cascade replaced below).
+            data_loss_chunks_live = []
+            l1_loss_chunks_live = []
             for chunk_i, (idx_mb, mb_size) in enumerate(microbatch_indices):
                 # Recompute tau_amp per chunk so its torch.exp autograd node
                 # is local to this microbatch's backward pass. Without this,
@@ -1361,6 +1397,8 @@ def train(args):
                     l1_F_pred_chunks.append(F_pred_l1_mb.detach())
                     l1_F_truth_chunks.append(F_truth_l1_mb.detach())
                     l1_loss_chunks.append(loss_pf_mb.detach())
+                    # [D2 2026-05-22] Live-graph copy for GradNorm only.
+                    l1_loss_chunks_live.append(loss_pf_mb)
                     # The GradNorm wrapper combines the [D-24] tau-MSE loss
                     # (loss_data_mb) and the L1 P_F loss with task weights.
                     # We REPLACE the additive loss_mb assembly with the
@@ -1494,7 +1532,19 @@ def train(args):
                         "disabled at smoke. Re-enable after Tier-1 lands."
                     )
 
-                (loss_mb / args.accum_steps).backward()
+                # [D2 2026-05-22] Live-graph copy for GradNorm only.
+                # IMPORTANT: capture BEFORE .backward() runs.
+                data_loss_chunks_live.append(loss_data_mb)
+                # When GradNorm full path (simplified=False) is active, the
+                # helper below calls torch.autograd.grad(w_i * L_i, params)
+                # which traverses the same per-chunk graph; we must retain it.
+                # Simplified=True only reads loss magnitudes (.detach() inside
+                # the wrapper) so retention is a no-op cost there but keeps
+                # one code path. See PI D2 spec 2026-05-22.
+                _retain = bool(
+                    getattr(args, "enable_l1_pf_loss", False) and l1_gn is not None
+                )
+                (loss_mb / args.accum_steps).backward(retain_graph=_retain)
                 data_loss_chunks.append(loss_data_mb.detach())
 
             # Loss values for logging (computed analytically from cycle mean)
@@ -1520,8 +1570,24 @@ def train(args):
                 data_loss_chunks=data_loss_chunks,
                 l1_loss_chunks=l1_loss_chunks,
                 step=step,
+                data_loss_chunks_live=data_loss_chunks_live,
+                l1_loss_chunks_live=l1_loss_chunks_live,
             )
             l1_gn_metrics = _step_assembly["l1_gn_metrics"]
+            # [D2 2026-05-22] Empty-branch guard accounting. When the helper
+            # signals ``gradnorm_guard_skipped`` we DO NOT propagate stale w_*
+            # metrics to MLflow (they would lie about a step where the task
+            # had no observable data). Increment the counter; log periodically.
+            if _step_assembly.get("gradnorm_guard_skipped", False):
+                gradnorm_guard_count += 1
+                l1_gn_metrics = {}
+                if step > 0 and step % 100 == 0:
+                    print(
+                        f"[D2] GradNorm guard-skip count @ step {step}: "
+                        f"{gradnorm_guard_count} "
+                        f"({100.0 * gradnorm_guard_count / max(step, 1):.2f}% of steps)",
+                        flush=True,
+                    )
 
             # Gradient clip + step
             grad_norm_clip = torch.nn.utils.clip_grad_norm_(params, 1.0)
