@@ -293,6 +293,68 @@ operational test.
     expansion specifically motivated by failure (iii). Cite: LEDGER §7
     [D-37]-rule-(a)-violation addendum 2026-05-13c.
 
+**Extension 2 update (added 2026-05-22 per [D-60] gate-pilot REOPEN 4-pilot evidence stack — twin-gate integration-discipline pattern):**
+
+R20 banked as binding. (R16/R17/R18/R19 reserved as previously banked under
+sprint-5 (c′)-at-48³ campaign; R21/R22/R23 reserved sprint-5 (c′) gate-5
+banks; R24 candidate DEFERRED — step-rate budget discipline, see [D-60]
+gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
+
+20. **Behavioral integration-test discipline (twin-gate before HPC dispatch).**
+    When a sprint involves multi-component loss-construction pipelines (e.g.,
+    GradNorm + per-microbatch chunked accumulation + autograd-graph-preserving
+    contracts), unit/wiring tests that assert *configuration state* (attribute
+    presence, flag toggling, init parameter values) are NECESSARY but NOT
+    SUFFICIENT to discharge gate-criteria that name a *behavior*. PI sign-off
+    on any agent-dispatched HPC pilot beyond smoke-tier requires TWO gates,
+    both binding:
+    (i) **Integration test** exercising the actual pipeline assembly path
+        (NOT a toy 2-param dummy in isolation) — the test must (a) instantiate
+        a real-enough surrogate of the pipeline's loss-construction code path
+        (helper-refactor pattern is the standard test seam), (b) assert
+        `loss_scalar.grad_fn is not None AND loss_scalar.requires_grad` for
+        every loss tensor handed to a downstream gradient-computing wrapper,
+        (c) assert the downstream weights MOVE under a known-good input by
+        a measurable threshold (e.g., ≥1e-6 over ≥2 update calls).
+    (ii) **Contract assertion at first non-trivial step (~step 100)** inside
+        the actual training loop, OUTSIDE any try/except block, that verifies
+        expected state-evolution: for GradNorm specifically,
+        `abs(w_tau - 1.0) >= 0.01 AND abs(w_pf - 1.0) >= 0.01` (BOTH weights
+        must move; the AND guards against half-graph-break failure modes).
+        The assertion must raise loud (AssertionError, not skip-log) so silent
+        degradation classes cannot recur.
+    Banking evidence: 4-pilot sequence [D-60] gate-pilot REOPEN
+    (201602 → 201607 → 201669 → 201712) demonstrating both failure modes the
+    rule guards against:
+    - **201602** (no rule applied): silent 5000-step null run on hardcoded
+      `simplified=True` GradNorm with bug-#1 (`shared_params=[l1_gn.w_tau]`
+      placeholder); wasted full pilot budget. Counterfactual: had rule been
+      applied, neither the unit test nor the contract assertion existed; null
+      would have shipped unnoticed.
+    - **201607** (deliberate-red dispatch validating contract assertion bite):
+      contract assertion fired at step 100 on the still-buggy code in ~5 min,
+      proving the assertion's necessary condition (raises loud + driver
+      exit 1 + visible AssertionError trace) before any fix landed.
+    - **201669** (contract assertion catches bug #2): post-Commit-B fix that
+      addressed bug #1 (`shared_params=list(model.parameters())`) but did NOT
+      address bug #2 (`.item() → np.mean → float → torch.tensor` graph-break
+      in loss-scalar construction at the call-site). The unit test (which
+      tested only wrapper internals, not call-site assembly) passed; the
+      contract assertion fired at step 100 in ~5 min — bug-class bounded.
+    - **201712** (integration test + contract assertion both green; real
+      training-dynamics evidence reached): post-Commit-D2 fix added a
+      behavioral integration test exercising the actual call-site loss
+      construction. Test passed locally (4 new + 14 prior = 18/18); pilot
+      ran 28 steps reaching real training-dynamics evidence (R-b retire at
+      step 200 on `var_pf_band_ratio = 0.0063`, not on a hidden wiring bug).
+      The R-b retire IS a scientific result, NOT a bug; it could only emerge
+      after the twin-gate discipline closed the wiring-bug-class hazards.
+    R-rule promotion path: candidate banked DEFERRED at gate-pilot iteration-2
+    (one operational test); promoted to BANKED at gate-pilot iteration-3 PI
+    final absorption (4 pilots of evidence; pattern of behavioral-test bite
+    against wiring failure modes confirmed). Cite: LEDGER §3 [D-60] gate-pilot
+    REOPEN block, sub-items 2026-05-21 through 2026-05-22.
+
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
 The user has authorized the near-term mission as: **complete the first
