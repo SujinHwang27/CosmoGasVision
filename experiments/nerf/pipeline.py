@@ -227,6 +227,16 @@ def parse_args(argv=None):
                    default=None,
                    help="[sprint-L1] Directory to drop retire.json on a "
                         "retire-trigger. Defaults to checkpoint_dir.")
+    p.add_argument("--gradnorm-full", dest="gradnorm_full",
+                   action="store_true",
+                   help="[sprint-L1 gate-8 Option A(b) rescue] Instantiate the "
+                        "GradNormWrapper with simplified=False (full Chen+ 2018 "
+                        "second-order autograd path). Default OFF — the "
+                        "simplified loss-magnitude proxy (G_i = w_i * |L_i|) is "
+                        "the NON-PROVISIONAL default per job 201587. This flag "
+                        "is the fallback knob added after the proxy was "
+                        "falsified at T3 scale (gradnorm_runaway retire at "
+                        "step 2271, w_ratio=0.000867).")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
@@ -832,7 +842,7 @@ def train(args):
     l1_gn_opt = None
     if args.enable_l1_pf_loss:
         from src.training.p_flux_loss import GradNormWrapper
-        # Use simplified=True (G_i = w_i * |L_i|, loss-magnitude proxy) to
+        # Default: simplified=True (G_i = w_i * |L_i|, loss-magnitude proxy) to
         # avoid the second-order ``torch.autograd.grad(create_graph=True)``
         # path through ``volume_render_physics``. The double-backward path
         # is the technically correct Chen+ 2018 formulation but it segfaults
@@ -840,15 +850,22 @@ def train(args):
         # exit code 0xC0000005 before step 1). The loss-magnitude proxy is
         # a known practical approximation that preserves the GradNorm
         # balance dynamics under well-conditioned per-task loss scales.
+        #
+        # [gate-8 Option A(b) rescue] --gradnorm-full opts back into the full
+        # second-order Chen+ 2018 path. Triggered after job 201587 retired at
+        # step 2271 on R-g gradnorm_runaway (w_ratio=0.000867, w_pf saturated
+        # at 1.998), falsifying the simplified proxy at T3 scale per Chen+ 2018
+        # §3 motivation. Default remains simplified=True (NON-PROVISIONAL).
+        simplified_flag = not bool(args.gradnorm_full)
         l1_gn = GradNormWrapper(
             initial_w=(1.0, 1.0),
             alpha=args.l1_gradnorm_alpha,
-            simplified=True,
+            simplified=simplified_flag,
         ).to(device)
         l1_gn_opt = torch.optim.Adam(l1_gn.parameters(), lr=1e-3)
         print(
             f"[sprint-L1] GradNorm wrapper active (alpha={args.l1_gradnorm_alpha}, "
-            f"simplified=True); w_tau=w_pf=1.0 at init.",
+            f"simplified={simplified_flag}); w_tau=w_pf=1.0 at init.",
             flush=True,
         )
     lr_lambda = build_lr_lambda(
