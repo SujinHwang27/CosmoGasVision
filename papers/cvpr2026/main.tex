@@ -3,8 +3,10 @@
 \documentclass[10pt,twocolumn,letterpaper]{article}
 
 %%%%%%%%% PAPER TYPE  - PLEASE UPDATE FOR FINAL VERSION
-% \usepackage{cvpr}              % To produce the CAMERA-READY version
-\usepackage[review]{cvpr}      % To produce the REVIEW version
+% Camera-ready / final mode: turns off line numbers and shows the author block.
+% (User-auth 2026-05-22: deliverables 2+3 discharged via this single toggle.)
+\usepackage{cvpr}              % To produce the CAMERA-READY version
+% \usepackage[review]{cvpr}      % To produce the REVIEW version
 % \usepackage[pagenumbers]{cvpr} % To force page numbers, e.g. for an arXiv version
 
 % Import additional packages in the preamble file, before hyperref
@@ -16,7 +18,7 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, shapes.geometric, backgrounds}
 
-% Canonical numerical chokepoint (single source of truth for result-claim numerals)
+% Canonical numerical chokepoint (single source of truth for result-claim numerals).
 \input{../shared/numbers}
 
 
@@ -39,7 +41,10 @@
 \title{CosmoGasVision: 3D Intergalactic Medium Reconstruction via Implicit Neural Representations}
 
 %%%%%%%%% AUTHORS - PLEASE UPDATE
-\author{Anonymous CVPR submission}
+\author{Sujin Hwang\\
+The University of Texas at Dallas\\
+{\tt\small sujin.hwang@utdallas.edu}
+}
 
 \begin{document}
 \maketitle
