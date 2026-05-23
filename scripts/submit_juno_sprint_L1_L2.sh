@@ -228,25 +228,33 @@ set -e
 
 echo "[preflight] DRYRUN_EXIT=${DRYRUN_EXIT}"
 
-# Pass criteria: exit 0, no NaN, both task losses present in log.
+# Pass criteria: exit 0, no NaN/Inf values in numerical fields, Step 1 line present.
+# Note: --pf-log-reduction lever lives in pf_log_mse_loss, NOT torch_p_flux (R26 catch
+# documented in LEDGER §3 v5); the lever activates only when the GradNorm wrapper
+# computes loss_pf during forward — at step 1 the rolled-up `Step 1/1 | loss=...` line
+# is the only signal. Per-task loss_pf / loss_tau lines fire at diag cadence
+# {100, 200, 500, 1000, 2000, 5000} — NOT at step 1 — so they cannot be the pre-flight
+# gate. Pre-flight signal is "step completes + finite loss + Training finished."
 if [[ "${DRYRUN_EXIT}" -ne 0 ]]; then
   echo "FATAL: 1-step CPU dry-run exited non-zero (${DRYRUN_EXIT}); aborting before Juno GPU." >&2
   exit 10
 fi
-if grep -Eiq "(nan|inf)" "${DRYRUN_LOG}"; then
-  echo "FATAL: 1-step CPU dry-run log contains NaN/Inf; aborting before Juno GPU." >&2
-  grep -Ei "(nan|inf)" "${DRYRUN_LOG}" | head -n 20 >&2 || true
+# Case-sensitive NaN/Inf check restricted to lines that look like numeric outputs
+# (Step N or loss= or grad=). Avoids false-positive on MLflow's "INFO" log lines.
+if grep -E "(Step [0-9]|loss=|grad=)" "${DRYRUN_LOG}" | grep -Eiq "\b(nan|inf|-inf)\b"; then
+  echo "FATAL: 1-step CPU dry-run log contains NaN/Inf in numeric field; aborting before Juno GPU." >&2
+  grep -E "(Step [0-9]|loss=|grad=)" "${DRYRUN_LOG}" | grep -Ei "\b(nan|inf|-inf)\b" | head -n 20 >&2 || true
   exit 11
 fi
-if ! grep -Eq "loss_pf" "${DRYRUN_LOG}"; then
-  echo "FATAL: 1-step CPU dry-run missing loss_pf signal; aborting before Juno GPU." >&2
+if ! grep -Eq "^Step 1/" "${DRYRUN_LOG}"; then
+  echo "FATAL: 1-step CPU dry-run missing 'Step 1' line; aborting before Juno GPU." >&2
   exit 12
 fi
-if ! grep -Eq "loss_tau" "${DRYRUN_LOG}"; then
-  echo "FATAL: 1-step CPU dry-run missing loss_tau signal; aborting before Juno GPU." >&2
+if ! grep -Eq "Training finished\." "${DRYRUN_LOG}"; then
+  echo "FATAL: 1-step CPU dry-run did not reach 'Training finished.'; aborting before Juno GPU." >&2
   exit 13
 fi
-echo "[preflight] PASS: dry-run completed 1 step, no NaN/Inf, both task losses observed."
+echo "[preflight] PASS: dry-run completed 1 step, no NaN/Inf in numeric fields, Training finished."
 echo "[preflight] dry-run artifacts retained at ${DRYRUN_DEST} for forensics."
 
 # --- 5. GPU + torch sanity ----------------------------------------------------
