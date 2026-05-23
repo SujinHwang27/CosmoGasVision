@@ -1,0 +1,17 @@
+Using device: cpu
+Data sanity check passed.
+Loaded 16384 rays. Normalizing to box 60000.0 kpc/h
+Normalized coord range: [0.0000, 0.9995]
+Run scope: 64 rays x 2048 bins (full grid).
+[D-24] DLA mask: 0/131072 bins excluded (0.000%).
+[D-39] saturation band: 404/131072 non-DLA bins in F_gt in (0.05, 0.30) (0.308%).
+[sprint-L1] truth flux cache: shape=(64, 2048) mean=0.9789 Var=6.4583e-03
+[sprint-L1] GradNorm wrapper active (alpha=0.12, simplified=False); w_tau=w_pf=1.0 at init.
+/work/sxh240010/CosmoGasVision/.venv/lib/python3.12/site-packages/mlflow/tracking/_tracking_service/utils.py:184: FutureWarning: The filesystem tracking backend (e.g., './mlruns') is deprecated as of February 2026. Consider transitioning to a database backend (e.g., 'sqlite:///mlflow.db') to take advantage of the latest MLflow features. See https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store for migration guidance.
+  return FileStore(store_uri, store_uri)
+Connected to MLflow at  [Experiment: CosmoGasVision/NeRF]
+Run id: 81a98d01095747858a3d7fc7f50ee798
+Model: 494084 params + log_tau_amp scalar.
+Step 1/1 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3873 | clip=4397.714 | lr=1.00e-07 | tau_amp=1.0000
+[checkpoint] step=1 -> /work/sxh240010/CosmoGasVision/cloud_runs/sprint_L1_L2_202109/dryrun/checkpoints/step_000001.pt
+Training finished.

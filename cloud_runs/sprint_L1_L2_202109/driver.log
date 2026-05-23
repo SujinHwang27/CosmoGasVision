@@ -1,0 +1,29 @@
+Using device: cuda
+Data sanity check passed.
+Loaded 16384 rays. Normalizing to box 60000.0 kpc/h
+Normalized coord range: [0.0000, 0.9995]
+Run scope: 64 rays x 2048 bins (full grid).
+[D-24] DLA mask: 0/131072 bins excluded (0.000%).
+[D-39] saturation band: 404/131072 non-DLA bins in F_gt in (0.05, 0.30) (0.308%).
+[sprint-L1] truth flux cache: shape=(64, 2048) mean=0.9789 Var=6.4583e-03
+[sprint-L1] GradNorm wrapper active (alpha=0.12, simplified=False); w_tau=w_pf=1.0 at init.
+MLflow connection issue: API request to http://127.0.0.1:5000/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=CosmoGasVision%2FNeRF (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+Run id: None
+Model: 494084 params + log_tau_amp scalar.
+Step 1/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3868 | clip=29751.807 | lr=1.00e-07 | tau_amp=1.0000
+Step 2/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3870 | clip=19961.602 | lr=2.00e-07 | tau_amp=1.0000
+Step 3/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3850 | clip=2102.418 | lr=3.00e-07 | tau_amp=1.0000
+Step 4/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3641 | clip=3361.529 | lr=4.00e-07 | tau_amp=1.0000
+Step 5/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.4005 | clip=24689.270 | lr=5.00e-07 | tau_amp=1.0000
+Step 6/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3016 | clip=3745.858 | lr=6.00e-07 | tau_amp=1.0000
+Step 7/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3992 | clip=16299.142 | lr=7.00e-07 | tau_amp=1.0000
+Step 8/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3886 | clip=7896.946 | lr=8.00e-07 | tau_amp=1.0000
+Step 9/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3940 | clip=18834.877 | lr=9.00e-07 | tau_amp=1.0000
+Step 10/5000 | loss=0.0342 (data=0.0220, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.4045 | clip=4634.551 | lr=1.00e-06 | tau_amp=1.0000
+Step 50/5000 | loss=0.0342 (data=0.0220, meanF=1.2169e-02, prior=0.0000) | <F>=0.8687 | grad=0.3739 | clip=13712.569 | lr=5.00e-06 | tau_amp=1.0001
+[sprint-L1] per-task grad-norm @ step 100: tau=0.028456, pf=55.613976, ratio=1954.376117
+Step 100/5000 | loss=0.0342 (data=0.0220, meanF=1.2199e-02, prior=0.0000) | <F>=0.8686 | grad=0.3604 | clip=2472.764 | lr=1.00e-05 | tau_amp=1.0004
+Step 150/5000 | loss=0.0344 (data=0.0221, meanF=1.2256e-02, prior=0.0000) | <F>=0.8683 | grad=0.3895 | clip=2193.824 | lr=1.50e-05 | tau_amp=1.0009
+[sprint-L1] per-task grad-norm @ step 200: tau=0.028836, pf=41.200909, ratio=1428.790087
+Step 200/5000 | loss=0.0345 (data=0.0222, meanF=1.2334e-02, prior=0.0000) | <F>=0.8679 | grad=0.3961 | clip=2169.090 | lr=2.00e-05 | tau_amp=1.0016
+[sprint-L1] RETIRE @ step 200: R-b:pf_pred_variance_collapse. Wrote /work/sxh240010/CosmoGasVision/cloud_runs/sprint_L1_L2_202109/checkpoints/retire.json. Exiting 0 (PCV pattern).
