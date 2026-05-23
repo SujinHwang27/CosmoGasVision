@@ -210,9 +210,9 @@ set +e
       --enable-l1-pf-loss \
       --pf-log-reduction "${PF_LOG_REDUCTION}" \
       --physics "${PHYSICS}" \
-      --n_rays 4 \
+      --n_rays 64 \
       --seed "${SEED}" \
-      --microbatch 4 \
+      --microbatch 64 \
       --max_steps 1 \
       --lr_max "${LR_MAX}" \
       --warmup_steps "${WARMUP_STEPS}" \
