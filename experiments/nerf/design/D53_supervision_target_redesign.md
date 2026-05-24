@@ -165,7 +165,7 @@ Same as (a) and (b): ≤30 min Juno A30 at P1-T1, step-200 instrumentation, CPU 
 | 3. Pre-committed falsification | DONE — step-200 var<1e-3 + (a)-specific | DONE — step-200 var<1e-3 + w_ratio>50k trigger | DONE — step-200 var<1e-3 + w_ratio-in-L1-range trigger |
 | 4. Falsified-prior cascade verbs | DONE — text-level audited above | DONE — text-level audited above | DONE — text-level audited above |
 | 5. Prior-failure ledger | DONE — table at doc top, all 4 attempts | DONE (shared with (a)) | DONE (shared with (a)) |
-| 6. Compute envelope + smoke | DONE — derived from L2 sbatch | DONE — derived from L2 sbatch | PARTIAL — implementation wallclock unestimated |
+| 6. Compute envelope + smoke | DONE — derived from L2 sbatch | DONE — derived from L2 sbatch | PARTIAL — implementation wallclock unestimated (ranking input only, NOT dispatch blocker) |
 
 ## Recommended panel-review scope
 
@@ -177,6 +177,8 @@ Per [D-37]-ext, panel should focus attacks on:
 4. **Soft-binning convention for candidate (a)** — PDF differentiability requires a kernel choice (Gaussian / triangular / sigmoid-sum); panel should specify the kernel + bandwidth before dispatch, since the soft-binning approximation directly affects the K2-equivalent test tolerance.
 5. **σ_k² estimator choice for candidate (b)** — batch-sample-variance vs. analytical-theory-prediction vs. fixed-per-mode-prior. Panel pre-commits before dispatch.
 6. **Multi-task weighting choice for candidate (c)** — `{gradnorm-full, kendall-uncertainty, mgda-ub}`. Panel pre-commits one for first attempt; the other two are NOT auto-fallbacks (would re-open within-[D-53] iteration that [D-61] stop-gate forbids).
+
+**Binding-decision discipline (per PI re-review 2026-05-23, R15-cascade lockdown)**: Panel's pre-commitment of (i) first-candidate selection (item 3), (ii) kernel choice for (a) (item 4), (iii) σ_k² estimator for (b) (item 5), and (iv) multi-task weighting for (c) (item 6) are **BINDING**. PI does NOT re-open these decisions post-panel verdict; the only re-open mechanism is empirical (panel re-review on step-200 result of the first-dispatched candidate). This locks down against post-panel PI drift per R15-cascade discipline.
 
 ## Honest-framing notes per [D-37] rule (a)
 
