@@ -398,6 +398,56 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     KILLER-3-follow-up sub-bullet, 2026-05-22; LEDGER §7 history
     paragraph 2026-05-22.
 
+**Extension 2 update (added 2026-05-24 per [D-66]/[D-67] 4th-panel-overturn pattern — PI dispatch-sequence procedural omission):**
+
+27. **PI dispatch-sequence rung-count cross-check (BANKED, 2026-05-24).**
+    PI dispatch-sequence authoring (the explicit list of agent-dispatches
+    that follow from an absorption verdict) must enumerate every
+    code-state-landing step named in the predecessor design doc as a
+    SEPARATE dispatch-ladder rung BEFORE any downstream-agent dispatch
+    (infrastructure-manager, defense-panel, etc.). Mandatory cross-check
+    before issuing the dispatch list:
+
+    **dispatch-ladder rung count ≥ predecessor design-doc landing-
+    artifact count**
+
+    Trigger pattern: PI authors design doc spec'ing N code/data
+    landing artifacts (e.g., "(i) `src/models/foo.py` ~100 lines,
+    (ii) `nerf.py` integration, (iii) `--bar` CLI flag, (iv) estimator-
+    equivalence re-cert"); later PI authors dispatch sequence with
+    fewer than N rungs, dispatching downstream agents to act on a
+    code path that doesn't exist yet. Banking provenance: [D-66] (3)
+    sbatch dispatch sequence — PI v8 ladder rung count = 2 (CPU
+    pre-flight + sbatch authoring) vs design-doc landing-artifact
+    count = 3+ (fgpa_prior + nerf wiring + flag + estimator-equiv
+    re-cert). Caught by defense-panel S2 finding "infrastructure-
+    manager literally cannot author the sbatch — the flag does not
+    exist."
+
+    R-rule promotion path: BANKED at first sighting because the
+    failure mode is mechanically demonstrable (dispatch-ladder rung
+    count is a literal integer that can be cross-checked against
+    design-doc artifact count) and the cost of the failure mode is
+    a wasted panel review cycle. R12 second-sighting-cross-track
+    not required for mechanical-discipline rules. Cite: LEDGER §3
+    [D-66] block + [D-67] R18 banking entry, 2026-05-24.
+
+28. **PI dispatch-sequence authoring is PROVISIONAL by default
+    (BANKED candidate, DEFERRED operational spec per R12, 2026-05-24).**
+    R15's "PROVISIONAL by default" discipline extends from stage-gate
+    sign-offs and inherited-claim re-verifications to PI-authored
+    dispatch sequences themselves. Lift mechanisms: (a) defense-panel
+    pre-review APPROVE on the dispatch ladder, OR (b) explicit
+    annotation in the dispatch list that "this sequence is single-rung
+    and contains no design-doc-spec'd landing steps" (e.g., a routine
+    monitor-existing-job dispatch). Banking trigger: 4-panel-overturn
+    pattern this session (2026-05-13a sprint-5 source-choice; 2026-05-13b
+    [D-52] scope-lock; 2026-05-22 [D-62] candidate-set; 2026-05-24 (3)
+    sbatch spec) is operational evidence that R15 default should extend
+    to dispatch-sequence authoring. R12 second-sighting-cross-track-
+    instance required before formal banking (defer). Cite: LEDGER §3
+    [D-67] block, 2026-05-24.
+
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
 The user has authorized the near-term mission as: **complete the first
