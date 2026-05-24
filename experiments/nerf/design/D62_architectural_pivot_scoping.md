@@ -85,7 +85,7 @@
 
 **Pre-committed falsification criteria (BOTH active):**
 - Standard close: same step-200 R-b pattern on the finetune stage (`var_pf_band_ratio < 1e-3`).
-- **Quantitative prior-decay close (new):** measure density-MSE at pretrain end vs density-MSE after flux-finetune step 200. If `density_MSE(finetune step 200) / density_MSE(pretrain end) > 2` → close as **"pretraining-prior-decayed-beyond-budget"** (the EWC mechanism failed to hold the density-realism prior against the flux-finetune gradient).
+- **Quantitative prior-decay close (new):** measure density-MSE at pretrain end vs density-MSE after flux-finetune step 200. If `density_MSE(finetune step 200) / density_MSE(pretrain end) > 2` → close as **"pretraining-prior-decayed-beyond-budget"** (the EWC mechanism failed to hold the density-realism prior against the flux-finetune gradient). **Threshold provenance per panel R15-lift PROBE 2 absorption 2026-05-24**: `> 2` is **expert-prior heuristic** (1 OOM short of full decay = double-the-loss as informal "doubled error" threshold familiar from training-curve sanity checks); precise calibration to "1-σ-equivalent of pretrain-loss-plateau noise" deferred to core-implementer EWC scoping pass — revision-window AT (2)-spec time before Juno dispatch.
 
 ### Candidate (1) — architecture-swap — DEFERRED, supervision-target-coupled reframe required
 
@@ -117,7 +117,7 @@
    (5) PASS (P2 stable, var_pf_band_ratio > 1e-3 sustained)
      → [D-64] L1-scope-revision ACTIVATES (pathology P1-thermal-state-specific)
      → CVPR claim narrows to multi-physics generalization gap
-     → [D-62] candidate ladder DE-ACTIVATES on this branch
+     → [D-62] candidate ladder DE-ACTIVATES (regardless of (4) outcome — (5) PASS is sufficient for [D-64] activation; (5)-PASS-after-(4)-FAIL still fully de-activates [D-62] because the supervision-target-structure inference is invalidated by physics-variant specificity per panel R15-lift PROBE 1 absorption 2026-05-24)
    (5) FAIL (R-b at step 200)
      → Pathology NOT P1-specific; inference strengthened
      → On (4) ALSO FAIL: [D-62] candidate ladder ACTIVATES at (3)
