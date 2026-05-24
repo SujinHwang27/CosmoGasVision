@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=sprint-L2-knorm-bspec-firstdispatch
+#SBATCH --job-name=sprint-L2-knorm-bspec-redispatch-fullladder
 #SBATCH --partition=a30
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
-#SBATCH --time=04:00:00
+#SBATCH --time=24:00:00
 #SBATCH --mail-type=END
 #SBATCH --output=sprint-L2-knorm-juno-%j.out
 #SBATCH --error=sprint-L2-knorm-juno-%j.err
-#SBATCH --comment="D-53 (b) panel-bound 2026-05-23 first dispatch; ledger amend v6"
+#SBATCH --comment="D-53 (b) re-dispatch post-R20-v2; full ladder max_steps=5000; ledger amend v6"
 
 # Sprint-L2 knorm [D-53] candidate (b) — k-space-normalized P_F target,
 # panel-bound first dispatch on Juno A30. Routing source: defense-panel
@@ -44,12 +44,22 @@
 #
 # STOP-GATE CALIBRATION (panel-bound clarification)
 # -------------------------------------------------
+# - Step 100: R20-v2 contract assertion (wrapper liveness + balanced-regime
+#   admission per PI v6 2026-05-24 absorption of 202259 false-positive).
 # - Step 200: PASS is PROVISIONAL (necessary, not sufficient — broke from
-#   L1 cluster but does not establish rescue).
+#   L1 cluster but does not establish rescue). Per-task ratio in [0.01, 100]
+#   sustained, no NaN.
 # - Step 1000: PASS is BINDING rescue verdict (var_pf_band_ratio > 0.05).
-# - Step 5000: PASS is generalization confirmation (var_pf_band_ratio > 0.3).
-# This smoke targets the 200-step retire-or-pass window only (max_steps=200);
-# the 1000/5000 gates require a separate longer dispatch on PROVISIONAL pass.
+#   This threshold is locked per [D-37] symmetric-disclosure; post-hoc
+#   relaxation forbidden absent symmetric-disclosure entry. 0.04 = FAIL,
+#   NOT "close enough."
+# - Step 5000: PASS is generalization confirmation (var_pf_band_ratio > 0.05
+#   sustained, no late-train collapse).
+# This re-dispatch (post-R20-v2 calibration) targets the FULL ladder
+# (max_steps=5000) to reach step-1000 BINDING gate. Prior 202259 dispatch
+# (max_steps=200) crashed at step 100 on R20-v1 false-positive — substantive
+# finding: per-task ratio = 0.98 at step 100 (4.36 log10-decade reduction
+# vs L1-class O(10^4)). See LEDGER §3 [D-53] (b) 202259 absorption block.
 #
 # HONEST FRAMING ([D-37] rule (a), hedged verbs throughout)
 # ---------------------------------------------------------
@@ -83,7 +93,7 @@
 #   --n_rays 64                      T1 scale
 #   --seed 0
 #   --microbatch 256
-#   --max_steps 200                  *** SMOKE-ONLY *** (NOT 5000)
+#   --max_steps 5000                 *** FULL LADDER *** (post-R20-v2 re-dispatch)
 #   --mean_flux_obs 0.979            z=0.3 Becker+ 2013 anchor [D-11]
 #   --l1-d24-baseline-tau-mse 0.01   R-a backstop
 #   --checkpoint_interval 200        end-state checkpoint only
@@ -105,15 +115,15 @@ PHYSICS=1
 N_RAYS=64
 SEED=0
 MICROBATCH=256
-MAX_STEPS=200                     # smoke-only window for step-200 retire-or-pass
+MAX_STEPS=5000                    # full ladder (post-R20-v2 re-dispatch) per PI v6
 MEAN_FLUX_OBS=0.979
 L1_D24_BASELINE_TAU_MSE=0.01
-CHECKPOINT_INTERVAL=200
+CHECKPOINT_INTERVAL=1000          # checkpoint at step-1000 BINDING gate + step-5000
 LR_MAX=1e-4
 WARMUP_STEPS=1000
 
 # Abort-guard tunables (carry from L2):
-STEPRATE_CHECK_AT_STEP=100        # tightened for 200-step smoke
+STEPRATE_CHECK_AT_STEP=1000       # standard 1000-step check for full ladder
 STEPRATE_MIN_THRESH=0.005
 
 # --- 1. RUN_TAG generation ----------------------------------------------------
