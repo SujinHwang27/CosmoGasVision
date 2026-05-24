@@ -86,7 +86,9 @@ Pre-committed test analogous to [D-60] gate-4 K2 (`tests/test_torch_pf_estimator
 
 ### 1. Mechanism prediction
 
-**Proposed property of the target that produces non-degenerate gradients on the diffuse-bin majority:** the k-space-normalized P_F target re-weights the per-mode contribution to the loss by `1 / σ_k²` (per-mode variance), so high-variance modes (typically low-k, dominated by saturated absorbers) do not dominate the gradient over low-variance modes (typically high-k inertial-band modes, dominated by diffuse-bin contributions). In the current `pf_log_mse_loss` (`src/training/p_flux_loss.py:262`) the inertial-band sum/mean is taken on `(log P_pred − log P_truth)²` per bin; candidate (b) replaces this with `Σ_k (P_pred(k) − P_truth(k))² / σ_k²(truth)` where `σ_k²` is estimated from sample variance across the batch's sightlines at each k-bin.
+**Proposed property of the target that produces non-degenerate gradients on the diffuse-bin majority:** the k-space-normalized P_F target re-weights the per-mode contribution to the loss by `1 / σ_k²` (per-mode variance), so high-variance modes (typically low-k, dominated by saturated absorbers) do not dominate the gradient over low-variance modes (typically high-k inertial-band modes, dominated by diffuse-bin contributions). In the current `pf_log_mse_loss` (`src/training/p_flux_loss.py:262`) the inertial-band sum/mean is taken on `(log P_pred − log P_truth)²` per bin; candidate (b) replaces this with `L = Σ_k (P_pred(k) − P_truth(k))² / σ_k²_truth(k)` where σ_k² is **truth-side** (NOT predicted-side — see panel pre-commit below).
+
+**Panel-binding pre-commit on σ_k² estimator (defense-panel design review 2026-05-23, KILLER-1 absorption)**: σ_k² estimator is **truth-side, batch-sample, EMA-stabilized with decay 0.99**, with floor `σ²_floor = 0.01 × median_k(σ_k²_truth)` (relative, not the prior-absolute 1e-12). Truth-side eliminates chicken-and-egg (predicted-side at step 0 is degenerate: all rays initialized to ~same field → σ_k² ≈ 0 → 1/σ_k² → ∞ → gradient explodes). EMA decay 0.99 stabilizes batch noise. Relative floor prevents single-mode dominance (absolute 1e-12 is 6 OOM below typical P_F values ~10⁻⁵-10⁻³ s/km; any mode at floor would dominate loss by ~10⁸). **Honest disclosure**: with truth-side σ_k², candidate (b) is functionally "fixed per-mode reweighting" with EMA smoothing — NOT "adaptive" in the predicted-side sense. The mechanism remains valid (truth-side reweighting amplifies gradient on collapsing modes), but the "adaptive" framing is dropped.
 
 **Why THIS target might rescue variance collapse where L1's τ-MSE-derived target did not (hedged):** the L1 sequence's pathology was variance collapse on the **predicted** P_F band — i.e., `var(P_pred(k))` → 0 across modes. A per-mode normalization by **truth-side** variance amplifies gradient signal on the high-k diffuse-band modes where the model is collapsing; this is mechanism-adjacent to the v3 KILLER-3 reduction-op intuition but operates **on the target structure, not the reduction operator**, so it is not in the L1 closed class.
 
@@ -94,7 +96,7 @@ Pre-committed test analogous to [D-60] gate-4 K2 (`tests/test_torch_pf_estimator
 
 ### 2. Estimator-equivalence test specification
 
-**K2-equivalent for candidate (b):** new `tests/test_torch_pf_knorm_estimator_equivalence.py` that asserts (i) the per-mode `σ_k²` estimator (`torch_per_mode_variance(batch_flux)`) matches a numpy reference at `rtol=1e-4 / atol=1e-6` over 10 batches; (ii) the full k-normalized loss reduces to the standard `pf_log_mse_loss` in the degenerate case `σ_k² = const ∀ k` (loss-form sanity check); (iii) gradient `∂L/∂flux` is finite and non-NaN under the smallest-allowed `σ_k²` floor (numerical-stability floor pre-commit at `σ_k²_floor = 1e-12`).
+**K2-equivalent for candidate (b):** new `tests/test_torch_pf_knorm_estimator_equivalence.py` that asserts (i) the per-mode `σ_k²` estimator (`torch_per_mode_variance(batch_flux)`) matches a numpy reference at `rtol=1e-4 / atol=1e-6` over 10 batches; (ii) the full k-normalized loss reduces to the standard `pf_log_mse_loss` in the degenerate case `σ_k² = const ∀ k` (loss-form sanity check); (iii) gradient `∂L/∂flux` is finite and non-NaN under the smallest-allowed `σ_k²` floor — pre-commit (panel-bound 2026-05-23, PROBE absorption): **σ²_floor = 0.01 × median_k(σ_k²_truth)** (relative, NOT absolute 1e-12 which would let any sub-floor mode dominate loss by ~10⁸ given typical P_F values ~10⁻⁵-10⁻³ s/km).
 
 K2 itself (`tests/test_torch_pf_estimator_equivalence.py`) is preserved by construction — `torch_p_flux` is unchanged; only the **downstream loss reduction** is modified.
 
@@ -102,7 +104,7 @@ K2 itself (`tests/test_torch_pf_estimator_equivalence.py`) is preserved by const
 
 **Same step-200 R-b pattern as (a).** `var_pf_band_ratio < 1e-3` at step 200 closes this candidate as R-b → [D-62] stop-gate. Step 1000 / 5000 / Amendment B criteria same as (a).
 
-**Additional candidate-(b)-specific FAIL trigger:** if the per-mode normalization causes the per-task `w_ratio` to **inflate** at step 200 (e.g., > 50000 vs. L1 cluster's [1429, 20807]) AND `var_pf_band_ratio < 1e-3`, this surfaces as **"normalization-amplification-without-rescue"** — close immediately as R-b WITHOUT waiting for step 1000.
+**Additional candidate-(b)-specific FAIL trigger (panel-bound 2026-05-23, KILLER-2 absorption — replaces prior arbitrary `w_ratio > 50000` threshold)**: if at step 200, **per-mode gradient-magnitude inflation `max_k(|∂L/∂F|) / median_k(|∂L/∂F|) > 100`** AND `var_pf_band_ratio < 1e-3`, this surfaces as **"normalization-amplification-without-rescue"** — close immediately as R-b WITHOUT waiting for step 1000. The grad-magnitude inflation metric directly indexes the failure-mode the trigger is named for (per-mode gradient blowup driven by σ_k² floor edge cases), unlike the prior `w_ratio > 50000` which was an arbitrary multiple of L1's worst observed range without mechanism derivation.
 
 ### 4. Falsified-prior cascade hedged verbs (text-level audit)
 
@@ -117,7 +119,9 @@ Identical compute envelope as (a): ≤30 min Juno A30 at P1-T1 with step-200 ins
 
 ---
 
-## Candidate (c) — Hybrid τ + P_F per-task-weighted supervision
+## Candidate (c) — Hybrid τ + P_F per-task-weighted supervision [STATUS: EXPLORATORY — REJECTED for first-slot dispatch per defense-panel 2026-05-23]
+
+**Panel verdict (binding, 2026-05-23)**: REJECTED for first-slot dispatch. Mechanism prediction is the weakest of the three candidates (§1 self-discloses 1-2 OOM gap to Chen+ 2018 / Sener-Koltun demonstrated regime — the same KILLER-2/SERIOUS-5 caveat the L1 v4→v5 cascade already absorbed and retracted). Implementation wallclock highest. Gradient-independence test as written (§2 "cosine similarity finite and bounded") is vacuously satisfiable. Candidate (c) is **eligible for later-slot dispatch ONLY** if (a) and (b) both R-b retire at step 200 AND defense-panel re-review approves either (i) reframe as exploratory architectural change with 5-decade-weaker mechanism claim than (a)/(b), OR (ii) synthetic-task evidence demonstrating chosen multi-task weighting handles 10³× imbalance before Juno commit. Panel-pre-committed selector if (c) later-dispatched: **Kendall uncertainty-weighting (arXiv:1705.07115)** — strongest mechanism match for "rescue from large per-task scale imbalance" among `{gradnorm-full, kendall-uncertainty, mgda-ub}`. The (c) text below is retained as design-record per [D-37] rule (a) honest-record (not paper-content propagation); it does NOT carry first-slot or auto-fallback status.
 
 ### 0. Literature audit + honest framing per [D-37] rule (a)
 
@@ -179,6 +183,18 @@ Per [D-37]-ext, panel should focus attacks on:
 6. **Multi-task weighting choice for candidate (c)** — `{gradnorm-full, kendall-uncertainty, mgda-ub}`. Panel pre-commits one for first attempt; the other two are NOT auto-fallbacks (would re-open within-[D-53] iteration that [D-61] stop-gate forbids).
 
 **Binding-decision discipline (per PI re-review 2026-05-23, R15-cascade lockdown)**: Panel's pre-commitment of (i) first-candidate selection (item 3), (ii) kernel choice for (a) (item 4), (iii) σ_k² estimator for (b) (item 5), and (iv) multi-task weighting for (c) (item 6) are **BINDING**. PI does NOT re-open these decisions post-panel verdict; the only re-open mechanism is empirical (panel re-review on step-200 result of the first-dispatched candidate). This locks down against post-panel PI drift per R15-cascade discipline.
+
+## Stop-gate criteria (panel-bound clarification 2026-05-23)
+
+The uniform falsification criterion `var_pf_band_ratio < 1e-3 at step 200` is a **necessary** indicator but NOT sufficient. Panel-bound calibration for [D-37] honest-reporting:
+
+- **Step 200**: PASS is **PROVISIONAL** — necessary condition, indicates the candidate broke from the L1 cluster's [6.9e-7, 2.93e-6] range, but does not establish rescue. Continue training.
+- **Step 1000**: PASS is the **BINDING rescue verdict** — `var_pf_band_ratio > 0.05` at step 1000 establishes that the candidate has materially rescued the variance collapse (~4-5 OOM above L1 cluster + maintained past the warmup-zone diagnostic threshold per [D-60] v3 KILLER-1 analog).
+- **Step 5000**: PASS is **generalization confirmation** — `var_pf_band_ratio > 0.3` at step 5000 establishes training-dynamics survival (analog of [D-60] gate-pilot 5k-survival bar from v3 §3 pre-commit).
+
+**Disclosure for marginal outcomes per [D-37] rule (a)**: if a candidate's `var_pf_band_ratio > 1e-3` at step 200 but reverts to L1-range by step 1000, the candidate is reported as **"step-200 PROVISIONAL PASS, step-1000 BINDING FAIL"** — NOT as "ambiguous" or "needs more data." The step-1000 result is dispositive.
+
+---
 
 ## Honest-framing notes per [D-37] rule (a)
 
