@@ -1,0 +1,230 @@
+Using device: cuda
+Data sanity check passed.
+Loaded 16384 rays. Normalizing to box 60000.0 kpc/h
+Normalized coord range: [0.0000, 0.9995]
+Run scope: 64 rays x 2048 bins (full grid).
+[D-24] DLA mask: 238/131072 bins excluded (0.182%).
+[D-39] saturation band: 613/130834 non-DLA bins in F_gt in (0.05, 0.30) (0.469%).
+[sprint-L1] truth flux cache: shape=(64, 2048) mean=0.9699 Var=1.2196e-02
+[sprint-L1] GradNorm wrapper active (alpha=0.12, simplified=False); w_tau=w_pf=1.0 at init.
+[sprint-L2-knorm] active: pf_log_mse_loss SWAPPED for pf_knorm_loss (linear-domain Σ_k r_k² / σ_k²_truth_ema, EMA decay 0.99, floor 0.01×median_k). Panel-bound first dispatch of [D-53] candidate (b).
+MLflow connection issue: API request to http://127.0.0.1:5000/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='127.0.0.1', port=5000): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=CosmoGasVision%2FNeRF (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=5000): Failed to establish a new connection: [Errno 111] Connection refused"))
+Run id: None
+Model: 494084 params + log_tau_amp scalar.
+[sprint-L2-knorm] step 1: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 1/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3910 | clip=1.023 | lr=1.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 2: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 2/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3966 | clip=0.972 | lr=2.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 3: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 3/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.4023 | clip=1.156 | lr=3.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 4: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 4/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.4011 | clip=1.163 | lr=4.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 5: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 5/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.4047 | clip=1.891 | lr=5.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 6: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 6/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3262 | clip=0.850 | lr=6.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 7: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 7/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.3334 | clip=0.843 | lr=7.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 8: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 8/200 | loss=0.0443 (data=0.0322, meanF=1.2160e-02, prior=0.0000) | <F>=0.8687 | grad=0.2968 | clip=0.753 | lr=8.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 9: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 9/200 | loss=0.0443 (data=0.0322, meanF=1.2159e-02, prior=0.0000) | <F>=0.8687 | grad=0.4059 | clip=1.590 | lr=9.00e-07 | tau_amp=1.0000
+[sprint-L2-knorm] step 10: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 10/200 | loss=0.0443 (data=0.0322, meanF=1.2159e-02, prior=0.0000) | <F>=0.8687 | grad=0.2726 | clip=0.683 | lr=1.00e-06 | tau_amp=1.0000
+[sprint-L2-knorm] step 11: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 12: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 13: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 14: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 15: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 16: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 17: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 18: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 19: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 20: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 21: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 22: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 23: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 24: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 25: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 26: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 27: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 28: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 29: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 30: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 31: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 32: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 33: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 34: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 35: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 36: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 37: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 38: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 39: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 40: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 41: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 42: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 43: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 44: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 45: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 46: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 47: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 48: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 49: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 50: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 50/200 | loss=0.0443 (data=0.0321, meanF=1.2129e-02, prior=0.0000) | <F>=0.8689 | grad=0.4026 | clip=1.933 | lr=5.00e-06 | tau_amp=0.9999
+[sprint-L2-knorm] step 51: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 52: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 53: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 54: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 55: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 56: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 57: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 58: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 59: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 60: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 61: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 62: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 63: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 64: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 65: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 66: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 67: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 68: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 69: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 70: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 71: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 72: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 73: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 74: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 75: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 76: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 77: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 78: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 79: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 80: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 81: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 82: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 83: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 84: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 85: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 86: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 87: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 88: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 89: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 90: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 91: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 92: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 93: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 94: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 95: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 96: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 97: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 98: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 99: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 100: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L1] per-task grad-norm @ step 100: tau=0.025557, pf=0.025787, ratio=1.008982
+Step 100/200 | loss=0.0441 (data=0.0321, meanF=1.2040e-02, prior=0.0000) | <F>=0.8693 | grad=0.4032 | clip=0.985 | lr=1.00e-05 | tau_amp=0.9996
+[sprint-L2-knorm] step 101: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 102: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 103: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 104: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 105: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 106: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 107: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 108: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 109: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 110: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 111: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 112: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 113: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 114: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 115: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 116: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 117: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 118: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 119: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 120: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 121: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 122: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 123: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 124: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 125: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 126: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 127: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 128: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 129: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 130: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 131: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 132: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 133: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 134: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 135: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 136: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 137: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 138: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 139: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 140: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 141: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 142: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 143: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 144: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 145: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 146: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 147: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 148: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 149: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 150: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+Step 150/200 | loss=0.0438 (data=0.0319, meanF=1.1893e-02, prior=0.0000) | <F>=0.8699 | grad=0.4078 | clip=1.319 | lr=1.50e-05 | tau_amp=0.9990
+[sprint-L2-knorm] step 151: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 152: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 153: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 154: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 155: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 156: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 157: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 158: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 159: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 160: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 161: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 162: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 163: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 164: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 165: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 166: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 167: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 168: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 169: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 170: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 171: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 172: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 173: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 174: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 175: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 176: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 177: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 178: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 179: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 180: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 181: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 182: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 183: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 184: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 185: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 186: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 187: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 188: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 189: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 190: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 191: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 192: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 193: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 194: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 195: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 196: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 197: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 198: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 199: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L2-knorm] step 200: sigma_k_floor=8.233776e-02, sigma_k_median=8.233776e+00, grad_inflation_metric=max_k|grad|/median_k|grad|=1.035274e+01
+[sprint-L1] per-task grad-norm @ step 200: tau=0.024969, pf=0.025174, ratio=1.008199
+Step 200/200 | loss=0.0435 (data=0.0318, meanF=1.1699e-02, prior=0.0000) | <F>=0.8708 | grad=0.4046 | clip=1.652 | lr=2.00e-05 | tau_amp=0.9983
+[sprint-L1] RETIRE @ step 200: R-b:pf_pred_variance_collapse. Wrote /work/sxh240010/CosmoGasVision/cloud_runs/diag_P2_202292/checkpoints/retire.json. Exiting 0 (PCV pattern).

@@ -1,0 +1,16 @@
+{
+  "retire_reason": "R-b:pf_pred_variance_collapse",
+  "step": 200,
+  "loss_total": 0.04346072372285874,
+  "loss_tau": 0.03176124021410942,
+  "loss_pf": 2.8540968894958496,
+  "inertial_rel_residual": 0.9998201468229042,
+  "var_F_ratio": 0.003389480543581045,
+  "var_pf_band_ratio": 3.741130571651015e-07,
+  "coh_median": 0.013952654786407948,
+  "n_coh_above_0p5": 0,
+  "w_tau": 1.0046203136444092,
+  "w_pf": 0.9953795671463013,
+  "w_ratio": 1.0092836618423462,
+  "mlflow_run_id": null
+}
