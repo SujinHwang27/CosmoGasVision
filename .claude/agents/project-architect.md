@@ -454,8 +454,9 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     mismatch is exactly the class of inherited-claim-without-re-verification
     R15 was banked for).
 
-29. **Gate-construction-vs-production-framing audit (BANKED candidate,
-    DEFERRED — 1 operational test, 2026-05-24).** Every smoke / pre-flight
+29. **Gate-construction-vs-production-framing audit (PROMOTED
+    candidate → BANKED 2026-05-24 per [D-68] amendment positive
+    operational test).** Every smoke / pre-flight
     / contract-assertion gate, before dispatch, must be checked that:
 
     (i) its measured quantity is in the same units / framing as the
