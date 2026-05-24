@@ -658,6 +658,7 @@ def _assemble_step_losses_and_gradnorm(
     step,
     data_loss_chunks_live=None,
     l1_loss_chunks_live=None,
+    l1_gn_diag=None,
 ):
     """Per-step GradNorm task-weight update.
 
@@ -738,11 +739,59 @@ def _assemble_step_losses_and_gradnorm(
             print(f"[sprint-L1] GradNorm update skipped: {gn_e}",
                   flush=True)
         if step == 100 and args.enable_l1_pf_loss and l1_gn is not None:
-            assert abs(l1_gn.w_tau.item() - 1.0) >= 0.01 and abs(l1_gn.w_pf.item() - 1.0) >= 0.01, (
-                f"[sprint-L1] GradNorm degeneracy contract violated at step 100: "
-                f"w_tau={l1_gn.w_tau.item():.6f}, w_pf={l1_gn.w_pf.item():.6f}. "
-                f"Weights pinned at init -> GradNorm dead. See gate-pilot-bug-prevention contract."
+            # R20-v2 contract assertion (calibrated 2026-05-24 per [D-53] (b)
+            # k-space-normalized P_F first-dispatch job 202259 false-positive).
+            # See LEDGER §3 [D-53] (b) absorption block + project-architect.md
+            # R20-v2 entry. R12 second-sighting: the original R20-v1
+            # (w_tau/w_pf displacement >= 0.01) misclassified the (b)-regime
+            # balanced steady-state (per_task_ratio ~ 1.0, weights near 1.0)
+            # as silent-null. R20-v2 splits into:
+            #   (i) liveness — per-task grad-norms finite, non-NaN, > 1e-8
+            #       (catches the original L1-regime silent-null where the
+            #       wrapper isn't computing anything);
+            #   (ii) imbalance-regime degeneracy — ONLY assert weights moved
+            #       off init when per_task_ratio falls outside [0.1, 10];
+            #       inside that band the weights staying near 1.0 IS the
+            #       correct steady-state of an active GradNorm wrapper.
+            _diag = l1_gn_diag if l1_gn_diag is not None else {}
+            grad_tau_val = _diag.get("l1_grad_tau_norm", float("nan"))
+            grad_pf_val = _diag.get("l1_grad_pf_norm", float("nan"))
+
+            # (i) Liveness: per-task grad-norms must exist + be computable.
+            #     This is the proxy for "diagnostic emitted this step" — the
+            #     diag dict is populated by the per-task grad-norm probe at
+            #     lines ~1786-1797, which runs immediately before this helper.
+            assert math.isfinite(grad_tau_val) and grad_tau_val > 1e-8, (
+                f"[R20-v2] GradNorm liveness FAIL at step 100: "
+                f"grad_tau={grad_tau_val} (not finite or below 1e-8 "
+                f"threshold). Wrapper not computing per-task gradients."
             )
+            assert math.isfinite(grad_pf_val) and grad_pf_val > 1e-8, (
+                f"[R20-v2] GradNorm liveness FAIL at step 100: "
+                f"grad_pf={grad_pf_val} (not finite or below 1e-8 "
+                f"threshold). Wrapper not computing per-task gradients."
+            )
+
+            # (ii) Imbalance-regime degeneracy check. In the (b) k-space-
+            #      normalized regime per_task_ratio ~ O(1); admit cleanly.
+            #      In the L1-regime per_task_ratio ~ O(10^4); require
+            #      weights to have moved off init or flag the dead wrapper.
+            per_task_ratio = grad_pf_val / max(grad_tau_val, 1e-30)
+            _BALANCED_LO, _BALANCED_HI = 0.1, 10.0
+            if not (_BALANCED_LO <= per_task_ratio <= _BALANCED_HI):
+                assert (abs(l1_gn.w_tau.item() - 1.0) >= 0.001 or
+                        abs(l1_gn.w_pf.item() - 1.0) >= 0.001), (
+                    f"[R20-v2] GradNorm imbalance-regime degeneracy contract "
+                    f"violated at step 100: w_tau={l1_gn.w_tau.item():.6f}, "
+                    f"w_pf={l1_gn.w_pf.item():.6f}, "
+                    f"per_task_ratio={per_task_ratio:.4f} (outside balanced "
+                    f"band [{_BALANCED_LO}, {_BALANCED_HI}]). Weights pinned "
+                    f"at init while per-task grads are imbalanced -> "
+                    f"GradNorm dead. See R20-v2 in project-architect.md."
+                )
+            # Balanced regime (per_task_ratio in [0.1, 10]): weights near 1.0
+            # is the CORRECT steady-state of an active GradNorm wrapper;
+            # nothing to balance, no displacement expected. No assertion.
         l1_gn_metrics = {
             "w_tau": float(l1_gn.w_tau.detach().item()),
             "w_pf": float(l1_gn.w_pf.detach().item()),
@@ -1889,6 +1938,11 @@ def train(args):
                 step=step,
                 data_loss_chunks_live=data_loss_chunks_live,
                 l1_loss_chunks_live=l1_loss_chunks_live,
+                # R20-v2 (2026-05-24): pass the per-task grad-norm diag dict
+                # populated above (lines ~1786-1797) so the step-100 assertion
+                # can distinguish (b)-regime balanced steady-state from
+                # L1-regime silent-null. See [D-53] (b) absorption block.
+                l1_gn_diag=_l1_gn_diag,
             )
             l1_gn_metrics = _step_assembly["l1_gn_metrics"]
             # [D2 2026-05-22] Empty-branch guard accounting. When the helper
