@@ -2,96 +2,153 @@
 
 ## Status
 
-- **PROVISIONAL** throughout. This is a research-mode scoping survey, NOT a design doc.
-- **Activated 2026-05-23** per defense-panel out-of-scope flag on [D-53] (commit `3074596`): the [D-62] stop-gate destination was undefined in [D-53]; scoping this BEFORE (b) dispatch ensures the R-b outcome of [D-53] has a concrete next step rather than a panic-design dispatch on a fresh empirical R-b.
-- Author: support-researcher per parent-PI scoping commission.
-- **No candidate pre-ranked.** Output is research-mode survey for PI's later design-stage commission if [D-53] candidate (b) fails first-binding step-200 R-b (or if all 3 [D-53] candidates exhaust without rescue).
-- Intended audience: defense-panel scoping review at [D-62] activation gate.
+- **PROVISIONAL pending defense-panel re-review on this re-authored D62 doc** (panel-bound R15-clause-(c) re-verification not available since panel diagnosis IS the operational test).
+- **Re-authored 2026-05-24** per defense-panel design review NEEDS WORK absorption + PI v7 verdict (LEDGER commit pending — see [D-62] addendum + [D-64] stub).
+- **Diagnostics (4)/(5) load-bearing on whether the [D-62] activation premise (supervision-target-structure inference) is mechanism-aligned or microbatch-coupled / P1-specific measurement artifact. PASS on either invalidates the [D-60]/[D-61]/[D-63] absorption stack and de-activates [D-62].**
+- Originally activated 2026-05-23 per defense-panel out-of-scope flag on [D-53] (commit `3074596`).
+- Author: support-researcher per parent-PI scoping commission; re-authored per PI v7 absorption.
+- Intended audience: defense-panel re-review on this re-authored D62 doc.
 
 ## Scope definition
 
-[D-62] activates **IF** [D-53] also fails — specifically: (i) the first [D-53] candidate dispatched (panel-bound = (b)) R-b at step 200, OR (ii) all 3 [D-53] candidates exhaust without rescue. [D-62] scope = **architectural intervention**: target the **model-side capacity / inductive-bias / reconstruction-target-class**, NOT loss-side. Loss-side is the closed class of [D-60] L1 (in-loss-function) ∪ [D-53] (supervision-target-redesign).
-
-## Candidate landscape (5 candidates, research-mode survey)
+[D-62] activates **IF** [D-53] also fails AND diagnostics (4) and (5) both R-b — specifically: (i) the first [D-53] candidate dispatched (panel-bound = (b)) R-b at step 200, OR (ii) all 3 [D-53] candidates exhaust without rescue, AND (iii) both diagnostics (4) microbatch=1024 and (5) P2 physics-variant return R-b at step 200. [D-62] scope = **architectural intervention**: target the **model-side capacity / inductive-bias / reconstruction-target-class**, NOT loss-side. Loss-side is the closed class of [D-60] L1 (in-loss-function) ∪ [D-53] (supervision-target-redesign).
 
 ---
 
-### Candidate 1 — Different model architecture (transformer / attention / convolutional)
+## §Absorption-Stack Diagnostics (dispatch FIRST; gate the candidate ladder)
 
-**Mechanism prediction (1 paragraph):** the current Voigt-integrator + MLP backbone treats each sightline ray as an independent forward pass through a coordinate-conditioned MLP. The variance collapse pathology may be **inductive-bias-coupled**: a coordinate MLP with sinusoidal positional encoding has limited capacity to represent the spatial-correlation structure of the IGM density field along the line-of-sight (the relevant scale is the Jeans length, ~100 kpc, ~1.5e-3 of unit-box; many MLP encodings under-resolve this). A transformer with self-attention along the ray (or across rays in a sightline-batch) could capture sightline-coherent structure that the MLP smooths over; this may break the variance-collapsed basin if the basin is partly an MLP-smoothing artifact. Convolutional discriminator (GAN-style) or VAE adversarial / reconstruction-prior architectures could enforce distributional realism on the density field as an architectural prior, not as a loss-side regularizer.
+> **Framing (binding):** these are **DIAGNOSTICS, NOT architectural pivots.** PASS on either routes to **[D-64] L1-scope-revision** (NOT [D-62] success). FAIL strengthens the supervision-target-structure inference and gates [D-62] candidate ladder activation. The candidate-set in §Architectural Candidates is GATED on (4)+(5) BOTH returning R-b.
 
-**Literature support:** Cabayol-García+ 2023 (`arXiv:2305.19064`) uses **transformer for IGM emulation** (P_1D regression from cosmology). Maitra/LyαNNA 2023 (`arXiv:2311.02167`) uses CNN+attention hybrid for inference. **No transformer-or-CNN IGM reconstruction (3-D field output) precedent** this researcher could locate — both cited works are summary-statistic regression, not 3-D field reconstruction. Honest framing per [D-37] rule (a): the architectural-trend support is for emulation/inference, not reconstruction; the inheritance claim is **weaker than apparent**.
+### Diagnostic (4) — microbatch=1024 — FIRST DISPATCH
 
-**Implementation complexity:** **architectural-rewrite**. Requires replacing `src/models/nerf.py` MLP backbone with transformer/attention module; differentiable Voigt integrator wrapper preserved. Estimate 1-2 sprint cycles (refactor + estimator equivalence re-certification).
+**Mechanism prediction (1 paragraph):** the L1 sequence ran at microbatch=256; if the per-mode P_F variance estimator is biased at small batch sizes (small-N sample variance underestimates true variance, biasing the model toward constant-flux solutions which match the underestimated low-variance target), then microbatch=1024 could shift the loss-surface geometry. This is **load-bearing diagnostic before any architectural commit**: PASS at microbatch=1024 means the variance-collapse pathology is microbatch-coupled at P1, the [D-60]/[D-61]/[D-63] supervision-target-structure inference does NOT hold, and the rescue is a scope-revision (NOT an architectural intervention).
 
-**Pre-committed falsification criterion:** same step-200 R-b pattern (`var_pf_band_ratio < 1e-3` at step 200 on P1-T1 smoke) closes this candidate, routing to candidate 2 or 3 per panel re-review.
+**Literature support:** small-batch P_F estimator bias is a known cosmology-statistics issue (the ensemble-average P_F is variance-biased at N < ~10³ sightlines; Iršič+ 2017 §4 systematic budget). No direct ML-training precedent for this being the IGM-NeRF-class pathology; cosmology-statistics support is solid.
 
----
+**Implementation complexity:** pipeline-config-only. Change microbatch flag in submission script. ~15 min Juno wall-clock.
 
-### Candidate 2 — Different reconstruction target class (move outside flux-domain supervision)
+**Pre-committed routing:**
+- **PASS** (`var_pf_band_ratio > 1e-3` at step 200) → **[D-64] L1-scope-revision ACTIVATES** (variance-collapse microbatch-coupled at P1); **[D-62] candidate ladder DE-ACTIVATES**; no further [D-62] dispatches.
+- **FAIL** (R-b at step 200) → L1 in-loss-function exhaustion holds at N=1024; continue to (5).
 
-**Mechanism prediction (1 paragraph):** the entire [D-53] candidate trio (a/b/c) supervises in flux-domain (or flux-derived) space because the **observable IS the flux**. If variance collapse is fundamentally a flux-domain-supervision pathology (e.g., information-theoretic bottleneck: P_F + PDF do not contain enough information to constrain the 3-D density field uniquely, so the model converges on the maximum-likelihood-under-the-loss constant solution), then no loss-side or flux-supervision-target-side intervention can rescue it. **Honest framing per [D-37] rule (a) (critical caveat):** direct density-field supervision **may not be observationally admissible** — the density field is not directly observed in Lyα; only the flux-after-Voigt-integration is. Surfacing density-field supervision as a candidate is honest-bounded: it would only be admissible in a **simulation-pretraining + flux-finetuning** regime where simulation density-fields are used for pretraining only. The mechanism prediction is then: pretraining on density-field MSE provides a strong field-realism prior that the flux-domain finetuning cannot collapse to constant. Inference-machine reformulation à la Maitra/LyαNNA 2023 is **inference-not-reconstruction** and would change the project's scientific framing — surface this as a scoping option but flag the framing shift.
+### Diagnostic (5) — P2 physics-variant — SECOND DISPATCH (parallel-eligible with (4))
 
-**Literature support:** simulation-pretraining is standard in computer-vision (ImageNet-pretrain → task-finetune), but **no IGM-NeRF density-field pretraining precedent** this researcher could locate. Maitra/LyαNNA 2023 inference reformulation is a different scientific task (parameter inference, not field reconstruction). Honest framing: **literature support is thin** — this candidate is a class-of-first-tests with weak external anchor.
+**Mechanism prediction (1 paragraph):** P1 physics-id may itself contribute to the diffuse-bin imbalance. P1 corresponds to a specific (γ, T₀) thermal-state combination in the Sherwood suite; P2 varies these parameters. If the variance collapse is P1-thermal-state-specific, then P2 smoke could rescue without architectural change. PASS routes to a scope-revision (CVPR claim narrows to multi-physics generalization gap), NOT to [D-62] success.
 
-**Implementation complexity:** **pipeline-refactor**. Requires (i) new pretraining stage with density-field MSE loss on simulation data; (ii) finetune stage with current flux supervision; (iii) handoff-state management. Estimate 1 sprint cycle.
+**Literature support:** physics-variation-driven loss-surface differences are well-documented in cosmology emulation literature (Cabayol-García+ 2023 Table 2 cross-physics emulator performance); not specifically for IGM-NeRF reconstruction failure modes. Honest framing: support is for emulator-output-variation, not failure-mode-variation; inheritance is weak.
 
-**Pre-committed falsification criterion:** same step-200 R-b pattern on the **finetune stage** (pretraining stage is supervised on direct density-field MSE and is expected to converge trivially; the test is whether finetuning resists collapse). If finetuning collapses by step 200, candidate fails.
+**Implementation complexity:** pipeline-config-only. Change physics-id flag. ~15 min Juno wall-clock.
 
----
-
-### Candidate 3 — Hybrid forward-model + ML (residual learning on physics prior)
-
-**Mechanism prediction (1 paragraph):** keep the differentiable Voigt integrator and the current flux-domain supervision, but **constrain the MLP to learn only residuals from a physics-based prior** (e.g., Hui-Gnedin 1997 analytic fluctuating Gunn-Peterson approximation, fGPA, which predicts density ↔ τ via a closed-form power-law). The MLP output is then `ρ = ρ_fGPA(δ, z) × (1 + MLP_residual(coords))` where MLP_residual is initialized small. This **architecturally enforces a non-constant prior** on the density field: the variance collapse basin is excluded by construction because ρ_fGPA already varies spatially per the input δ-field. Alternative: flow-based generative model (Normalizing Flow) for the density field with the Voigt integrator as a fixed forward operator — flow has a Jacobian-determinant constraint that prevents collapse to a delta-distribution (zero-variance).
-
-**Literature support:** fGPA-based density-field initialization is **standard in IGM forward-modeling** (Hui-Gnedin 1997, used in TARDIS baseline Horowitz+ 2019); the residual-MLP-on-fGPA-prior pattern is novel for IGM-NeRF but **inherits the residual-learning success in ResNet / NeRF-W (residual NeRFs)**. Normalizing-flow density-field generative models exist in cosmology (Rouhiainen+ 2021 for matter density), not specifically for IGM. Honest framing per [D-37] rule (a): the inheritance from ResNet / NeRF-W is structural (residual learning generally works); the application to IGM is novel.
-
-**Implementation complexity:** **pipeline-refactor + small architectural change**. Requires (i) fGPA prior module (`src/models/fgpa_prior.py`, ~100 lines, analytic); (ii) residual-MLP wiring in `nerf.py`; (iii) initialization scheme. Estimate 1 sprint cycle.
-
-**Pre-committed falsification criterion:** same step-200 R-b. Additional candidate-3-specific criterion: if the MLP_residual converges to ≈ 0 (the prior dominates and the MLP contributes nothing), this is a **silent-MLP** failure — close as R-b regardless of variance-collapse number, since the architecture has degenerated to fGPA alone.
+**Pre-committed routing:**
+- **PASS** (P2 stable, `var_pf_band_ratio > 1e-3` sustained at step 200) → **[D-64] L1-scope-revision ACTIVATES** (pathology P1-thermal-state-specific); CVPR claim narrows to multi-physics generalization gap; **[D-62] candidate ladder DE-ACTIVATES on this branch**.
+- **FAIL** (R-b at step 200) → pathology NOT P1-specific; inference strengthened. On (4) ALSO FAIL → [D-62] candidate ladder ACTIVATES at (3).
 
 ---
 
-### Candidate 4 — Microbatch / batch-scale ablation (NOT strictly architectural)
+## §Architectural Candidates (GATED on (4)+(5) both R-b)
 
-**Mechanism prediction (1 paragraph):** panel-flagged as out-of-L1-scope: is the variance-collapse pathology **microbatch-coupled**? The L1 sequence ran at microbatch=256; if the per-mode P_F variance estimator is biased at small batch sizes (small-N sample variance underestimates true variance, biasing the model toward constant-flux solutions which match the underestimated low-variance target), then microbatch=1024 or full-batch training could shift the loss-surface geometry. This is **load-bearing diagnostic before committing to architectural pivots 1-3**: if microbatch=1024 rescues, [D-62] resolves without architectural rewrite.
+> **Activation precondition (binding):** this section's candidates may only be dispatched after BOTH diagnostics (4) and (5) above return R-b at step 200. Candidate ladder order is FIXED: (3) → (2) → (1). Within-ladder iteration past first-candidate-R-b requires panel re-review per [D-37]-ext rule 1 anti-degeneracy.
 
-**Literature support:** small-batch P_F estimator bias is a known cosmology-statistics issue (the ensemble-average P_F is variance-biased at N < ~10³ sightlines; Iršič+2017 §4 systematic budget). **No direct ML-training precedent** for this being the IGM-NeRF-class pathology, but the cosmology-statistics support is solid.
+### Candidate (3) — fGPA-residual — FIRST in candidate-ladder
 
-**Implementation complexity:** **loss-module-only / pipeline-config-only**. Requires only changing microbatch flag in submission script. Estimate <1 day; could run as smoke before candidate 1-3 dispatch.
+**Mechanism prediction (1 paragraph):** keep the differentiable Voigt integrator and current flux-domain supervision, but **constrain the MLP to learn only residuals from a physics-based prior** — Hui-Gnedin 1997 fluctuating Gunn-Peterson approximation (fGPA), which predicts density ↔ τ via a closed-form power-law. The MLP output is parameterized as `ρ = ρ_fGPA(δ, z) × (1 + MLP_residual(coords))` with MLP_residual initialized small. This **may rescue** by architecturally enforcing a non-constant prior: the variance-collapsed basin is excluded by construction because ρ_fGPA already varies spatially per the input δ-field. This is the **first test of the fGPA-residual architectural class** for IGM-NeRF; hedged-verb framing per [D-37].
 
-**Pre-committed falsification criterion:** same step-200 R-b at microbatch=1024 closes this candidate (architectural pivot 1-3 still needed). Candidate-4 PASS at step 200 (`var_pf_band_ratio > 1e-3`) is **PROVISIONAL** and gated on step-1000 BINDING per [D-53] §"Stop-gate criteria" convention.
+**Literature support:** fGPA-based density-field initialization is standard in IGM forward-modeling (Hui-Gnedin 1997, used in TARDIS baseline Horowitz+ 2019); residual-MLP-on-fGPA-prior is novel for IGM-NeRF but inherits structural support from residual-learning (ResNet, NeRF-W). Application to IGM is novel.
+
+**Implementation complexity:** pipeline-refactor + small architectural change. Requires (i) fGPA prior module (`src/models/fgpa_prior.py`, ~100 lines, analytic); (ii) residual-MLP wiring in `nerf.py`; (iii) initialization scheme. ~1 sprint cycle.
+
+**CPU pre-flight (MANDATORY before Juno dispatch):**
+1. Compute fGPA variance spectrum on P1-T1 truth field; compare to L1's collapsed-basin spectrum (confirms the prior carries the variance structure L1 fails to recover).
+2. Verify autograd-through-δ: the `ρ = ρ_fGPA(δ, z) × (1 + MLP_residual)` parameterization must preserve autograd through the δ-field input pathway (no detached NumPy in the prior module; addresses honesty-audit finding #3).
+
+**Estimator-equivalence test:** re-certify after architectural change (estimator must match within tolerance on a fixed seed before Juno commitment).
+
+**Pre-committed falsification criteria (BOTH active):**
+- Standard close: same step-200 R-b pattern (`var_pf_band_ratio < 1e-3` at step 200 on P1-T1 smoke).
+- **Inverse-failure-mode close (new, per panel KILLER absorption — catches MLP_residual converging to non-trivial-but-wrong correction that fits τ-MSE locally while preserving variance collapse in P_F):**
+  - `||MLP_residual||_2 / ||ρ_fGPA||_2 > 0.1` AND `var_pf_band_ratio < 1e-3` at step 200 → close as **"residual-rescued-tau-not-Pf"**.
+- Silent-MLP close: if MLP_residual converges to ≈ 0 (the prior dominates and the MLP contributes nothing), close as R-b regardless of variance-collapse number — the architecture has degenerated to fGPA alone.
+
+**Scope note on normalizing-flow sub-variant:** the flow-based generative model with Jacobian-determinant anti-collapse guarantee was previously bundled here. **Dropped from candidate-ladder pending separate scoping** — the Jacobian-determinant constraint operates upstream of post-Voigt post-binning `var_pf_band_ratio`, and propagation to the binned-band statistic is not verified. Re-eligible only after explicit constraint-propagation analysis.
+
+### Candidate (2) — density-pretraining sub-variant only — SECOND
+
+**Observational-admissibility constraint (surfaced explicitly):** **density is NOT directly observed in Lyα.** Only flux-after-Voigt-integration is observable. This candidate is a bet with **no published precedent at this regime**.
+
+**Mechanism prediction (1 paragraph, scope-restricted to pretraining sub-variant):** if variance collapse is fundamentally a flux-domain-supervision pathology (information-theoretic bottleneck: P_F + PDF do not contain enough information to constrain the 3-D density field uniquely), then pretraining on density-field MSE in simulation may provide a strong field-realism prior that the flux-domain finetuning cannot collapse to constant. **Inference sub-variant (Maitra/LyαNNA 2023) REJECTED**: that is parameter inference, NOT 3-D field reconstruction; adopting it would abandon project scope per [D-43] CVPR plan-of-record.
+
+**Literature support:** simulation-pretraining is standard in computer-vision; no IGM-NeRF density-field pretraining precedent located. Literature support is thin.
+
+**Implementation complexity:** pipeline-refactor. Requires (i) pretraining stage with density-field MSE on simulation data; (ii) finetune stage with current flux supervision; (iii) handoff-state management; (iv) **EWC-class anti-forgetting mechanism** (see below). ~1 sprint cycle.
+
+**EWC-class anti-forgetting (REQUIRED IN SCOPE):** Kirkpatrick+ 2017 (Elastic Weight Consolidation) — catastrophic forgetting is the well-studied failure mode under pretrain-then-finetune. The current sub-variant has **no anti-forgetting mechanism spec'd**; adding EWC (Fisher-information-weighted L2 penalty on drift from pretrained weights) is in-scope mandatory before dispatch.
+
+**Pre-committed falsification criteria (BOTH active):**
+- Standard close: same step-200 R-b pattern on the finetune stage (`var_pf_band_ratio < 1e-3`).
+- **Quantitative prior-decay close (new):** measure density-MSE at pretrain end vs density-MSE after flux-finetune step 200. If `density_MSE(finetune step 200) / density_MSE(pretrain end) > 2` → close as **"pretraining-prior-decayed-beyond-budget"** (the EWC mechanism failed to hold the density-realism prior against the flux-finetune gradient).
+
+### Candidate (1) — architecture-swap — DEFERRED, supervision-target-coupled reframe required
+
+**BLOCKED at first-slot per panel BINDING.** Standalone transformer / CNN / attention architecture inherits the same supervision target → inherits upstream pathology (per [D-53] mechanism evidence + [D-63] inference). Substituting backbone class without changing what the loss looks at is mechanism-disjoint from the diagnosed failure mode.
+
+**Reframe required for re-eligibility:** any future (1) candidate must be **supervision-target-coupled** (e.g., transformer + density-pretraining = candidate 1∩2) before re-eligibility. Standalone architecture-swap is **not re-eligible** as a [D-62] candidate.
+
+**Honesty-audit downgrade per panel:** "heaviest implementation commitment has weakest prior evidence" — no published IGM-3D-reconstruction transformer precedent exists. Cabayol-García+ 2023 and Maitra/LyαNNA 2023 are summary-statistic regression / parameter inference, NOT 3-D field reconstruction; the inheritance claim is materially weaker than the architectural-trend framing previously suggested.
+
+**Convolutional discriminator + adversarial loss specifically:** GAN-class is a different optimization regime entirely; mode collapse is a well-studied failure mode (Salimans+ 2016, Arjovsky+ 2017). Substituting one collapse-prone optimization for another is **not a rescue** and should not be re-introduced without an explicit anti-mode-collapse mechanism spec'd ex ante.
+
+**Pre-committed falsification criterion (if a supervision-target-coupled reframe is eventually dispatched):** same step-200 R-b pattern. Within-class close routes to **[D-65 stub] further-class-pivot (out of current scope)**.
 
 ---
 
-### Candidate 5 — Physics-variant ablation (P2/P3/P4, NOT strictly architectural)
+## §Stop-gate routing tree
 
-**Mechanism prediction (1 paragraph):** panel-flagged: P1 physics-id may itself contribute to the diffuse-bin imbalance. P1 corresponds to a specific (γ, T₀) thermal-state combination in the Sherwood suite; P2/P3/P4 vary these parameters. If the variance collapse is P1-physics-specific (e.g., the diffuse-bin distribution shape is more pathological at P1's thermal state than at P2's), then P2/P3/P4 smoke could rescue without architectural change. This is the **same caveat-class as candidate 4**: load-bearing diagnostic before architectural commit.
+```
+1. Dispatch (4) microbatch=1024 diagnostic FIRST [~15 min Juno]
+   (4) PASS (var_pf_band_ratio > 1e-3 at step 200)
+     → [D-64] L1-scope-revision ACTIVATES (variance-collapse microbatch-coupled at P1)
+     → [D-62] candidate ladder DE-ACTIVATES
+     → No further [D-62] dispatches
+   (4) FAIL (R-b at step 200)
+     → L1 in-loss-function exhaustion holds at N=1024
+     → Continue to (5)
 
-**Literature support:** physics-variation-driven loss-surface differences are well-documented in cosmology emulation literature (Cabayol-García+ 2023 Table 2 cross-physics emulator performance); not specifically for IGM-NeRF reconstruction failure modes. Honest framing: the support is for emulator-output-variation, not failure-mode-variation; the inheritance is **weak**.
+2. Dispatch (5) P2 physics-variant diagnostic SECOND (parallel-eligible with (4)) [~15 min Juno]
+   (5) PASS (P2 stable, var_pf_band_ratio > 1e-3 sustained)
+     → [D-64] L1-scope-revision ACTIVATES (pathology P1-thermal-state-specific)
+     → CVPR claim narrows to multi-physics generalization gap
+     → [D-62] candidate ladder DE-ACTIVATES on this branch
+   (5) FAIL (R-b at step 200)
+     → Pathology NOT P1-specific; inference strengthened
+     → On (4) ALSO FAIL: [D-62] candidate ladder ACTIVATES at (3)
 
-**Implementation complexity:** **pipeline-config-only**. Requires only changing physics-id flag in submission script. <1 day.
-
-**Pre-committed falsification criterion:** same step-200 R-b at P2/P3/P4 closes this candidate (P1 not the cause; architectural pivot 1-3 still needed). Candidate-5 PASS at step 200 is PROVISIONAL gated on step-1000 BINDING per [D-53] convention.
+3. [D-62] candidate ladder (activates only on (4)+(5) both R-b):
+   (3) fGPA-residual — CPU pre-flight first, then Juno
+     (3) R-b at step 200 → escalate to (2-pretraining)
+   (2) density-pretraining + EWC — Juno
+     (2) FAIL → escalate to (1-reframed)
+   (1) architecture-swap-reframed — design re-review required
+     (1) R-b at step 200 → [D-65 stub] further-class-pivot (out of current scope)
+```
 
 ---
 
 ## Honest-framing notes per [D-37] rule (a)
 
-- **All 5 candidates have thin published-precedent support for IGM-NeRF-class reconstruction.** Candidates 1-3 lean on architectural-trend support from adjacent fields (emulation, inference, general residual learning); none has a direct IGM-3-D-field-reconstruction precedent. Candidates 4-5 lean on cosmology-statistics-bias and emulator-output-variation literature respectively; neither directly addresses reconstruction failure modes. **No candidate is "the published fix" for an [D-53]-also-exhausted scenario** — this is genuinely a class of next-tests.
-- **Candidates 4 and 5 are load-bearing diagnostics, NOT architectural pivots strictly.** They should likely be dispatched FIRST in any [D-62] activation, as PASS on either closes [D-62] without architectural rewrite. The defense-panel scoping review at [D-62] activation should rank dispatch order with this in mind.
-- **Candidate 2 (direct density-field supervision) has a fundamental observational-admissibility constraint:** the observable IS the flux. Pretraining-then-finetuning is the only honest framing; pure density-field supervision is **inadmissible as the production reconstruction target** because it would not generalize to real observations. This is a fundamental constraint, not a [D-62] blocker — surface in panel review.
-- **Candidate 1 (transformer/attention/convolutional) is the heaviest implementation commitment** and should require the strongest panel-pre-commitment before dispatch.
-- **What this scoping memo does NOT do**: it does NOT pre-rank, does NOT pre-commit any candidate, does NOT specify K2-equivalent test designs (those are design-stage work, commissioned per-candidate if PI activates [D-62] and panel-selects a candidate). It is intentionally a research-mode survey.
+- **All candidates have thin published-precedent support for IGM-NeRF-class reconstruction.** (3) inherits structural residual-learning support; (2) has no IGM density-pretraining precedent; (1) has no IGM-3D-reconstruction architecture-class precedent. No candidate is "the published fix."
+- **Diagnostics (4)/(5) are load-bearing.** PASS on either invalidates the [D-60]/[D-61]/[D-63] supervision-target-structure absorption stack and routes to [D-64] scope-revision, NOT to [D-62] success. This is surfaced in §Status above.
+- **Candidate (2) observational-admissibility constraint is fundamental.** Density is not directly observed in Lyα; the pretrain-then-finetune framing is the only honest framing, and the inference sub-variant is REJECTED as out-of-project-scope.
+- **Candidate (1) is BLOCKED standalone** per panel BINDING; supervision-target-coupled reframe required before re-eligibility.
+- **No independent verification of [D-63]'s 5-attempt sweep coverage claim** — PI signed off on PI's own coverage assertion. Deferred to a future defense-panel review of [D-63] specifically (out-of-scope for this design doc; logged as carry-forward).
+- **What this scoping memo does NOT do:** does NOT pre-commit any architectural candidate without diagnostic-first routing; does NOT specify K2-equivalent test designs beyond the pre-commitments here (those are design-stage work, commissioned per-candidate if PI activates [D-62] post-diagnostic-FAIL and panel re-affirms).
 
 ---
 
 ## Carry-forward
 
-If [D-53] candidate (b) R-b at step 200, this memo seeds the [D-62] activation defense-panel scoping review. Panel scope: (i) pre-commit dispatch order (suggested: candidates 4 + 5 first as diagnostics, then 1-3 by panel-ranking); (ii) commission per-candidate design doc for the panel-selected first dispatch; (iii) re-affirm [D-37]-ext rule 1 anti-degeneracy (no within-[D-62] iteration past first-candidate-R-b without panel re-review).
+- **Cross-reference to [D-64] L1-scope-revision stub** (BINDING): diagnostic (4) or (5) PASS routes execution to [D-64]. [D-64] stub authored per PI v7 absorption; LEDGER commit pending.
+- **Cross-reference to [D-65 stub]** for further-class-pivot if all of (3), (2-EWC), (1-reframed) exhaust.
+- **Cross-reference to a future defense-panel review of [D-63]** (5-attempt sweep coverage claim) — out-of-scope here, surfaced as carry-forward.
+- If [D-53] candidate (b) PASS at step 1000 BINDING verdict, this memo is **archived non-binding** and not activated.
 
-If all 3 [D-53] candidates exhaust without rescue, same activation pathway with expanded urgency.
-
-If [D-53] candidate (b) PASS at step 1000 BINDING verdict, this memo is **archived non-binding** and not activated.
-
-*Total word count estimate: ~1450 words excluding headers.*
+*Total word count estimate: ~1850 words excluding headers.*
