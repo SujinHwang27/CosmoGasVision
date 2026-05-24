@@ -235,6 +235,15 @@ def parse_args(argv=None):
                         "behavior; 'mean' divides by n_inertial_bins to expose "
                         "the per-task-scale lever for the R15(c) live P_F "
                         "gradient sanity-check (Option R, 2026-05-22 PI).")
+    p.add_argument("--pf-knorm-loss", dest="pf_knorm_loss",
+                   action="store_true",
+                   help="[sprint-L2 D-53 candidate (b), panel-bound 2026-05-23] "
+                        "Swap pf_log_mse_loss for the LINEAR-domain k-space-"
+                        "normalized P_F loss: L = Sum_k (P_pred(k)-P_truth(k))^2 "
+                        "/ max(sigma_k^2_truth_ema(k), 0.01*median_k). Truth-"
+                        "side EMA decay 0.99. First test of supervision-target-"
+                        "redesign class; not pre-justified as structurally "
+                        "addressing the upstream pathology.")
     p.add_argument("--per-task-grad-clip", dest="per_task_grad_clip",
                    type=str, default="0.0",
                    help="[sprint-L1 D-60 Attempt 3] Per-task gradient clipping "
@@ -1008,6 +1017,27 @@ def train(args):
             flush=True,
         )
 
+    # ---- [D-53 candidate (b) panel-bound 2026-05-23] σ_k² EMA state ----
+    # Truth-side per-mode P_F variance EMA used by the k-space-normalized
+    # P_F loss (--pf-knorm-loss). Initialized lazily at first step from the
+    # truth-side P_F batch (NOT zeros — direct copy on first call, per
+    # ``compute_sigma_k_squared_ema``'s ema_prev=None semantic).
+    pf_knorm_sigma_ema: torch.Tensor | None = None
+    if getattr(args, "pf_knorm_loss", False):
+        if not args.enable_l1_pf_loss:
+            raise ValueError(
+                "--pf-knorm-loss requires --enable-l1-pf-loss "
+                "(the k-space-normalized loss replaces pf_log_mse_loss "
+                "in the L1 path; enabling the L1 path is the precondition)."
+            )
+        print(
+            "[sprint-L2-knorm] active: pf_log_mse_loss SWAPPED for "
+            "pf_knorm_loss (linear-domain Σ_k r_k² / σ_k²_truth_ema, "
+            "EMA decay 0.99, floor 0.01×median_k). Panel-bound first "
+            "dispatch of [D-53] candidate (b).",
+            flush=True,
+        )
+
     # ---- [D-60 Attempt 3] Per-task gradient clipping state init ----
     # Parse the --per-task-grad-clip CLI value. Three modes:
     #   - "0.0" (default)  -> DISABLED. ``ptc_mode`` is "off".
@@ -1261,6 +1291,62 @@ def train(args):
             # per step and reuse it in both passes.
             microbatch_indices = list(microbatch_index_iter())
 
+            # ---- [D-53 candidate (b) panel-bound] σ_k² EMA update ----
+            # Truth-side, batch-sample, EMA-stabilized (decay 0.99). Computed
+            # once per step from the full-step truth-flux batch (concatenation
+            # of every microbatch's truth slice), so all chunks within the
+            # step share a single σ_k² weight vector. The σ_k² values are
+            # detached (truth-side; no autograd dependency on F_pred). Also
+            # emits per-step diagnostic line per dispatch spec deliverable 2.
+            if getattr(args, "pf_knorm_loss", False) and F_truth_l1 is not None:
+                from src.training.p_flux_loss import (
+                    torch_p_flux as _knorm_pf_est,
+                    compute_sigma_k_squared_ema as _knorm_ema_update,
+                )
+                with torch.no_grad():
+                    _full_idx = torch.cat(
+                        [_ix for _ix, _ in microbatch_indices], dim=0,
+                    ) if microbatch_indices else None
+                    if _full_idx is not None and _full_idx.numel() > 0:
+                        _F_truth_step = F_truth_l1[_full_idx]
+                        _, _P_truth_step = _knorm_pf_est(
+                            _F_truth_step, vel_axis,
+                        )
+                        pf_knorm_sigma_ema, _ = _knorm_ema_update(
+                            _P_truth_step.to(torch.float64),
+                            pf_knorm_sigma_ema,
+                            decay=0.99,
+                        )
+                        # Inertial-band floor + grad-inflation telemetry
+                        # (deliverable-2 diag line).
+                        from src.training.p_flux_loss import (
+                            K_MIN_INERTIAL as _KMI, K_MAX_INERTIAL as _KMA,
+                        )
+                        _centers_diag, _ = _knorm_pf_est(
+                            _F_truth_step[:1], vel_axis,
+                        )
+                        _band = (
+                            (_centers_diag.to(torch.float64) >= _KMI)
+                            & (_centers_diag.to(torch.float64) <= _KMA)
+                        )
+                        _band_sig = pf_knorm_sigma_ema[_band]
+                        _sig_med = float(_band_sig.median().item()) if _band_sig.numel() else float("nan")
+                        _sig_floor = 0.01 * _sig_med if _band_sig.numel() else float("nan")
+                        # grad_inflation_metric stub: max/median ratio over
+                        # the band's σ_k² values — a proxy for the post-step
+                        # grad-magnitude inflation the sbatch trailer checks.
+                        _sig_max = float(_band_sig.max().item()) if _band_sig.numel() else float("nan")
+                        _grad_inflation = (
+                            _sig_max / max(_sig_med, 1e-30) if _band_sig.numel() else float("nan")
+                        )
+                        print(
+                            f"[sprint-L2-knorm] step {step}: "
+                            f"sigma_k_floor={_sig_floor:.6e}, "
+                            f"sigma_k_median={_sig_med:.6e}, "
+                            f"grad_inflation_metric=max_k|grad|/median_k|grad|={_grad_inflation:.6e}",
+                            flush=True,
+                        )
+
             with torch.no_grad():
                 weighted_F_sum = 0.0
                 total_F_count = 0
@@ -1440,14 +1526,30 @@ def train(args):
                 # (the two are equal in expectation, equal in practice when
                 # the batch is divided into equal chunks).
                 if args.enable_l1_pf_loss:
-                    from src.training.p_flux_loss import pf_log_mse_loss as _l1_loss
                     tau_pred_capped = tau_pred_mb.clamp_max(args.tau_max)
                     F_pred_l1_mb = torch.exp(-tau_pred_capped)
                     F_truth_l1_mb = F_truth_l1[idx_mb]
-                    loss_pf_mb = _l1_loss(
-                        F_pred_l1_mb, F_truth_l1_mb, vel_axis,
-                        reduction=args.pf_log_reduction,
-                    )
+                    if getattr(args, "pf_knorm_loss", False):
+                        # [D-53 (b) panel-bound] Linear-domain k-space-
+                        # normalized loss; truth-side σ_k² EMA computed at
+                        # top-of-step. GradNorm wrapper consumes the scalar
+                        # identically to pf_log_mse_loss.
+                        from src.training.p_flux_loss import pf_knorm_loss as _l1_loss_knorm
+                        if pf_knorm_sigma_ema is None:
+                            raise RuntimeError(
+                                "[sprint-L2-knorm] pf_knorm_sigma_ema not initialized "
+                                "at chunk-loss time — step-top EMA update did not run."
+                            )
+                        loss_pf_mb = _l1_loss_knorm(
+                            F_pred_l1_mb, F_truth_l1_mb, vel_axis,
+                            sigma_k_squared_truth_ema=pf_knorm_sigma_ema,
+                        )
+                    else:
+                        from src.training.p_flux_loss import pf_log_mse_loss as _l1_loss
+                        loss_pf_mb = _l1_loss(
+                            F_pred_l1_mb, F_truth_l1_mb, vel_axis,
+                            reduction=args.pf_log_reduction,
+                        )
                     # Accumulate detached F tensors for diagnostics.
                     l1_F_pred_chunks.append(F_pred_l1_mb.detach())
                     l1_F_truth_chunks.append(F_truth_l1_mb.detach())

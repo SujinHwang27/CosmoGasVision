@@ -367,6 +367,171 @@ def pf_log_mse_loss(
     return loss.to(F_pred.dtype)
 
 
+# ---------------------------------------------------------------------------
+# (b') k-space-normalized P_F loss ([D-53] candidate (b), panel-bound 2026-05-23)
+# ---------------------------------------------------------------------------
+
+
+def compute_sigma_k_squared_ema(
+    P_truth_batch: torch.Tensor,
+    ema_prev: torch.Tensor | None,
+    decay: float = 0.99,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Update per-mode P_truth(k) variance EMA (panel pre-commit, 2026-05-23).
+
+    Per [D-53] candidate (b) panel-binding selector 1: σ_k² is **truth-side**,
+    batch-sample, **EMA-stabilized with decay 0.99**. Truth-side eliminates
+    the predicted-side chicken-and-egg at step 0 (all rays initialized to
+    near-identical fields -> σ_k² ≈ 0 -> 1/σ_k² -> inf -> grad explode).
+
+    Parameters
+    ----------
+    P_truth_batch : (n_rays, n_kbins) tensor
+        Per-ray truth-side P_F(k); typically the output of ``torch_p_flux``
+        on the truth flux batch. Detached.
+    ema_prev : (n_kbins,) tensor or None
+        Previous EMA state. ``None`` on the first call (initialize directly
+        from the batch variance — NOT 0.99 * 0 + 0.01 * v, which would take
+        many steps to track the truth scale).
+    decay : float
+        EMA decay; pre-committed 0.99 per panel.
+
+    Returns
+    -------
+    ema_new : (n_kbins,) tensor
+        Updated EMA state. Pass back in on the next call.
+    sigma_k_sq : (n_kbins,) tensor
+        The EMA value to use as σ_k² weights this step (== ema_new; named
+        separately for caller-side readability).
+    """
+    if P_truth_batch.dim() != 2:
+        raise ValueError(
+            f"P_truth_batch must be 2D (n_rays, n_kbins); got "
+            f"{tuple(P_truth_batch.shape)}"
+        )
+    # Per-mode batch variance over the ray axis (unbiased=False to match
+    # the numpy var() default in callers; n_rays >> 1 in practice so the
+    # bias correction is negligible).
+    with torch.no_grad():
+        batch_var = P_truth_batch.to(torch.float64).var(
+            dim=0, unbiased=False
+        )  # (n_kbins,)
+        if ema_prev is None:
+            ema_new = batch_var.clone()
+        else:
+            ema_new = decay * ema_prev.to(batch_var.dtype) + (1.0 - decay) * batch_var
+    return ema_new, ema_new
+
+
+def pf_knorm_loss(
+    F_pred: torch.Tensor,
+    F_truth: torch.Tensor,
+    vel_axis_kms: torch.Tensor,
+    sigma_k_squared_truth_ema: torch.Tensor,
+    k_min_inertial: float = K_MIN_INERTIAL,
+    k_max_inertial: float = K_MAX_INERTIAL,
+    n_kbins: int = _DEFAULT_N_KBINS,
+    k_min: float = _DEFAULT_K_MIN,
+    k_max: float = _DEFAULT_K_MAX,
+    floor_rel: float = 0.01,
+) -> torch.Tensor:
+    """k-space-normalized P_F loss ([D-53] candidate (b), panel-bound 2026-05-23).
+
+    Form (panel-binding selector 3, verbatim):
+
+    ``L = Σ_k (P_pred(k) − P_truth(k))² / max(σ_k²_truth_ema(k), floor)``
+
+    where ``floor = 0.01 × median_k(σ_k²_truth_ema)`` per panel-binding
+    selector 1 (relative floor, NOT absolute 1e-12 which would let any
+    sub-floor mode dominate loss by ~10⁸ given typical P_F values
+    ~10⁻⁵-10⁻³ s/km).
+
+    Inertial band selection is the same as ``pf_log_mse_loss`` — the lever
+    is the weighting form, not the band selection. Ray-averaging is done
+    BEFORE the per-mode-squared-residual (analog of K1 absorption); this is
+    the natural reduction for the inverse-variance-weighted residual sum.
+
+    Important
+    ---------
+    This is the **LINEAR-domain** inverse-variance-weighted **squared
+    residual sum** — NOT log10-domain, NOT mean-reduced. The first test of
+    the [D-53] supervision-target-redesign class candidate (b); first test
+    of a k-space-normalized P_F target in this project.
+
+    Parameters
+    ----------
+    F_pred : (n_rays, n_bins) tensor
+        Predicted flux (autograd-live).
+    F_truth : (n_rays, n_bins) tensor
+        Truth flux (typically detached).
+    vel_axis_kms : (n_bins,) tensor
+        Uniform velocity grid in km/s.
+    sigma_k_squared_truth_ema : (n_kbins,) tensor
+        Truth-side per-mode P_F variance EMA (from
+        ``compute_sigma_k_squared_ema``). Detached. Must span the same
+        ``n_kbins`` bin grid the underlying ``torch_p_flux`` produces.
+    k_min_inertial, k_max_inertial : float
+        Inertial-band edges in s/km. Defaults [10^-2.5, 10^-1.5] s/km
+        per [D-13].
+    n_kbins, k_min, k_max : float / int
+        Log-k binning of the underlying P_F estimator (must match the
+        ``compute_sigma_k_squared_ema`` call).
+    floor_rel : float
+        Relative floor multiplier; ``floor = floor_rel * median_k(σ_k²_ema)``
+        across the inertial band. Panel-bound default 0.01.
+
+    Returns
+    -------
+    loss : 0-dim tensor
+        Scalar loss; autograd-live in ``F_pred``.
+    """
+    if F_pred.shape != F_truth.shape:
+        raise ValueError(
+            f"F_pred {tuple(F_pred.shape)} != F_truth {tuple(F_truth.shape)}"
+        )
+    if sigma_k_squared_truth_ema.dim() != 1 or sigma_k_squared_truth_ema.shape[0] != n_kbins:
+        raise ValueError(
+            f"sigma_k_squared_truth_ema must be 1D of shape ({n_kbins},); "
+            f"got {tuple(sigma_k_squared_truth_ema.shape)}"
+        )
+
+    centers_p, P_pred = torch_p_flux(
+        F_pred, vel_axis_kms, k_min=k_min, k_max=k_max, n_kbins=n_kbins,
+        empty_bin_value=0.0,
+    )
+    centers_t, P_truth = torch_p_flux(
+        F_truth, vel_axis_kms, k_min=k_min, k_max=k_max, n_kbins=n_kbins,
+        empty_bin_value=0.0,
+    )
+
+    # Ray-average BEFORE the per-mode squared residual (analog of K1).
+    P_pred_ravg = P_pred.to(torch.float64).mean(dim=0)   # (n_kbins,)
+    P_truth_ravg = P_truth.to(torch.float64).mean(dim=0)
+
+    # Inertial band selection — SAME as pf_log_mse_loss (lines 262-367).
+    band_mask = (centers_p.to(torch.float64) >= k_min_inertial) & (
+        centers_p.to(torch.float64) <= k_max_inertial
+    )
+    if not bool(band_mask.any()):
+        raise ValueError(
+            f"No log-k bin centers fall in inertial range "
+            f"[{k_min_inertial:.4g}, {k_max_inertial:.4g}] s/km."
+        )
+
+    sigma_band = sigma_k_squared_truth_ema.to(torch.float64)[band_mask].detach()
+    # Relative floor over the inertial band, per panel-binding selector 1.
+    band_median = sigma_band.median().clamp_min(1e-30)
+    floor = (floor_rel * band_median).detach()
+    weights = torch.clamp_min(sigma_band, floor)  # (n_inertial,)
+
+    P_pred_band = P_pred_ravg[band_mask]
+    P_truth_band = P_truth_ravg[band_mask]
+    resid_sq = (P_pred_band - P_truth_band) ** 2
+    # Σ_k r_k² / σ_k² (NOT mean — verbatim per panel selector 3).
+    loss = (resid_sq / weights).sum()
+    return loss.to(F_pred.dtype)
+
+
 def inertial_rel_residual(
     F_pred: torch.Tensor,
     F_truth: torch.Tensor,
@@ -725,6 +890,8 @@ __all__ = [
     "K_MAX_INERTIAL",
     "torch_p_flux",
     "pf_log_mse_loss",
+    "pf_knorm_loss",
+    "compute_sigma_k_squared_ema",
     "inertial_rel_residual",
     "cross_coherence_per_bin",
     "GradNormWrapper",
