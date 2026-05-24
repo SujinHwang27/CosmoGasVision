@@ -433,7 +433,8 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     [D-66] block + [D-67] R18 banking entry, 2026-05-24.
 
 28. **PI dispatch-sequence authoring is PROVISIONAL by default
-    (BANKED candidate, DEFERRED operational spec per R12, 2026-05-24).**
+    (PROMOTED candidate → DEFERRED-BANKED 2026-05-24 per [D-68]
+    operational test).**
     R15's "PROVISIONAL by default" discipline extends from stage-gate
     sign-offs and inherited-claim re-verifications to PI-authored
     dispatch sequences themselves. Lift mechanisms: (a) defense-panel
@@ -446,7 +447,42 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     sbatch spec) is operational evidence that R15 default should extend
     to dispatch-sequence authoring. R12 second-sighting-cross-track-
     instance required before formal banking (defer). Cite: LEDGER §3
-    [D-67] block, 2026-05-24.
+    [D-67] block, 2026-05-24. **Promoted to DEFERRED-BANKED at [D-68]
+    2026-05-24** — Stage 1 redo K2 smoke FAIL was a positive test of R28
+    (PI v9 dispatch sequence sign-off should have been PROVISIONAL pending
+    K2-gate construction audit; gate-construction-vs-production-framing
+    mismatch is exactly the class of inherited-claim-without-re-verification
+    R15 was banked for).
+
+29. **Gate-construction-vs-production-framing audit (BANKED candidate,
+    DEFERRED — 1 operational test, 2026-05-24).** Every smoke / pre-flight
+    / contract-assertion gate, before dispatch, must be checked that:
+
+    (i) its measured quantity is in the same units / framing as the
+        production metric it proxies (e.g., dimensionless ratio vs
+        absolute variance; band-averaged vs per-mode; predicted-vs-truth
+        vs absolute-truth);
+    (ii) its threshold value is expressed in those same units;
+    (iii) any external anchor it cites (Boera+ 2019, etc.) is in those
+        same units AND at the same band / k-range / redshift as the
+        production metric.
+
+    Mis-framed gates produce either **false halts** (this banking event —
+    K2 absolute-variance gate halted Stage 1 redo on a comparison
+    production never makes) or **false passes** (the original CPU
+    pre-flight v1 1.1-decade-margin claim, which compared
+    un-prefactored fGPA to prefactored L1 — same shape failure, opposite
+    sign). Either failure mode wastes review cycles and/or invites
+    [D-37]-rule-(a)-violation downstream framing.
+
+    Meta-pattern motivating banking: three "gate uses units/framing
+    different from production" issues in this track (R20-v1 on (b)
+    jobid 202259 false-positive 2026-05-22; K1+K2 panel HOLD on (3)
+    pre-flight v1 2026-05-24; K2 wrong-frame halt on (3) pre-flight
+    v2 2026-05-24). Pattern is gate-construction-discipline, not
+    physics. Trigger one more gate-framing failure → BANKED.
+
+    Cite: LEDGER §3 [D-68] block, 2026-05-24.
 
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 
