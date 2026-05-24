@@ -6,7 +6,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
 #SBATCH --mem=64G
-#SBATCH --time=24:00:00
+#SBATCH --time=12:00:00
 #SBATCH --mail-type=END
 #SBATCH --output=sprint-L2-knorm-juno-%j.out
 #SBATCH --error=sprint-L2-knorm-juno-%j.err
