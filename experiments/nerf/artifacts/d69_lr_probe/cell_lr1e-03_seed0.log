@@ -1,0 +1,11 @@
+[probe] rho_field shape=(64, 64, 64) min=2.764e-02 max=3.435e+02
+[probe] fixed probe sample: n_vox=1024 var_truth_fixed=9.9962e+00
+[probe] L_pre @ step 0 = 2.769606e-01
+[probe] step 100: L_pre=2.2447e-01 var_theta=1.3406e-04 var_truth=9.9962e+00 ratio=1.3411e-05 L_pre_probe=1.9670e-01
+[probe M1] step 200: L_pre=2.0952e-01 / L_pre_0=2.7696e-01 -> R_pre=0.7565 [FAIL]
+[probe R-b-pre1] FIRE @ step 200: var_theta=1.7612e-04 < 0.1 * var_truth=8.4811e+00
+[probe] step 250: L_pre=2.1071e-01 var_theta=1.9677e-04 var_truth=9.9962e+00 ratio=1.9685e-05 L_pre_probe=2.2000e-01
+[probe] step 500: L_pre=1.9020e-01 var_theta=6.0403e-05 var_truth=9.9962e+00 ratio=6.0426e-06 L_pre_probe=2.0239e-01
+[probe] step 750: L_pre=1.8769e-01 var_theta=3.6506e-05 var_truth=9.9962e+00 ratio=3.6520e-06 L_pre_probe=1.9934e-01
+[probe] step 1000: L_pre=2.2656e-01 var_theta=1.8690e-05 var_truth=9.9962e+00 ratio=1.8697e-06 L_pre_probe=2.1358e-01
+[probe] cell verdict: UNKNOWN_NON_MONOTONIC  (elapsed 37.6s)

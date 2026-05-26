@@ -1,0 +1,11 @@
+[probe] rho_field shape=(64, 64, 64) min=2.764e-02 max=3.435e+02
+[probe] fixed probe sample: n_vox=1024 var_truth_fixed=9.9962e+00
+[probe] L_pre @ step 0 = 2.769606e-01
+[probe] step 100: L_pre=2.2688e-01 var_theta=1.6287e-04 var_truth=9.9962e+00 ratio=1.6293e-05 L_pre_probe=2.0047e-01
+[probe M1] step 200: L_pre=2.0796e-01 / L_pre_0=2.7696e-01 -> R_pre=0.7509 [FAIL]
+[probe R-b-pre1] FIRE @ step 200: var_theta=5.2479e-05 < 0.1 * var_truth=8.4811e+00
+[probe] step 250: L_pre=2.1043e-01 var_theta=6.8581e-05 var_truth=9.9962e+00 ratio=6.8607e-06 L_pre_probe=2.2072e-01
+[probe] step 500: L_pre=1.9023e-01 var_theta=5.1684e-05 var_truth=9.9962e+00 ratio=5.1703e-06 L_pre_probe=2.0231e-01
+[probe] step 750: L_pre=1.8758e-01 var_theta=3.2913e-05 var_truth=9.9962e+00 ratio=3.2925e-06 L_pre_probe=1.9940e-01
+[probe] step 1000: L_pre=2.2667e-01 var_theta=2.2445e-05 var_truth=9.9962e+00 ratio=2.2453e-06 L_pre_probe=2.1359e-01
+[probe] cell verdict: FAIL_SINKING  (elapsed 59.1s)

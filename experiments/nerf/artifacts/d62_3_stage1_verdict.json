@@ -1,0 +1,17 @@
+{
+  "d_decision": "D-68 amendment 2026-05-24: R_feas dimensionless gate replaces K2 Boera absolute-variance assertion",
+  "R_feas": 0.008333558686192037,
+  "var_mean_fgpa_td": 91410.046875,
+  "var_mean_fgpa_nd": 10968909.0,
+  "var_mean_truth": 5.389370918273926,
+  "verdict": "FAIL",
+  "escalation_target": "(2)",
+  "verdict_note": "automatic (2) escalation per [D-68] / [D-62] ladder binding",
+  "script_commit_sha": "fe99c23a39e4b572305cfa31d866b8c72082aefb",
+  "physics_id": 1,
+  "redshift": 0.3,
+  "n_rays": 128,
+  "fgpa_beta": 1.6,
+  "fgpa_gamma": -0.7,
+  "noise_seed": 2026
+}

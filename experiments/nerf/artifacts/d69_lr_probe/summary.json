@@ -1,0 +1,49 @@
+{
+  "cells": [
+    {
+      "lr_max": 0.0001,
+      "verdict": "FAIL_SINKING",
+      "r_pre_at_M1": 0.7508558624817973,
+      "r_b_pre1_fire_step": 200,
+      "var_ratio_spread_over_mean": 2.074296772904681,
+      "var_ratio_monotone_increasing": false,
+      "n_steps_run": 1000,
+      "elapsed_sec": 59.1359338760376
+    },
+    {
+      "lr_max": 0.0005,
+      "verdict": "UNKNOWN_NON_MONOTONIC",
+      "r_pre_at_M1": 0.7550298027914217,
+      "r_b_pre1_fire_step": 200,
+      "var_ratio_spread_over_mean": 1.5917831109702458,
+      "var_ratio_monotone_increasing": false,
+      "n_steps_run": 1000,
+      "elapsed_sec": 40.63535833358765
+    },
+    {
+      "lr_max": 0.001,
+      "verdict": "UNKNOWN_NON_MONOTONIC",
+      "r_pre_at_M1": 0.7565112532667503,
+      "r_b_pre1_fire_step": 200,
+      "var_ratio_spread_over_mean": 1.994488320582178,
+      "var_ratio_monotone_increasing": false,
+      "n_steps_run": 1000,
+      "elapsed_sec": 37.626461029052734
+    }
+  ],
+  "per_cell_verdicts": [
+    "FAIL_SINKING",
+    "UNKNOWN_NON_MONOTONIC",
+    "UNKNOWN_NON_MONOTONIC"
+  ],
+  "overall_verdict": "FREEZE_ESCALATE_D62_LADDER_REFRAME",
+  "verdict_matrix_route": "fallback_mixed_outcome",
+  "pre_committed_matrix": {
+    "PASS_cell_rule": "r_pre_at_M1 <= 0.5",
+    "FAIL_MOVING_cell_rule": "r_pre_at_M1 > 0.5 AND var_ratio strictly increasing 100 -> fire/end",
+    "FAIL_FLAT_cell_rule": "var_ratio (max-min)/mean <= 0.10",
+    "overall_a_confirmed": ">=1 cell PASS",
+    "overall_a_plus_b": "0 cells PASS, >=1 FAIL_MOVING with var-ratio improving",
+    "overall_c_confirmed": "ALL cells FAIL_FLAT"
+  }
+}

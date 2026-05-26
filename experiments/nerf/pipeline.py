@@ -14,6 +14,7 @@ import math
 import os
 import random
 import sys
+from contextlib import nullcontext
 
 # Add src to path for imports
 sys.path.append(os.path.abspath('.'))
@@ -265,6 +266,64 @@ def parse_args(argv=None):
                         "falsified at T3 scale (gradnorm_runaway retire at "
                         "step 2271, w_ratio=0.000867).")
 
+    # [D-69] Stage 1a — density pretraining feasibility (loss-isolated). ----
+    # When --pretrain-density is True, the production L_data + L_meanF losses
+    # are NOT computed; the trainer optimizes ONLY the log10-MSE between the
+    # NeRF MLP density head output (post-Softplus, [D-06]) and the Sherwood
+    # truth overdensity drawn from extract_rho_crops. Stage 1a is a Stage-1-
+    # pretrain-only feasibility per K1 absorption; fine-tune wiring is Stage 2
+    # (out of scope here). See experiments/nerf/design/D69_stage1_pretraining_scoping.md
+    # Revision 5 (NON-PROVISIONAL per R15 clause (a) on Rev-3 panel APPROVE).
+    p.add_argument("--pretrain-density", dest="pretrain_density",
+                   action="store_true",
+                   help="[D-69] Enable Stage-1a density-pretraining loss "
+                        "L_pre = mean((log10(rho_theta+1e-3) - "
+                        "log10(rho_truth+1e-3))^2) over a 1024-voxel microbatch "
+                        "drawn from random rho-field crops. When ON, L_data + "
+                        "L_meanF are NOT computed (pretrain stage is loss-"
+                        "isolated from the L1 production stage). Default OFF.")
+    p.add_argument("--pretrain-n-grid", dest="pretrain_n_grid",
+                   type=int, default=768,
+                   help="[D-69] n_grid for extract_rho_crops in the pretrain "
+                        "loop. 768 = production substrate (K3-calibrated M3 "
+                        "band); 64 = CPU-preflight substrate (faster).")
+    p.add_argument("--pretrain-crop-size", dest="pretrain_crop_size",
+                   type=int, default=48,
+                   help="[D-69] crop_size for the pretrain microbatch draw + "
+                        "M3 100-crop sample. Default 48 = K3 calibration scale.")
+    p.add_argument("--pretrain-microbatch", dest="pretrain_microbatch",
+                   type=int, default=1024,
+                   help="[D-69] Voxels per pretrain step (drawn uniformly with "
+                        "replacement from the per-step crop sample). Default 1024.")
+    p.add_argument("--pretrain-crops-per-step", dest="pretrain_crops_per_step",
+                   type=int, default=4,
+                   help="[D-69] Number of fresh rho-field crops drawn each "
+                        "pretrain step (microbatch voxels sampled across the "
+                        "stacked crops). Default 4.")
+    p.add_argument("--pretrain-m3-n-crops", dest="pretrain_m3_n_crops",
+                   type=int, default=100,
+                   help="[D-69] M3 held-out crop sample size for R_real. "
+                        "Default 100 per K3 calibration (band derived at this n).")
+    p.add_argument("--zero-shot-eval-physics", dest="zero_shot_eval_physics",
+                   type=str, default=None,
+                   help="[D-69] Stage 1b sub-step 1 — load a checkpoint via "
+                        "--resume_from and run M3 evaluation ONLY against the "
+                        "named physics' rho-field with NO weight updates. "
+                        "Accepts 'P1'..'P4' or '1'..'4'. Default None = OFF.")
+
+    # [D-70 Rev 5.1] Body architecture variant ------------------------------
+    # 'current' = pre-Rev-5.1 4+4 layers1/layers2 with single mid-skip
+    # (estimator-equivalent, bit-identical default path).
+    # 'skip-rich-mlp' = DeepSDF every-layer skip-input ResMLP per §1.6 spec
+    # line 191/208. Activates Stage 1a (1b) wiring; eligible for the
+    # operative-cause swap-back test (pre-flight D, M0-PASS-conditional).
+    p.add_argument("--arch", dest="arch",
+                   type=str, default="current",
+                   choices=["current", "skip-rich-mlp"],
+                   help="[D-70 (1b)] Body architecture. 'current' preserves "
+                        "the pre-Rev-5.1 model; 'skip-rich-mlp' enables the "
+                        "DeepSDF every-layer skip-input variant.")
+
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
@@ -300,6 +359,760 @@ def build_lr_lambda(warmup_steps: int, max_steps: int,
         return min_ratio + (1.0 - min_ratio) * cosine
 
     return lr_lambda
+
+
+# ---------------------------------------------------------------------------
+# [D-69] Stage-1a density-pretraining helpers
+# ---------------------------------------------------------------------------
+#
+# Self-contained loss + sampling + gate-ladder harness for the loss-isolated
+# pretrain feasibility study. See experiments/nerf/design/D69_stage1_pretraining_scoping.md
+# Revision 5 for the full source-of-truth spec. The harness mirrors the
+# [D-60] B-stack pattern (per-step metric scrape + verdict tagging + auto-
+# abort backstops). Production losses (L_data, L_meanF) are NOT computed
+# under this code path; the pretrain stage is loss-isolated per K1 absorption.
+
+# Numerical stabilizer for log10(rho + eps). Documented at design/§2 footnote
+# (numerical coincidence with loader._RHO_CROP_LO; the stabilizer is the
+# load-bearing one because the loader floor is documentation-only).
+PRETRAIN_LOG_EPS = 1.0e-3
+
+# K3-calibrated M3 bands (provenance: scripts/d69_m3_band_calibration.py;
+# artifact: experiments/nerf/artifacts/d69_m3_band_calibration.json).
+# Bands are the gate-ladder constants for L=48^3, 100 crops, log10 framing.
+M3_PASS_LO, M3_PASS_HI = 0.980, 1.021
+M3_MARG_LO, M3_MARG_HI = 0.960, 1.041
+
+
+def _resolve_zero_shot_physics(spec: str) -> int:
+    """Map --zero-shot-eval-physics CLI value to a 1..4 physics_id int."""
+    s = str(spec).strip().upper()
+    if s.startswith("P"):
+        s = s[1:]
+    try:
+        pid = int(s)
+    except ValueError:
+        raise ValueError(
+            f"--zero-shot-eval-physics expects 'P1..P4' or '1..4'; got {spec!r}"
+        )
+    if pid not in (1, 2, 3, 4):
+        raise ValueError(
+            f"--zero-shot-eval-physics physics_id must be 1..4; got {pid}"
+        )
+    return pid
+
+
+def _pretrain_density_head(model, coords_voxel):
+    """Forward the IGMNeRF MLP and return ONLY the post-Softplus density head.
+
+    Parameters
+    ----------
+    model : IGMNeRF
+    coords_voxel : (B, 3) float32 tensor in the unit cube [0, 1]^3.
+
+    Returns
+    -------
+    rho_theta : (B,) float32 tensor; autograd-live through model parameters.
+
+    Notes
+    -----
+    IGMNeRF.forward expects coords with shape (..., 3) and returns (..., 4)
+    where channel 0 is the post-Softplus density. We unsqueeze a fake ray-axis
+    of length 1 so the (1, B, 4) output is unambiguous, then slice channel 0.
+    Mirrors the d69_m3_band_calibration.s2_dry_run pattern verbatim so the
+    autograd path and tensor shapes are byte-identical to the K3 dry-run.
+    """
+    out = model(coords_voxel.unsqueeze(0))     # (1, B, 4)
+    rho_theta = out[0, :, 0]                   # post-Softplus density
+    return rho_theta
+
+
+def _pretrain_sample_voxels(rho_field_torch, microbatch, n_crops, crop_size,
+                            generator, device):
+    """Draw `microbatch` random voxels from `n_crops` random crops of rho_field.
+
+    Returns ``(coords_unit_cube, rho_truth_voxels)`` where:
+      - coords_unit_cube: (microbatch, 3) float32 in [0, 1] (voxel-center coords
+        within the *crop* — NeRF input convention; matches the K3 dry-run path).
+      - rho_truth_voxels: (microbatch,) float32 truth overdensity.
+
+    No detached NumPy in the forward path — the truth tensor is float32 torch
+    and the autograd graph through rho_theta carries through `loss.backward()`.
+    rho_field_torch is a *constant* (truth-side), so it is correctly detached.
+    """
+    n_grid = rho_field_torch.shape[0]
+    if crop_size > n_grid:
+        raise ValueError(
+            f"crop_size {crop_size} exceeds n_grid {n_grid}"
+        )
+
+    # Random crop corners with periodic-BC wrap (matches loader.extract_rho_crops).
+    corners = torch.randint(
+        0, n_grid, (n_crops, 3), generator=generator, device=device,
+    )
+    L = crop_size
+    offset = torch.arange(L, device=device)
+
+    # Gather crop tensors as a stacked (n_crops, L, L, L) tensor in one go.
+    crops = torch.empty((n_crops, L, L, L), dtype=rho_field_torch.dtype,
+                        device=device)
+    for c in range(n_crops):
+        i0 = int(corners[c, 0].item())
+        j0 = int(corners[c, 1].item())
+        k0 = int(corners[c, 2].item())
+        if (i0 + L) <= n_grid and (j0 + L) <= n_grid and (k0 + L) <= n_grid:
+            crops[c] = rho_field_torch[i0:i0+L, j0:j0+L, k0:k0+L]
+        else:
+            ii = (i0 + offset) % n_grid
+            jj = (j0 + offset) % n_grid
+            kk = (k0 + offset) % n_grid
+            crops[c] = rho_field_torch[ii[:, None, None], jj[None, :, None],
+                                       kk[None, None, :]]
+
+    # Sample microbatch voxels uniformly with replacement across the stacked
+    # crops. Voxel coords in [0, 1] within the crop (no absolute-position info
+    # leaked — the MLP only sees within-crop coords, which is the K1-isolated
+    # supervision target). Per-voxel crop_id is implicit and unused.
+    per_crop = max(1, microbatch // n_crops)
+    total = per_crop * n_crops
+    # voxel indices within a crop
+    vi = torch.randint(0, L, (n_crops, per_crop), generator=generator, device=device)
+    vj = torch.randint(0, L, (n_crops, per_crop), generator=generator, device=device)
+    vk = torch.randint(0, L, (n_crops, per_crop), generator=generator, device=device)
+    crop_idx = torch.arange(n_crops, device=device).unsqueeze(1).expand(n_crops, per_crop)
+    rho_truth = crops[crop_idx, vi, vj, vk].reshape(total)
+    coords_int = torch.stack([vi, vj, vk], dim=-1).reshape(total, 3).to(torch.float32)
+    coords_unit = (coords_int + 0.5) / float(L)
+    # Truncate to exactly microbatch (drops at most n_crops-1 voxels when
+    # microbatch is not divisible by n_crops; behavior matches K3 dry-run cost).
+    return coords_unit[:microbatch], rho_truth[:microbatch].to(torch.float32)
+
+
+def _pretrain_loss(rho_theta, rho_truth, eps=PRETRAIN_LOG_EPS):
+    """L_pre per D69 §2:
+
+        L_pre = mean((log10(rho_theta + eps) - log10(rho_truth + eps)) ** 2)
+
+    Both tensors are (B,) float; rho_theta carries the autograd graph back
+    through the MLP. Reference: design Revision 5 §2 single equation.
+    """
+    diff = (torch.log10(rho_theta + eps) - torch.log10(rho_truth + eps))
+    return (diff * diff).mean()
+
+
+def _pretrain_m3_eval(model, rho_field_torch, n_crops, crop_size, generator,
+                      device):
+    """Compute M3 R_real on a held-out crop sample (no autograd; no weight updates).
+
+    Returns dict with R_real (log10-framing per K3) plus the per-bin diagnostic
+    inputs (var_pred, var_truth) and the raw rho_theta tensor for S3 binning.
+    Mirrors the K3 calibration script's log-domain variance accounting voxel-
+    by-voxel (no spatial masking — masking would invalidate the K3 PASS band).
+    """
+    model.eval()
+    n_grid = rho_field_torch.shape[0]
+    L = crop_size
+    offset = torch.arange(L, device=device)
+
+    log_pred_chunks = []
+    log_truth_chunks = []
+    raw_pred_chunks = []
+    raw_truth_chunks = []
+
+    # M3 uses a held-out sample — draw corners with the supplied generator.
+    corners = torch.randint(0, n_grid, (n_crops, 3),
+                            generator=generator, device=device)
+    with torch.no_grad():
+        for c in range(n_crops):
+            i0 = int(corners[c, 0].item())
+            j0 = int(corners[c, 1].item())
+            k0 = int(corners[c, 2].item())
+            if (i0 + L) <= n_grid and (j0 + L) <= n_grid and (k0 + L) <= n_grid:
+                crop = rho_field_torch[i0:i0+L, j0:j0+L, k0:k0+L]
+            else:
+                ii = (i0 + offset) % n_grid
+                jj = (j0 + offset) % n_grid
+                kk = (k0 + offset) % n_grid
+                crop = rho_field_torch[ii[:, None, None], jj[None, :, None],
+                                       kk[None, None, :]]
+            # Build per-voxel coords for the full crop.
+            grid_i = torch.arange(L, device=device).view(L, 1, 1).expand(L, L, L)
+            grid_j = torch.arange(L, device=device).view(1, L, 1).expand(L, L, L)
+            grid_k = torch.arange(L, device=device).view(1, 1, L).expand(L, L, L)
+            coords_int = torch.stack([grid_i, grid_j, grid_k], dim=-1).reshape(-1, 3)
+            coords_unit = (coords_int.to(torch.float32) + 0.5) / float(L)
+            rho_theta = _pretrain_density_head(model, coords_unit)
+            rho_truth_flat = crop.reshape(-1).to(torch.float32)
+            raw_pred_chunks.append(rho_theta)
+            raw_truth_chunks.append(rho_truth_flat)
+            log_pred_chunks.append(torch.log10(rho_theta + PRETRAIN_LOG_EPS))
+            log_truth_chunks.append(torch.log10(rho_truth_flat + PRETRAIN_LOG_EPS))
+
+    log_pred_all = torch.cat(log_pred_chunks)
+    log_truth_all = torch.cat(log_truth_chunks)
+    raw_pred_all = torch.cat(raw_pred_chunks)
+    raw_truth_all = torch.cat(raw_truth_chunks)
+
+    # K3 PASS band is on log10 framing — see design §2 R29 frame-audit.
+    var_pred_log = float(log_pred_all.var(unbiased=True).item())
+    var_truth_log = float(log_truth_all.var(unbiased=True).item())
+    var_pred_lin = float(raw_pred_all.var(unbiased=True).item())
+    var_truth_lin = float(raw_truth_all.var(unbiased=True).item())
+    R_real = var_pred_log / max(var_truth_log, 1e-30)
+
+    model.train()
+    return {
+        "R_real": R_real,
+        "var_pred_log": var_pred_log,
+        "var_truth_log": var_truth_log,
+        "var_pred_lin": var_pred_lin,
+        "var_truth_lin": var_truth_lin,
+        "rho_theta_all": raw_pred_all,
+        "rho_truth_all": raw_truth_all,
+    }
+
+
+def _m3_verdict(R_real: float) -> str:
+    """K3 PASS/MARGINAL/FAIL classifier for R_real."""
+    if M3_PASS_LO <= R_real <= M3_PASS_HI:
+        return "PASS"
+    if (M3_MARG_LO <= R_real < M3_PASS_LO) or (M3_PASS_HI < R_real <= M3_MARG_HI):
+        return "MARGINAL"
+    return "FAIL"
+
+
+def _m1_verdict(R_pre: float) -> str:
+    if R_pre <= 0.1:
+        return "PASS"
+    if R_pre <= 0.5:
+        return "MARGINAL"
+    return "FAIL"
+
+
+def _m2_verdict(R_sat: float) -> str:
+    if R_sat <= 0.5:
+        return "PASS"
+    if R_sat <= 0.9:
+        return "MARGINAL"
+    return "FAIL"
+
+
+def _s3_per_bin_diagnostic(rho_theta_all, rho_truth_all):
+    """Per-bin log-MSE on truth-delta bins A/B/C/D (D69 §2.5).
+
+    Bins on truth-delta:
+        A: delta < 0.1 (void)
+        B: 0.1 <= delta < 1 (mean-density)
+        C: 1 <= delta < 10 (overdense)
+        D: delta >= 10 (filament/halo tail)
+
+    MARGINAL triggers (Rev-3 B3 absorption, pre-committed; do NOT change):
+      (a) max_i(log_mse_bin_i) / median_i(log_mse_bin_i) > 5.0
+      (b) log_mse(Bin_D) > 5 * log_mse(Bin_B)
+
+    Either fires MARGINAL regardless of M3 aggregate PASS.
+    """
+    with torch.no_grad():
+        diff_sq = (
+            torch.log10(rho_theta_all + PRETRAIN_LOG_EPS)
+            - torch.log10(rho_truth_all + PRETRAIN_LOG_EPS)
+        ) ** 2
+        bin_masks = {
+            "A": rho_truth_all < 0.1,
+            "B": (rho_truth_all >= 0.1) & (rho_truth_all < 1.0),
+            "C": (rho_truth_all >= 1.0) & (rho_truth_all < 10.0),
+            "D": rho_truth_all >= 10.0,
+        }
+        per_bin = {}
+        for name, mask in bin_masks.items():
+            n = int(mask.sum().item())
+            if n > 0:
+                per_bin[name] = float(diff_sq[mask].mean().item())
+            else:
+                per_bin[name] = float("nan")
+        # Aggregate triggers — operate on the finite subset; if any bin is
+        # empty, skip the corresponding trigger and surface "nan" so the
+        # MLflow scrape records the gap honestly.
+        finite_vals = [v for v in per_bin.values() if math.isfinite(v)]
+        if len(finite_vals) >= 2:
+            max_v = max(finite_vals)
+            sorted_v = sorted(finite_vals)
+            mid = len(sorted_v) // 2
+            median_v = (sorted_v[mid] if len(sorted_v) % 2 == 1
+                        else 0.5 * (sorted_v[mid - 1] + sorted_v[mid]))
+            max_over_median = max_v / max(median_v, 1e-30)
+        else:
+            max_over_median = float("nan")
+        if math.isfinite(per_bin["B"]) and math.isfinite(per_bin["D"]):
+            d_over_b = per_bin["D"] / max(per_bin["B"], 1e-30)
+        else:
+            d_over_b = float("nan")
+        s3_marginal = (
+            (math.isfinite(max_over_median) and max_over_median > 5.0)
+            or (math.isfinite(d_over_b) and d_over_b > 5.0)
+        )
+        verdict = "MARGINAL" if s3_marginal else "PASS"
+        return {
+            "per_bin": per_bin,
+            "max_over_median": max_over_median,
+            "d_over_b": d_over_b,
+            "verdict": verdict,
+        }
+
+
+def _pretrain_load_rho_field(loader, physics_id, redshift, n_grid, device):
+    """Trigger extract_rho_crops once to hydrate _RHO_FIELD_CACHE, then return
+    the cached field as a float32 torch tensor on ``device``.
+
+    Returns a (n_grid, n_grid, n_grid) float32 torch tensor (truth-side
+    constant; no autograd dependency on it).
+    """
+    from src.data.loader import _RHO_FIELD_CACHE
+    # 1-crop warm-up to populate the cache via the production path.
+    _ = loader.extract_rho_crops(
+        physics_id=physics_id, redshift=redshift,
+        crop_size=min(32, n_grid), n_crops=1, seed=0, n_grid=n_grid,
+    )
+    rho_field_np = _RHO_FIELD_CACHE[(int(physics_id), round(float(redshift), 3), int(n_grid))]
+    # mmap'd numpy -> torch on device. Materialize in chunks if the field is
+    # large (P1 z=0.3 n_grid=768 is ~1.8 GB float32).
+    rho_field_torch = torch.from_numpy(np.asarray(rho_field_np, dtype=np.float32))
+    if device.type == "cuda":
+        rho_field_torch = rho_field_torch.to(device)
+    return rho_field_torch
+
+
+# ---------------------------------------------------------------------------
+# [D-69] Stage-1a density-pretraining training loop
+# ---------------------------------------------------------------------------
+
+def train_pretrain(args):
+    """Stage-1a density-pretraining feasibility loop (D-69 design Rev 5).
+
+    Loss: L_pre per §2 (log10-MSE on rho_theta vs Sherwood truth overdensity).
+    Production L_data + L_meanF are NOT computed (loss-isolated per K1).
+    Gate ladder: M1 @ step warmup_steps, M2 @ step max_steps, M3 @ step
+    max_steps. S3 per-bin diagnostic at M2 with pre-committed MARGINAL
+    triggers (§2.5). R-b-pre1/2/3 auto-abort backstops (§2 R-b block).
+
+    Optimizer + schedule mirror production verbatim per §2.6 (AdamW 5e-4,
+    weight_decay 1e-6, linear-warmup-1000 + cosine to 5e-6 over 5000 steps;
+    cites pipeline.py:1022 + :71 + :287-300 as the source-of-truth refs).
+    """
+    set_global_seed(args.seed)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[D-69 pretrain] Using device: {device}", flush=True)
+
+    # Model — same constructor as the production path (no embedding, no
+    # velocity-gradient feature; pretraining is bare-MLP on coords -> density).
+    # [D-70 (1b)] body_arch wired from --arch (default 'current' = bit-identical).
+    model = IGMNeRF(hidden_dim=256, num_layers=8, L=10,
+                    body_arch=getattr(args, "arch", "current")).to(device)
+
+    # Optimizer + schedule — production-matched per §2.6. Cites pipeline.py
+    # lines 1022 (AdamW), 71 (warmup_steps default 1000), 287-300 (build_lr_lambda).
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=args.lr_max,
+        betas=(0.9, 0.999),
+        weight_decay=1e-6,
+    )
+    lr_lambda = build_lr_lambda(
+        args.warmup_steps, args.max_steps, args.lr_max, args.lr_min,
+    )
+    scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    # Load the truth-side rho-field via the production extract_rho_crops API.
+    loader = SherwoodLoader(args.data_root)
+    rho_field_torch = _pretrain_load_rho_field(
+        loader, physics_id=args.physics, redshift=0.3,
+        n_grid=args.pretrain_n_grid, device=device,
+    )
+    print(
+        f"[D-69 pretrain] rho_field shape={tuple(rho_field_torch.shape)} "
+        f"dtype={rho_field_torch.dtype} "
+        f"min={float(rho_field_torch.min()):.3e} "
+        f"max={float(rho_field_torch.max()):.3e}",
+        flush=True,
+    )
+
+    # Pretrain sampling RNG — separate from the global seed so step-by-step
+    # crop draws are deterministic but isolated from any other RNG consumer.
+    pre_rng = torch.Generator(device=device).manual_seed(args.seed + 6900)
+    # Held-out M3 RNG (different seed offset so M3 crops do not overlap the
+    # training crops in expectation).
+    m3_rng = torch.Generator(device=device).manual_seed(args.seed + 6903)
+
+    # MLflow setup — mirror production path so the run lives in the same exp.
+    mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+    mlflow_active = True
+    try:
+        mlflow.set_tracking_uri(mlflow_uri)
+        mlflow.set_experiment("CosmoGasVision/NeRF")
+        print(f"[D-69 pretrain] Connected to MLflow at {mlflow_uri}")
+    except Exception as e:
+        print(f"[D-69 pretrain] MLflow connection issue: {e}")
+        mlflow_active = False
+
+    if args.run_name is None:
+        args.run_name = (
+            f"Stage1a-Pretrain-P{args.physics}-N{args.pretrain_n_grid}-"
+            f"L{args.pretrain_crop_size}-S{args.seed}"
+        )
+
+    run_ctx = mlflow.start_run(run_name=args.run_name) if mlflow_active else nullcontext()
+
+    # R-b-pre3 NaN/Inf ring buffer — track per-step nan/inf fraction over a
+    # rolling 100-step window. Trigger when any window exceeds 0.1%.
+    nan_window = []
+    NAN_WINDOW = 100
+    NAN_FRAC_LIMIT = 0.001
+
+    # Gate-ladder state.
+    L_pre_step0 = None
+    L_pre_step_m1 = None  # logged at warmup_steps
+
+    with run_ctx:
+        if mlflow_active:
+            mlflow.set_tags({
+                "model_type": "nerf",
+                "stage": "1a-density-pretrain",
+                "physics_id": str(args.physics),
+                "redshift": "0.3",
+                "pretrain_target": "density_log10_mse",
+                "design_doc": "D69_stage1_pretraining_scoping.md Rev5",
+                "loss_variant": "pretrain_density",
+            })
+            mlflow.log_params({
+                "lr_max": args.lr_max,
+                "lr_min": args.lr_min,
+                "warmup_steps": args.warmup_steps,
+                "max_steps": args.max_steps,
+                "weight_decay": 1e-6,
+                "pretrain_n_grid": args.pretrain_n_grid,
+                "pretrain_crop_size": args.pretrain_crop_size,
+                "pretrain_microbatch": args.pretrain_microbatch,
+                "pretrain_crops_per_step": args.pretrain_crops_per_step,
+                "pretrain_m3_n_crops": args.pretrain_m3_n_crops,
+                "log_eps": PRETRAIN_LOG_EPS,
+                "seed": args.seed,
+            })
+
+        active_run_id = (
+            mlflow.active_run().info.run_id if mlflow_active else None
+        )
+        print(f"[D-69 pretrain] Run id: {active_run_id}", flush=True)
+
+        # ---- Step-0 baseline L_pre (no grad update). Required for M1 R_pre. ----
+        with torch.no_grad():
+            coords0, rho_truth0 = _pretrain_sample_voxels(
+                rho_field_torch,
+                microbatch=args.pretrain_microbatch,
+                n_crops=args.pretrain_crops_per_step,
+                crop_size=args.pretrain_crop_size,
+                generator=pre_rng, device=device,
+            )
+            rho_theta0 = _pretrain_density_head(model, coords0)
+            L_pre_step0 = float(_pretrain_loss(rho_theta0, rho_truth0).item())
+        print(f"[D-69 pretrain] L_pre @ step 0 = {L_pre_step0:.6e}", flush=True)
+        if mlflow_active:
+            mlflow.log_metric("L_pre", L_pre_step0, step=0)
+
+        # ---- Training loop ----
+        for step in range(1, args.max_steps + 1):
+            optimizer.zero_grad(set_to_none=True)
+            coords_mb, rho_truth_mb = _pretrain_sample_voxels(
+                rho_field_torch,
+                microbatch=args.pretrain_microbatch,
+                n_crops=args.pretrain_crops_per_step,
+                crop_size=args.pretrain_crop_size,
+                generator=pre_rng, device=device,
+            )
+            rho_theta_mb = _pretrain_density_head(model, coords_mb)
+
+            # R-b-pre3 NaN/Inf check on the live forward output BEFORE backward.
+            n_voxels = int(rho_theta_mb.numel())
+            n_nan = int((~torch.isfinite(rho_theta_mb)).sum().item())
+            nan_window.append((n_nan, n_voxels))
+            if len(nan_window) > NAN_WINDOW:
+                nan_window.pop(0)
+            if len(nan_window) >= NAN_WINDOW:
+                tot_nan = sum(x[0] for x in nan_window)
+                tot_vox = sum(x[1] for x in nan_window)
+                frac = tot_nan / max(1, tot_vox)
+                if frac > NAN_FRAC_LIMIT:
+                    msg = (
+                        f"R-b-pre3: numerical instability (nan/inf fraction "
+                        f"{frac:.6f} over last {NAN_WINDOW} steps exceeds "
+                        f"{NAN_FRAC_LIMIT}); aborting @ step {step}."
+                    )
+                    if mlflow_active:
+                        mlflow.set_tag("rb_pre3_triggered", "true")
+                        mlflow.set_tag("abort_reason", "R-b-pre3")
+                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
+                    raise RuntimeError(msg)
+
+            loss = _pretrain_loss(rho_theta_mb, rho_truth_mb)
+            loss.backward()
+            # Light grad-clip mirrors production (pipeline.py:1964).
+            grad_norm_clip = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            optimizer.step()
+            scheduler.step()
+
+            loss_val = float(loss.item())
+            cur_lr = scheduler.get_last_lr()[0]
+
+            # Per-layer grad-norm logging for the first 10 steps per the
+            # differentiability contract (CLAUDE.md "log per-layer grad_norm
+            # for at least the first 10 steps").
+            if step <= 10:
+                grad_lines = []
+                for name, p in model.named_parameters():
+                    if p.grad is not None:
+                        grad_lines.append(f"{name}={float(p.grad.norm().item()):.3e}")
+                print(
+                    f"[D-69 pretrain] step {step}: L_pre={loss_val:.4e} "
+                    f"lr={cur_lr:.2e} grad_clip={float(grad_norm_clip):.3f}",
+                    flush=True,
+                )
+                if step == 1:
+                    print(
+                        f"[D-69 pretrain] per-layer grad norms (step {step}): "
+                        + " ".join(grad_lines[:8]) + " ...",
+                        flush=True,
+                    )
+
+            if mlflow_active:
+                mlflow.log_metric("L_pre", loss_val, step=step)
+                mlflow.log_metric("lr", cur_lr, step=step)
+                mlflow.log_metric("grad_norm_clipped", float(grad_norm_clip),
+                                  step=step)
+
+            # ---- M1 hook @ step warmup_steps ----
+            if step == args.warmup_steps:
+                L_pre_step_m1 = loss_val
+                R_pre = L_pre_step_m1 / max(L_pre_step0, 1e-30)
+                verdict = _m1_verdict(R_pre)
+                print(
+                    f"[D-69 M1] step {step}: L_pre={L_pre_step_m1:.4e} / "
+                    f"L_pre_0={L_pre_step0:.4e} -> R_pre={R_pre:.4f} "
+                    f"[{verdict}]",
+                    flush=True,
+                )
+                if mlflow_active:
+                    mlflow.log_metric("m1_r_pre", R_pre, step=step)
+                    mlflow.set_tag("m1_verdict", verdict)
+
+                # R-b-pre1: constant-density basin check at M1.
+                with torch.no_grad():
+                    _coords_eval, _ = _pretrain_sample_voxels(
+                        rho_field_torch,
+                        microbatch=min(args.pretrain_microbatch,
+                                       args.pretrain_crop_size ** 3),
+                        n_crops=min(args.pretrain_crops_per_step, args.pretrain_m3_n_crops),
+                        crop_size=args.pretrain_crop_size,
+                        generator=m3_rng, device=device,
+                    )
+                    _theta_eval = _pretrain_density_head(model, _coords_eval)
+                    # Use a small fast variance ratio probe rather than the
+                    # full M3 sample (which fires at M2). The PI spec is
+                    # "Var(rho_theta) < 0.1 * Var(rho_truth) over the M3
+                    # 100-crop sample"; we cap probe size to keep step-1000
+                    # latency bounded but the comparison is on the same
+                    # truth-side field.
+                    var_theta = float(_theta_eval.var(unbiased=True).item())
+                # truth-side variance from a fresh small sample
+                with torch.no_grad():
+                    _, _truth_eval = _pretrain_sample_voxels(
+                        rho_field_torch,
+                        microbatch=min(args.pretrain_microbatch,
+                                       args.pretrain_crop_size ** 3),
+                        n_crops=min(args.pretrain_crops_per_step, args.pretrain_m3_n_crops),
+                        crop_size=args.pretrain_crop_size,
+                        generator=m3_rng, device=device,
+                    )
+                    var_truth_probe = float(_truth_eval.var(unbiased=True).item())
+                if var_theta < 0.1 * var_truth_probe:
+                    msg = (
+                        f"R-b-pre1: constant-density basin "
+                        f"(Var(rho_theta)={var_theta:.4e} < 0.1 * "
+                        f"Var(rho_truth)={var_truth_probe:.4e}) @ step {step}."
+                    )
+                    if mlflow_active:
+                        mlflow.set_tag("rb_pre1_triggered", "true")
+                        mlflow.set_tag("abort_reason", "R-b-pre1")
+                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
+                    raise RuntimeError(msg)
+
+            # ---- M2 + M3 hooks @ step max_steps ----
+            if step == args.max_steps:
+                R_sat = (loss_val / max(L_pre_step_m1, 1e-30)
+                         if L_pre_step_m1 is not None else float("nan"))
+                m2_verdict = _m2_verdict(R_sat) if math.isfinite(R_sat) else "UNKNOWN"
+                print(
+                    f"[D-69 M2] step {step}: L_pre={loss_val:.4e} / "
+                    f"L_pre_M1={L_pre_step_m1} -> R_sat={R_sat:.4f} "
+                    f"[{m2_verdict}]",
+                    flush=True,
+                )
+                if mlflow_active:
+                    mlflow.log_metric("m2_r_sat", R_sat, step=step)
+                    mlflow.set_tag("m2_verdict", m2_verdict)
+
+                # M3 — held-out R_real. K3 calibration band.
+                m3 = _pretrain_m3_eval(
+                    model, rho_field_torch,
+                    n_crops=args.pretrain_m3_n_crops,
+                    crop_size=args.pretrain_crop_size,
+                    generator=m3_rng, device=device,
+                )
+                m3_verdict = _m3_verdict(m3["R_real"])
+                print(
+                    f"[D-69 M3] step {step}: R_real={m3['R_real']:.4f} "
+                    f"(var_pred_log={m3['var_pred_log']:.4e}, "
+                    f"var_truth_log={m3['var_truth_log']:.4e}) "
+                    f"[{m3_verdict}]",
+                    flush=True,
+                )
+                if mlflow_active:
+                    mlflow.log_metric("m3_r_real", m3["R_real"], step=step)
+                    mlflow.log_metric("m3_var_pred_log", m3["var_pred_log"], step=step)
+                    mlflow.log_metric("m3_var_truth_log", m3["var_truth_log"], step=step)
+                    mlflow.set_tag("m3_verdict", m3_verdict)
+
+                # S3 per-bin diagnostic at M2 step.
+                s3 = _s3_per_bin_diagnostic(
+                    m3["rho_theta_all"], m3["rho_truth_all"],
+                )
+                print(
+                    f"[D-69 S3] per-bin log-MSE: A={s3['per_bin']['A']:.4e} "
+                    f"B={s3['per_bin']['B']:.4e} C={s3['per_bin']['C']:.4e} "
+                    f"D={s3['per_bin']['D']:.4e} | "
+                    f"max/median={s3['max_over_median']:.3f} "
+                    f"D/B={s3['d_over_b']:.3f} [{s3['verdict']}]",
+                    flush=True,
+                )
+                if mlflow_active:
+                    for _bn, _bv in s3["per_bin"].items():
+                        mlflow.log_metric(f"s3_log_mse_bin_{_bn}", _bv, step=step)
+                    mlflow.log_metric("s3_max_over_median",
+                                      s3["max_over_median"], step=step)
+                    mlflow.log_metric("s3_d_over_b", s3["d_over_b"], step=step)
+                    mlflow.set_tag("s3_verdict", s3["verdict"])
+
+                # R-b-pre2: loss decreased monotonically but realism failed.
+                loss_decreased = (
+                    L_pre_step0 is not None
+                    and loss_val < L_pre_step0
+                )
+                if loss_decreased and m3_verdict == "FAIL":
+                    msg = (
+                        f"R-b-pre2: loss-decreased-but-realism-failed "
+                        f"(L_pre 0->step{step}: {L_pre_step0:.4e}->{loss_val:.4e}, "
+                        f"R_real={m3['R_real']:.4f} outside [{M3_MARG_LO}, "
+                        f"{M3_MARG_HI}])."
+                    )
+                    if mlflow_active:
+                        mlflow.set_tag("rb_pre2_triggered", "true")
+                        mlflow.set_tag("abort_reason", "R-b-pre2")
+                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
+                    raise RuntimeError(msg)
+
+            # Checkpoint at intervals for downstream Stage 1b sub-step 1 use.
+            if (args.checkpoint_interval > 0
+                    and step % args.checkpoint_interval == 0):
+                ckpt_path = os.path.join(
+                    args.checkpoint_dir,
+                    f"pretrain_step_{step:06d}.pt",
+                )
+                save_checkpoint(
+                    ckpt_path,
+                    model=model, optimizer=optimizer, scheduler=scheduler,
+                    log_tau_amp=torch.nn.Parameter(torch.tensor(0.0, device=device)),
+                    step=step, mlflow_run_id=active_run_id,
+                )
+
+        print("[D-69 pretrain] Stage-1a pretraining finished.", flush=True)
+
+
+def eval_pretrain_zero_shot(args):
+    """Stage 1b sub-step 1 — zero-shot M3 evaluation on a loaded checkpoint.
+
+    Loads model state from --resume_from, runs M3 on the rho-field of the
+    --zero-shot-eval-physics target with NO weight updates, logs
+    m3_zero_shot_r_real + m3_zero_shot_verdict, and exits.
+    """
+    if not args.resume_from:
+        raise ValueError(
+            "--zero-shot-eval-physics requires --resume_from (the Stage-1a "
+            "checkpoint to evaluate)."
+        )
+    target_pid = _resolve_zero_shot_physics(args.zero_shot_eval_physics)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(
+        f"[D-69 zero-shot] Loading {args.resume_from} -> M3 eval on P{target_pid}",
+        flush=True,
+    )
+
+    # [D-70 (1b)] body_arch wired from --arch; zero-shot eval must match
+    # the checkpoint arch, so the CLI value is load-bearing.
+    model = IGMNeRF(hidden_dim=256, num_layers=8, L=10,
+                    body_arch=getattr(args, "arch", "current")).to(device)
+    state = torch.load(args.resume_from, map_location=device, weights_only=False)
+    model.load_state_dict(state["model_state"])
+    model.eval()
+
+    loader = SherwoodLoader(args.data_root)
+    rho_field_torch = _pretrain_load_rho_field(
+        loader, physics_id=target_pid, redshift=0.3,
+        n_grid=args.pretrain_n_grid, device=device,
+    )
+    m3_rng = torch.Generator(device=device).manual_seed(args.seed + 6903)
+
+    mlflow_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+    mlflow_active = True
+    try:
+        mlflow.set_tracking_uri(mlflow_uri)
+        mlflow.set_experiment("CosmoGasVision/NeRF")
+    except Exception as e:
+        print(f"[D-69 zero-shot] MLflow connection issue: {e}")
+        mlflow_active = False
+
+    if args.run_name is None:
+        args.run_name = (
+            f"Stage1b-ZeroShot-P{target_pid}-from-S{args.seed}"
+        )
+
+    run_ctx = mlflow.start_run(run_name=args.run_name) if mlflow_active else nullcontext()
+    with run_ctx:
+        if mlflow_active:
+            mlflow.set_tags({
+                "model_type": "nerf",
+                "stage": "1b-zero-shot",
+                "physics_id": str(target_pid),
+                "redshift": "0.3",
+                "design_doc": "D69_stage1_pretraining_scoping.md Rev5",
+            })
+            mlflow.log_params({
+                "resume_from": args.resume_from,
+                "pretrain_n_grid": args.pretrain_n_grid,
+                "pretrain_crop_size": args.pretrain_crop_size,
+                "pretrain_m3_n_crops": args.pretrain_m3_n_crops,
+            })
+        m3 = _pretrain_m3_eval(
+            model, rho_field_torch,
+            n_crops=args.pretrain_m3_n_crops,
+            crop_size=args.pretrain_crop_size,
+            generator=m3_rng, device=device,
+        )
+        verdict = _m3_verdict(m3["R_real"])
+        print(
+            f"[D-69 zero-shot] R_real={m3['R_real']:.4f} [{verdict}]",
+            flush=True,
+        )
+        if mlflow_active:
+            mlflow.log_metric("m3_zero_shot_r_real", m3["R_real"])
+            mlflow.set_tag("m3_zero_shot_verdict", verdict)
 
 
 # ---------------------------------------------------------------------------
@@ -1013,6 +1826,7 @@ def train(args):
         hidden_dim=256, num_layers=8, L=10,
         use_velocity_gradient_conditioning=args.use_velocity_gradient_conditioning,
         use_physics_embedding=args.use_physics_embedding,
+        body_arch=getattr(args, "arch", "current"),
     ).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
     sigma_log = 0.5
@@ -2220,6 +3034,20 @@ def train(args):
 
 def main(argv=None):
     args = parse_args(argv)
+    # [D-70 (1b)] Stdout trailer line for sbatch trailer-grep validation.
+    # Emitted EARLY (before any work) so the line appears even if training
+    # later aborts; downstream pre-validation greps for the literal token.
+    print(f"BODY_ARCH={args.arch}", flush=True)
+    # [D-69] Stage 1b sub-step 1 — zero-shot M3 eval on a loaded checkpoint.
+    # Takes priority over --pretrain-density because the two modes are
+    # mutually exclusive (eval doesn't fit, fit doesn't eval-only).
+    if args.zero_shot_eval_physics is not None:
+        eval_pretrain_zero_shot(args)
+        return
+    # [D-69] Stage 1a — density pretraining feasibility loop.
+    if args.pretrain_density:
+        train_pretrain(args)
+        return
     train(args)
 
 

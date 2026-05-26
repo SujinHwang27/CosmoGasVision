@@ -1,0 +1,68 @@
+{
+  "lr_max": 0.001,
+  "seed": 0,
+  "n_steps_run": 1000,
+  "r_b_pre1_fire_step": 200,
+  "r_pre_at_M1": 0.7565112532667503,
+  "L_pre_step0": 0.2769606411457062,
+  "L_pre_at_M1": 0.20952384173870087,
+  "var_ratio_trajectory": [
+    {
+      "step": 100,
+      "var_rho_theta": 0.00013406343350652605,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 1.3411440223868483e-05
+    },
+    {
+      "step": 250,
+      "var_rho_theta": 0.00019677146337926388,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 1.96846272682227e-05
+    },
+    {
+      "step": 500,
+      "var_rho_theta": 6.0403359384508803e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 6.042632375716012e-06
+    },
+    {
+      "step": 750,
+      "var_rho_theta": 3.6506335163721815e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 3.6520214277290597e-06
+    },
+    {
+      "step": 1000,
+      "var_rho_theta": 1.8689819626160897e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 1.8696925190935018e-06
+    }
+  ],
+  "var_ratio_spread_over_mean": 1.994488320582178,
+  "var_ratio_monotone_increasing": false,
+  "l_pre_trajectory": [
+    {
+      "step": 100,
+      "l_pre": 0.19669660925865173
+    },
+    {
+      "step": 250,
+      "l_pre": 0.22000104188919067
+    },
+    {
+      "step": 500,
+      "l_pre": 0.20239238440990448
+    },
+    {
+      "step": 750,
+      "l_pre": 0.19934281706809998
+    },
+    {
+      "step": 1000,
+      "l_pre": 0.2135765254497528
+    }
+  ],
+  "verdict": "UNKNOWN_NON_MONOTONIC",
+  "elapsed_sec": 37.626461029052734,
+  "cell_log_path": "experiments\\nerf\\artifacts\\d69_lr_probe\\cell_lr1e-03_seed0.log"
+}

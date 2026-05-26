@@ -24,13 +24,27 @@ class PositionalEncoding(nn.Module):
 class IGMNeRF(nn.Module):
     """
     Continuous MLP mapping 3D position -> density, temp, h1_frac, vpec.
+
+    body_arch: 'current' (default) | 'skip-rich-mlp' [D-70 Rev 5.1 (1b)]
+        - 'current'      — original 4+4 layers1/layers2 with single mid-skip.
+        - 'skip-rich-mlp' — DeepSDF every-layer skip-input variant: 8 body
+          layers, each consuming concat([h, skip_in]) (encoded coords [+g]
+          re-injected at every layer). ReLU activations unchanged; head
+          unchanged. Tests the Lu+2019 dying-ReLU body pathology under the
+          same activation regime as 'current' (operative-cause swap test).
     """
     def __init__(self, hidden_dim=256, num_layers=8, L=10,
                  use_velocity_gradient_conditioning: bool = False,
                  use_physics_embedding: bool = False,
                  n_physics: int = 4,
-                 physics_embedding_dim: int = 16):
+                 physics_embedding_dim: int = 16,
+                 body_arch: str = "current"):
         super().__init__()
+        if body_arch not in ("current", "skip-rich-mlp"):
+            raise ValueError(
+                f"body_arch must be 'current' or 'skip-rich-mlp'; got {body_arch!r}"
+            )
+        self.body_arch = body_arch
         # use_velocity_gradient_conditioning toggles the [D-42] sidecar feature
         # (Sherwood-truth dv_pec/dchi, z-scored, detached) concatenated onto the
         # encoded coordinate before layer 1 — see LEDGER §3 [D-42] Math contract.
@@ -62,20 +76,43 @@ class IGMNeRF(nn.Module):
         if use_physics_embedding:
             self.physics_embedding = nn.Embedding(n_physics, physics_embedding_dim)
 
-        self.layers1 = nn.ModuleList()
-        for i in range(4):
-            dim = in_dim if i == 0 else hidden_dim
-            self.layers1.append(nn.Linear(dim, hidden_dim))
+        if body_arch == "current":
+            # Estimator-equivalence path: identical construction order/shape to
+            # the pre-Rev-5.1 model. Do NOT touch this branch.
+            self.layers1 = nn.ModuleList()
+            for i in range(4):
+                dim = in_dim if i == 0 else hidden_dim
+                self.layers1.append(nn.Linear(dim, hidden_dim))
 
-        self.layers2 = nn.ModuleList()
-        for i in range(num_layers - 4):
-            dim = hidden_dim + skip_dim if i == 0 else hidden_dim
-            self.layers2.append(nn.Linear(dim, hidden_dim))
+            self.layers2 = nn.ModuleList()
+            for i in range(num_layers - 4):
+                dim = hidden_dim + skip_dim if i == 0 else hidden_dim
+                self.layers2.append(nn.Linear(dim, hidden_dim))
+
+            # Output layer input dimension depends on whether we have layers after the skip connection
+            out_in_dim = hidden_dim if (num_layers - 4) > 0 else (hidden_dim + skip_dim)
+        else:
+            # [D-70 (1b)] Skip-rich MLP: 8 body layers, every layer consumes
+            # concat([h, skip_in]) where skip_in = encoded[, g] (matches the
+            # current single-mid-skip skip_dim contract — physics embedding
+            # excluded from re-injection, same as 'current').
+            #
+            # First layer input: h_in (= skip_in [+e_p]) has dim `in_dim`, then
+            # concatenated with skip_in again -> in_dim + skip_dim.
+            # Subsequent layers: hidden_dim + skip_dim.
+            #
+            # We still expose .layers1 (length 0 ModuleList) + .layers2 (the
+            # 8 body layers) so the d70 pre-flight measurement code that
+            # iterates list(model.layers1) + list(model.layers2) sees 8 sites
+            # under both arches.
+            self.layers1 = nn.ModuleList()  # empty under skip-rich
+            self.layers2 = nn.ModuleList()
+            for i in range(num_layers):
+                in_features = (in_dim + skip_dim) if i == 0 else (hidden_dim + skip_dim)
+                self.layers2.append(nn.Linear(in_features, hidden_dim))
+            out_in_dim = hidden_dim
 
         self.relu = nn.ReLU()
-
-        # Output layer input dimension depends on whether we have layers after the skip connection
-        out_in_dim = hidden_dim if (num_layers - 4) > 0 else (hidden_dim + skip_dim)
         self.out_layer = nn.Linear(out_in_dim, 4)
 
         self.softplus = nn.Softplus()
@@ -122,15 +159,21 @@ class IGMNeRF(nn.Module):
 
         h = h_in
 
-        for layer in self.layers1:
-            h = self.relu(layer(h))
+        if self.body_arch == "current":
+            for layer in self.layers1:
+                h = self.relu(layer(h))
 
-        # NeRF residual/skip connection re-injects the (encoded[, g]) vector
-        # — physics embedding e_p is intentionally excluded per [D-46].
-        h = torch.cat([h, skip_in], dim=-1)
+            # NeRF residual/skip connection re-injects the (encoded[, g]) vector
+            # — physics embedding e_p is intentionally excluded per [D-46].
+            h = torch.cat([h, skip_in], dim=-1)
 
-        for layer in self.layers2:
-            h = self.relu(layer(h))
+            for layer in self.layers2:
+                h = self.relu(layer(h))
+        else:
+            # [D-70 (1b)] Skip-rich: concat skip_in into every body layer input.
+            for layer in self.layers2:
+                h_in_layer = torch.cat([h, skip_in], dim=-1)
+                h = self.relu(layer(h_in_layer))
 
         out = self.out_layer(h)
         # Bounding fields to physical ranges

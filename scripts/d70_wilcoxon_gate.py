@@ -1,0 +1,522 @@
+"""
+D70 Wilcoxon gate harness — MLflow-direct read.
+
+Per D70 Rev 5.1 §0.9 F2 path-β: this harness reads Stage 1a (1b) per-seed
+metrics DIRECTLY from MLflow via `mlflow.search_runs` + `MlflowClient.
+get_metric_history`, rather than from a placeholder JSON written by a
+hand-rolled post-Juno aggregation step. This reduces hand-off surface and
+defers failure modes (tag-key drift, filter syntax, store-URI handling)
+to the harness layer itself.
+
+Spec
+----
+Gate-1 criterion for Stage 1a (1b) skip-rich-mlp:
+  - Two-stage Bonferroni adaptive design per S3:
+      Stage 1 (n=10, α=0.05 one-sided IMPROVE):
+        p ≤ 0.025      → PASS
+        0.025 < p ≤ 0.05 → MARGINAL (re-bake to n=20, evaluate stage-2)
+        p > 0.05       → FAIL
+      Stage 2 (n=20, α=0.025 one-sided Bonferroni):
+        p ≤ 0.025 → PASS, else FAIL
+
+Bin-D sub-clause (ii) per §2.2 amended applies the same Wilcoxon harness
+to per-bin log-MSE (`s3_log_mse_bin_D`). Sub-clause (i) (constant-floor 10×)
+was RETIRED per S2; only (ii) is gating.
+
+Per-seed metric extraction
+--------------------------
+Stage 1a pipeline.py only logs `m3_var_pred_log`/`m3_var_truth_log` at
+step = max_steps (M3 fires ONLY at max_steps; see pipeline.py L948-980).
+There is NO step-0 baseline for these metrics; the only step-0 metric
+logged is `L_pre` (line 819). Same for `s3_log_mse_bin_*` (logged only
+at M2 step, line 996-997).
+
+** DESIGN-QUESTION-SURFACED **
+The PI brief specifies the test as per-seed Wilcoxon on
+  Var_ratio(500) − Var_ratio(0).
+But Var_ratio(0) is NOT logged. This harness interprets the per-seed
+delta as:
+  Δ_seed = R_real(step=500) − 1.0
+where R_real = m3_var_pred_log / m3_var_truth_log is the canonical M3
+metric (pipeline.py L561). The null hypothesis "no improvement" maps to
+R_real = 1.0 (predicted variance matches truth-side variance up to
+sampling); IMPROVE direction is Δ > 0 (predicted variance recovers
+truth-side variance from below — the canonical M3 K3 calibration band
+target). This is honest framing: the gate tests whether the n=10 sweep
+recovers truth-side variance, not whether step-500 beats a missing
+step-0 baseline.
+
+Tag-emission contract (verified against pipeline.py + submit_juno_stage1a_1b.sh)
+------------------------------------------------------------------------------
+Tags emitted by pipeline.py train_pretrain (L777-785):
+  model_type=nerf, stage="1a-density-pretrain", physics_id, redshift,
+  pretrain_target, design_doc, loss_variant
+Tags emitted by post-run tagger (sbatch L139-145):
+  body_arch="skip-rich-mlp", compute="juno",
+  juno_batch="stage1a-1b-skiprich", seed="<int>",
+  stage_substep="1a-(1b)", design_doc_ref, framing_amendment_A
+
+Canonical filter:
+  tags.stage = '1a-density-pretrain' AND
+  tags.body_arch = 'skip-rich-mlp' AND
+  tags.juno_batch = 'stage1a-1b-skiprich'
+
+MLflow store handling (file:// vs http://)
+------------------------------------------
+Stage 1a Juno sbatch sets `MLFLOW_TRACKING_URI=file://${RUN_DIR}/mlflow`
+PER SEED (one file-store per run; n=10 separate stores). Host-side
+aggregation requires either (a) replaying each store into the local
+http:// tracker, or (b) iterating multiple --tracking-uri values.
+
+This harness supports both:
+  --tracking-uri file:///path/to/store  (single store, multiple runs)
+  --tracking-uri http://127.0.0.1:5000  (default, post-replay)
+For the n=10 file://-per-run layout, the post-Juno step is expected to
+either run host-side `sagemaker_stage2b_import_mlflow.py`-style replay
+or call this harness once per store and aggregate externally. The
+--multi-store flag enables the latter path.
+
+R20 fail-loud-not-skip-log
+--------------------------
+--dry-run runs the search against the configured tracking URI and asserts
+that ≥ N_STAGE1 matching runs are present. Empty result set → loud
+AssertionError. NEVER returns PASS-by-default when no runs match.
+
+Out-of-scope (DO NOT execute under this dispatch)
+-------------------------------------------------
+Authoring only. The harness will be executed AFTER the Juno sweep returns
+and (optionally) after a file://-store import step.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import sys
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+from scipy.stats import wilcoxon
+
+# Late-imported so unit tests can mock mlflow without requiring the real lib
+# at import time. The CLI path imports unconditionally; tests inject mocks.
+try:  # pragma: no cover - thin import shim
+    import mlflow
+    from mlflow.tracking import MlflowClient
+    _MLFLOW_AVAILABLE = True
+except Exception:  # pragma: no cover
+    mlflow = None  # type: ignore
+    MlflowClient = None  # type: ignore
+    _MLFLOW_AVAILABLE = False
+
+
+ALPHA_STAGE1 = 0.05
+ALPHA_PASS_STRICT = 0.025
+ALPHA_STAGE2 = 0.025
+
+N_STAGE1 = 10
+N_STAGE2 = 20
+
+# Canonical metric + tag keys (verified in-session against pipeline.py /
+# submit_juno_stage1a_1b.sh — see module docstring).
+METRIC_VAR_PRED = "m3_var_pred_log"
+METRIC_VAR_TRUTH = "m3_var_truth_log"
+METRIC_BIN_D = "s3_log_mse_bin_D"
+METRIC_BIN_B = "s3_log_mse_bin_B"
+
+TAG_STAGE = "stage"
+TAG_STAGE_VALUE = "1a-density-pretrain"
+TAG_ARCH = "body_arch"
+TAG_ARCH_VALUE = "skip-rich-mlp"
+TAG_JUNO_BATCH = "juno_batch"
+TAG_JUNO_BATCH_VALUE = "stage1a-1b-skiprich"
+TAG_SEED = "seed"
+
+DEFAULT_EXPERIMENT_NAME = "CosmoGasVision/NeRF"
+DEFAULT_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+
+# Bin-D coverage gate per S5 / Rev 5.1 §2.2 amended.
+BIN_D_MIN_SAMPLES_PER_CROP = 5
+BIN_D_MAX_EXCLUDED_FRACTION = 0.20
+
+
+# ---------------------------------------------------------------------------
+# MLflow read layer
+# ---------------------------------------------------------------------------
+
+def _build_client(tracking_uri: str):
+    """Construct an MlflowClient bound to ``tracking_uri``.
+
+    Kept thin + monkeypatchable for unit tests.
+    """
+    if not _MLFLOW_AVAILABLE:  # pragma: no cover
+        raise RuntimeError(
+            "mlflow not importable; install with `uv add mlflow` or run on a "
+            "machine with the project venv activated."
+        )
+    return MlflowClient(tracking_uri=tracking_uri)
+
+
+def _stage1a_filter_string(arch_value: str = TAG_ARCH_VALUE,
+                           juno_batch_value: str = TAG_JUNO_BATCH_VALUE) -> str:
+    """Canonical Stage-1a filter string.
+
+    NB: MLflow's `search_runs` filter language requires backticks around
+    tag keys containing periods; plain `tags.X = 'Y'` is fine for our keys.
+    """
+    return (
+        f"tags.{TAG_STAGE} = '{TAG_STAGE_VALUE}' AND "
+        f"tags.{TAG_ARCH} = '{arch_value}' AND "
+        f"tags.{TAG_JUNO_BATCH} = '{juno_batch_value}'"
+    )
+
+
+def _search_stage1a_runs(client, experiment_name: str,
+                         filter_string: str) -> List:
+    """Return the list of stage-1a runs matching the canonical filter."""
+    exp = client.get_experiment_by_name(experiment_name)
+    if exp is None:
+        raise RuntimeError(
+            f"MLflow experiment '{experiment_name}' not found at the "
+            f"configured tracking URI; refusing to compute Wilcoxon verdict."
+        )
+    runs = client.search_runs(
+        experiment_ids=[exp.experiment_id],
+        filter_string=filter_string,
+        max_results=2 * N_STAGE2,  # ample headroom; gate later
+    )
+    return runs
+
+
+def _last_metric_at(client, run_id: str, key: str,
+                    step: Optional[int] = None) -> Optional[float]:
+    """Return the metric value at ``step`` (or the last logged step if
+    ``step`` is None). Uses get_metric_history for time-series access.
+    Returns None when the key is absent from the run."""
+    hist = client.get_metric_history(run_id, key)
+    if not hist:
+        return None
+    if step is None:
+        # Pick the highest step recorded for this key.
+        last = max(hist, key=lambda m: m.step)
+        return float(last.value)
+    matches = [m for m in hist if m.step == step]
+    if not matches:
+        return None
+    return float(matches[-1].value)
+
+
+def _extract_per_seed_metrics(client, runs,
+                              max_steps: int) -> Dict[int, Dict[str, float]]:
+    """Build per-seed payload from the canonical metrics.
+
+    Returns a dict keyed by integer seed:
+      {seed: {
+        "run_id": str,
+        "var_pred": float | None,    # m3_var_pred_log @ step=max_steps
+        "var_truth": float | None,
+        "r_real": float | None,      # var_pred / var_truth
+        "delta": float | None,       # r_real - 1.0  (IMPROVE direction)
+        "bin_d": float | None,       # s3_log_mse_bin_D @ step=max_steps
+        "bin_b": float | None,
+      }, ...}
+    Runs missing the `seed` tag are skipped with a stderr warning.
+    """
+    out: Dict[int, Dict[str, float]] = {}
+    for r in runs:
+        tags = r.data.tags
+        seed_raw = tags.get(TAG_SEED)
+        if seed_raw is None:
+            print(
+                f"[d70_wilcoxon] WARN: run {r.info.run_id} missing 'seed' "
+                f"tag; skipping.",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            seed = int(seed_raw)
+        except ValueError:
+            print(
+                f"[d70_wilcoxon] WARN: run {r.info.run_id} has non-int seed "
+                f"tag '{seed_raw}'; skipping.",
+                file=sys.stderr,
+            )
+            continue
+
+        vp = _last_metric_at(client, r.info.run_id, METRIC_VAR_PRED,
+                             step=max_steps)
+        vt = _last_metric_at(client, r.info.run_id, METRIC_VAR_TRUTH,
+                             step=max_steps)
+        bd = _last_metric_at(client, r.info.run_id, METRIC_BIN_D,
+                             step=max_steps)
+        bb = _last_metric_at(client, r.info.run_id, METRIC_BIN_B,
+                             step=max_steps)
+
+        r_real = None
+        delta = None
+        if vp is not None and vt is not None and vt > 0:
+            r_real = vp / vt
+            delta = r_real - 1.0
+
+        if seed in out:
+            print(
+                f"[d70_wilcoxon] WARN: duplicate seed {seed} (runs "
+                f"{out[seed]['run_id']} + {r.info.run_id}); keeping latest.",
+                file=sys.stderr,
+            )
+        out[seed] = {
+            "run_id": r.info.run_id,
+            "var_pred": vp,
+            "var_truth": vt,
+            "r_real": r_real,
+            "delta": delta,
+            "bin_d": bd,
+            "bin_b": bb,
+        }
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Wilcoxon engine
+# ---------------------------------------------------------------------------
+
+def _wilcoxon_one_sided(deltas: List[float]) -> float:
+    """One-sided Wilcoxon signed-rank against zero, IMPROVE direction.
+
+    Returns the one-sided p-value (alternative='greater').
+    """
+    arr = np.array([d for d in deltas if d is not None and math.isfinite(d)])
+    if len(arr) < 2:
+        raise ValueError(
+            f"Need ≥ 2 valid samples for Wilcoxon; got {len(arr)}."
+        )
+    res = wilcoxon(arr, alternative="greater", zero_method="wilcox")
+    return float(res.pvalue)
+
+
+def _gate(p_stage1: float, p_stage2: Optional[float],
+          n1: int, n2: Optional[int]) -> str:
+    """Two-stage Bonferroni adaptive gate."""
+    if p_stage2 is None:
+        if n1 < N_STAGE1:
+            return "INSUFFICIENT-N"
+        if p_stage1 <= ALPHA_PASS_STRICT:
+            return "PASS"
+        if p_stage1 <= ALPHA_STAGE1:
+            return "MARGINAL"
+        return "FAIL"
+    # Stage 2 evaluated.
+    if n2 is None or n2 < N_STAGE2:
+        return "INSUFFICIENT-N-STAGE2"
+    return "PASS" if p_stage2 <= ALPHA_STAGE2 else "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# Bin-D sub-clause (ii)
+# ---------------------------------------------------------------------------
+
+def _bin_d_wilcoxon(per_seed: Dict[int, Dict[str, float]]) -> Dict[str, object]:
+    """Run Wilcoxon on per-seed Bin-D log-MSE.
+
+    Per Rev 5.1 §2.2 amended sub-clause (ii): IMPROVE direction means Bin-D
+    log-MSE DECREASES (negative delta). We test `−bin_d` increasing.
+    The PI memo describes "Wilcoxon-decreasing"; we encode this as the
+    one-sided ``alternative='less'``-equivalent via sign flip.
+
+    Coverage gate per S5: count seeds with non-None Bin-D values. If
+    fraction of seeds excluded > BIN_D_MAX_EXCLUDED_FRACTION ⇒ flag
+    INSUFFICIENT-COVERAGE.
+    """
+    total = len(per_seed)
+    valid = [(s, v["bin_d"]) for s, v in per_seed.items()
+             if v.get("bin_d") is not None and math.isfinite(v["bin_d"])]
+    excluded_frac = (total - len(valid)) / max(total, 1)
+    if excluded_frac > BIN_D_MAX_EXCLUDED_FRACTION:
+        return {
+            "verdict": "INSUFFICIENT-COVERAGE",
+            "excluded_fraction": excluded_frac,
+            "n_valid": len(valid),
+            "p_value": None,
+        }
+    if len(valid) < 2:
+        return {
+            "verdict": "INSUFFICIENT-N",
+            "excluded_fraction": excluded_frac,
+            "n_valid": len(valid),
+            "p_value": None,
+        }
+    # IMPROVE = decrease in log-MSE relative to Bin-B reference.
+    # Per S2 retirement of the constant-floor sub-clause (i), the test is
+    # framed as per-seed Bin-D log-MSE decreasing toward Bin-B-comparable
+    # error levels — we test the delta (Bin-D − Bin-B) against zero with
+    # alternative='less'.
+    deltas = []
+    for _s, _ in valid:
+        v = per_seed[_s]
+        if v.get("bin_b") is None or not math.isfinite(v["bin_b"]):
+            continue
+        deltas.append(v["bin_d"] - v["bin_b"])
+    if len(deltas) < 2:
+        return {
+            "verdict": "INSUFFICIENT-N-BIN-B",
+            "excluded_fraction": excluded_frac,
+            "n_valid": len(deltas),
+            "p_value": None,
+        }
+    arr = np.array(deltas)
+    res = wilcoxon(arr, alternative="less", zero_method="wilcox")
+    p = float(res.pvalue)
+    verdict = "PASS" if p <= ALPHA_STAGE1 else "FAIL"
+    return {
+        "verdict": verdict,
+        "excluded_fraction": excluded_frac,
+        "n_valid": len(deltas),
+        "p_value": p,
+    }
+
+
+# ---------------------------------------------------------------------------
+# CLI orchestration
+# ---------------------------------------------------------------------------
+
+def run_gate(tracking_uri: str,
+             experiment_name: str,
+             max_steps: int,
+             arch_value: str = TAG_ARCH_VALUE,
+             juno_batch_value: str = TAG_JUNO_BATCH_VALUE,
+             stage2: bool = False,
+             dry_run: bool = False,
+             client=None) -> Dict[str, object]:
+    """End-to-end harness. ``client`` is injectable for unit tests."""
+    if client is None:
+        if _MLFLOW_AVAILABLE:
+            mlflow.set_tracking_uri(tracking_uri)
+        client = _build_client(tracking_uri)
+
+    filter_string = _stage1a_filter_string(arch_value, juno_batch_value)
+    runs = _search_stage1a_runs(client, experiment_name, filter_string)
+
+    # R20 twin-gate: empty result set ⇒ loud AssertionError, NEVER
+    # silently return PASS-by-default.
+    if dry_run:
+        assert len(runs) >= N_STAGE1, (
+            f"Stage 1a sweep returned {len(runs)} matching runs; refusing to "
+            f"compute Wilcoxon verdict (expected ≥ {N_STAGE1})."
+        )
+
+    if len(runs) == 0:
+        raise AssertionError(
+            "Stage 1a sweep returned 0 matching runs; refusing to compute "
+            "Wilcoxon verdict."
+        )
+
+    per_seed = _extract_per_seed_metrics(client, runs, max_steps)
+    n_obs = len(per_seed)
+
+    valid_deltas = [v["delta"] for v in per_seed.values()
+                    if v["delta"] is not None and math.isfinite(v["delta"])]
+
+    # Choose the n for stage classification: if stage2 flag set, expect n_20.
+    n_target = N_STAGE2 if stage2 else N_STAGE1
+    n_used = min(n_obs, n_target)
+
+    p_stage1: Optional[float] = None
+    p_stage2: Optional[float] = None
+    try:
+        p_stage1 = _wilcoxon_one_sided(valid_deltas[:N_STAGE1])
+    except ValueError as e:
+        print(f"[d70_wilcoxon] Stage 1 Wilcoxon failed: {e}", file=sys.stderr)
+
+    if stage2 and len(valid_deltas) >= N_STAGE2:
+        try:
+            p_stage2 = _wilcoxon_one_sided(valid_deltas[:N_STAGE2])
+        except ValueError as e:
+            print(
+                f"[d70_wilcoxon] Stage 2 Wilcoxon failed: {e}",
+                file=sys.stderr,
+            )
+
+    n1 = min(len(valid_deltas), N_STAGE1)
+    n2 = len(valid_deltas) if stage2 else None
+    if p_stage1 is None:
+        verdict = "INSUFFICIENT-N"
+    else:
+        verdict = _gate(p_stage1, p_stage2, n1, n2)
+
+    bin_d_result = _bin_d_wilcoxon(per_seed)
+
+    out = {
+        "tracking_uri": tracking_uri,
+        "experiment_name": experiment_name,
+        "filter_string": filter_string,
+        "n_runs_matched": len(runs),
+        "n_seeds_extracted": n_obs,
+        "n_valid_deltas": len(valid_deltas),
+        "per_seed": {
+            str(s): {k: v for k, v in payload.items() if k != "run_id"}
+                    | {"run_id": payload["run_id"]}
+            for s, payload in per_seed.items()
+        },
+        "p_stage1": p_stage1,
+        "p_stage2": p_stage2,
+        "verdict": verdict,
+        "bin_d": bin_d_result,
+        "design_doc": "D70 Rev 5.1 §2.2 amended",
+        "framing_note": (
+            "Per-seed delta = R_real(step=max_steps) − 1.0; step-0 baseline "
+            "for m3_var_*_log is not logged by pipeline.py train_pretrain "
+            "(M3 fires only at max_steps). Null hypothesis: R_real = 1.0 "
+            "(variance recovery)."
+        ),
+    }
+    return out
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
+    p.add_argument("--tracking-uri", default=DEFAULT_TRACKING_URI,
+                   help="MLflow tracking URI (default: $MLFLOW_TRACKING_URI "
+                        "or http://127.0.0.1:5000).")
+    p.add_argument("--experiment", default=DEFAULT_EXPERIMENT_NAME,
+                   help="MLflow experiment name "
+                        f"(default: {DEFAULT_EXPERIMENT_NAME}).")
+    p.add_argument("--max-steps", type=int, default=500,
+                   help="Step at which M3 metrics were logged (default 500).")
+    p.add_argument("--arch", default=TAG_ARCH_VALUE,
+                   help=f"body_arch tag value (default '{TAG_ARCH_VALUE}').")
+    p.add_argument("--juno-batch", default=TAG_JUNO_BATCH_VALUE,
+                   help=f"juno_batch tag value "
+                        f"(default '{TAG_JUNO_BATCH_VALUE}').")
+    p.add_argument("--stage2", action="store_true",
+                   help="Evaluate Stage-2 Bonferroni n=20 path.")
+    p.add_argument("--dry-run", action="store_true",
+                   help="R20 twin-gate: assert ≥ N_STAGE1 matching runs "
+                        "exist at the configured URI; do not write output.")
+    p.add_argument("--output-json", default=None,
+                   help="Path to write the full verdict payload.")
+    args = p.parse_args(argv)
+
+    result = run_gate(
+        tracking_uri=args.tracking_uri,
+        experiment_name=args.experiment,
+        max_steps=args.max_steps,
+        arch_value=args.arch,
+        juno_batch_value=args.juno_batch,
+        stage2=args.stage2,
+        dry_run=args.dry_run,
+    )
+
+    print(json.dumps(result, indent=2, default=str))
+    if args.output_json:
+        Path(args.output_json).write_text(json.dumps(result, indent=2,
+                                                     default=str))
+
+    verdict = result["verdict"]
+    return 0 if verdict == "PASS" else (1 if verdict == "MARGINAL" else 2)
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

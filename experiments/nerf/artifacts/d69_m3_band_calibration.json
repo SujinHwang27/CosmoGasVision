@@ -1,0 +1,226 @@
+{
+  "meta": {
+    "script": "scripts/d69_m3_band_calibration.py",
+    "started_at": "2026-05-24T20:09:09-0500",
+    "cache_npy_path": "Sherwood/.rho_field_cache/rho_field_p1_z0.300_n768.npy",
+    "cache_npy_size_bytes": 1811939456,
+    "cache_npy_first_1MB_md5": "0d9ca217d039b8da8008feb1ea5ff45d",
+    "cache_json": {
+      "dtype": "float32",
+      "max": 20654.947265625,
+      "mean": 1.0,
+      "min": 0.0,
+      "n_grid": 768,
+      "physics_id": 1,
+      "redshift": 0.3,
+      "schema_version": 1,
+      "sha256_first_1MB": "c9cc766ee3a24ea804db639e270d162423fcf37eafb18658ac6f2b2c5ddc5453",
+      "shape": [
+        768,
+        768,
+        768
+      ],
+      "sherwood_snapshot_mtime_utc": "2020-05-23T18:59:05Z"
+    },
+    "physics_id": 1,
+    "redshift": 0.3,
+    "n_grid": 768,
+    "n_crops_per_sample": 100,
+    "n_bootstrap": 1000,
+    "log_eps": 0.001,
+    "crop_sizes": [
+      32,
+      48
+    ],
+    "seed_base_single": 100000,
+    "seed_base_ratio_num": 200000,
+    "seed_base_ratio_den": 300000,
+    "_RHO_CROP_LO_value_in_loader": 0.001,
+    "rho_crop_lo_semantics": "per-voxel-not-enforced",
+    "rho_crop_lo_semantics_long": "not-enforced (documentation only; loader._validate_rho_crops asserts only non-negativity + max < 1e6; zero cells pass through unchanged)",
+    "rho_field_stats": {
+      "shape": [
+        768,
+        768,
+        768
+      ],
+      "dtype": "float32",
+      "min": 0.0,
+      "max": 20654.947265625,
+      "mean": 1.0,
+      "zero_cells_frac": 0.2550588846206665
+    },
+    "finished_at": "2026-05-24T20:22:30"
+  },
+  "var_truth": {
+    "L32": {
+      "log10_var": {
+        "mean": 1.556372579074434,
+        "std": 0.031269733363254545,
+        "p2_5": 1.4980229172168555,
+        "p16": 1.5259588637199688,
+        "p50": 1.5543409309430625,
+        "p84": 1.5876032627805716,
+        "p97_5": 1.621609019250362,
+        "n": 1000
+      },
+      "linear_var": {
+        "mean": 180.80869626927665,
+        "std": 196.385826423353,
+        "p2_5": 25.242022100737906,
+        "p16": 51.97827492177346,
+        "p50": 107.26767133764952,
+        "p84": 314.39501178165784,
+        "p97_5": 723.9215025494519,
+        "n": 1000
+      },
+      "wall_clock_sec": 60.69940320000751
+    },
+    "L48": {
+      "log10_var": {
+        "mean": 1.5573041053902255,
+        "std": 0.023094784377860302,
+        "p2_5": 1.5116381806580546,
+        "p16": 1.5354882220514265,
+        "p50": 1.5574451886040617,
+        "p84": 1.5793065682305274,
+        "p97_5": 1.603628053067789,
+        "n": 1000
+      },
+      "linear_var": {
+        "mean": 181.19961586710866,
+        "std": 118.79347855250457,
+        "p2_5": 45.29375808928103,
+        "p16": 75.72942077554248,
+        "p50": 151.96947406496065,
+        "p84": 279.51461350072645,
+        "p97_5": 518.1526285540299,
+        "n": 1000
+      },
+      "wall_clock_sec": 224.52447329997085
+    }
+  },
+  "ratio_under_null": {
+    "L32": {
+      "log10_ratio": {
+        "mean": 0.9997651758074837,
+        "std": 0.02778964775253171,
+        "p2_5": 0.9448541411888429,
+        "p16": 0.9737935029161194,
+        "p50": 0.9988777652377302,
+        "p84": 1.0264126454032556,
+        "p97_5": 1.0553367303931702,
+        "n": 1000
+      },
+      "linear_ratio": {
+        "mean": 2.115175119336778,
+        "std": 3.4214208719152577,
+        "p2_5": 0.0884791467799703,
+        "p16": 0.27483609080374255,
+        "p50": 0.9289421992254103,
+        "p84": 3.444239653356547,
+        "p97_5": 12.521538733322785,
+        "n": 1000
+      },
+      "wall_clock_sec": 107.52634530002251
+    },
+    "L48": {
+      "log10_ratio": {
+        "mean": 1.0003733773452095,
+        "std": 0.020328182638546223,
+        "p2_5": 0.9618414711888833,
+        "p16": 0.9794486934061916,
+        "p50": 1.0002770457450683,
+        "p84": 1.0202145554565774,
+        "p97_5": 1.0416101198058194,
+        "n": 1000
+      },
+      "linear_ratio": {
+        "mean": 1.4549825045489537,
+        "std": 1.4410735296485941,
+        "p2_5": 0.18969203678313645,
+        "p16": 0.3999411447883188,
+        "p50": 0.9903328271610021,
+        "p84": 2.431255754896314,
+        "p97_5": 5.717968885927683,
+        "n": 1000
+      },
+      "wall_clock_sec": 373.0441429000348
+    }
+  },
+  "pass_band": {
+    "L32": {
+      "log10_framing": {
+        "pass_lo": 0.971975528054952,
+        "pass_hi": 1.0275548235600154,
+        "marginal_lo_outer": 0.9441858803024202,
+        "marginal_hi_outer": 1.055344471312547,
+        "marginal_lo_inner": 0.971975528054952,
+        "marginal_hi_inner": 1.0275548235600154,
+        "rule": "PASS = R in [mu-1s, mu+1s]; MARGINAL = [mu-2s, mu-1s] U [mu+1s, mu+2s]; FAIL = outside [mu-2s, mu+2s]",
+        "mu": 0.9997651758074837,
+        "sigma": 0.02778964775253171
+      },
+      "linear_framing": {
+        "pass_lo": -1.3062457525784796,
+        "pass_hi": 5.536595991252035,
+        "marginal_lo_outer": -4.727666624493738,
+        "marginal_hi_outer": 8.958016863167293,
+        "marginal_lo_inner": -1.3062457525784796,
+        "marginal_hi_inner": 5.536595991252035,
+        "rule": "PASS = R in [mu-1s, mu+1s]; MARGINAL = [mu-2s, mu-1s] U [mu+1s, mu+2s]; FAIL = outside [mu-2s, mu+2s]",
+        "mu": 2.115175119336778,
+        "sigma": 3.4214208719152577
+      }
+    },
+    "L48": {
+      "log10_framing": {
+        "pass_lo": 0.9800451947066633,
+        "pass_hi": 1.0207015599837557,
+        "marginal_lo_outer": 0.959717012068117,
+        "marginal_hi_outer": 1.0410297426223019,
+        "marginal_lo_inner": 0.9800451947066633,
+        "marginal_hi_inner": 1.0207015599837557,
+        "rule": "PASS = R in [mu-1s, mu+1s]; MARGINAL = [mu-2s, mu-1s] U [mu+1s, mu+2s]; FAIL = outside [mu-2s, mu+2s]",
+        "mu": 1.0003733773452095,
+        "sigma": 0.020328182638546223
+      },
+      "linear_framing": {
+        "pass_lo": 0.013908974900359583,
+        "pass_hi": 2.8960560341975476,
+        "marginal_lo_outer": -1.4271645547482346,
+        "marginal_hi_outer": 4.337129563846142,
+        "marginal_lo_inner": 0.013908974900359583,
+        "marginal_hi_inner": 2.8960560341975476,
+        "rule": "PASS = R in [mu-1s, mu+1s]; MARGINAL = [mu-2s, mu-1s] U [mu+1s, mu+2s]; FAIL = outside [mu-2s, mu+2s]",
+        "mu": 1.4549825045489537,
+        "sigma": 1.4410735296485941
+      }
+    }
+  },
+  "s2_dry_run": {
+    "microbatch": 1024,
+    "crop_size_for_voxels": 48,
+    "n_steps_timed": 10,
+    "per_step_wall_sec_all": [
+      3.4485881999717094,
+      0.06502970005385578,
+      0.026027599989902228,
+      0.02459039998939261,
+      0.026006200001575053,
+      0.024695999978575855,
+      0.01568409998435527,
+      0.022338999959174544,
+      0.026713000028394163,
+      0.025645699992310256
+    ],
+    "per_step_wall_sec_mean_excl_warmup": 0.028525744441948418,
+    "cpu_5000_step_extrapolation_sec": 142.62872220974208,
+    "juno_a30_5000_step_estimate_sec_lo_100x": 1.426287222097421,
+    "juno_a30_5000_step_estimate_sec_hi_30x": 4.754290740324737,
+    "speedup_band_used": "30x-100x (back-of-envelope CPU-thread -> A30 fp32 MLP)",
+    "model": "IGMNeRF(hidden_dim=256, num_layers=8, L=10)",
+    "torch_num_threads": 4
+  },
+  "wall_clock_total_sec": 801.0186241999618
+}
