@@ -238,6 +238,28 @@ Five new rules surfaced by convergent attack from a 3-examiner defense panel + a
     it as upstream-of-D1-D4 (not parallel-5th); the [D-53] entry banks the
     binding rule for it specifically, in advance of R12 generalizing.
 
+    **R12 amendment 2026-05-26 (banking-grade per R29-promotion panel
+    ruling 5; banks on R29-promotion-panel-verdict as the candidate-test
+    for the R12-accounting amendment)**: a sighting subsequently revealed
+    to be itself an instance of the failure-mode the rule prevents
+    **RESETS the sighting count to zero AND requires a fresh banking
+    cycle from candidate**. The parent promotion is invalidated. The
+    "sighting" is not merely null; it actively anti-satisfies R12 because
+    the candidate accumulated false confidence between the broken sighting
+    and its discovery. Statistical interpretation: a passed gate later
+    revealed to have wrong-unit construction is equivalent to a Type II
+    error in the gate itself (failed to reject a wrong-unit gate
+    construction). Concrete instance the amendment banks on: R29 was
+    promoted candidate-banked → BANKED at [D-71] §H 2026-05-26 on the
+    claim that MDE-block at job 203337 was a "successful prevention"; K6
+    panel revealed the MDE-block ε=0.05 anchor was itself an instance of
+    R29's failure mode (Boera P_F-units applied to density-variance-ratio
+    gate-observable without unit-chain derivation). Per this R12
+    amendment, R29 demoted BANKED → CANDIDATE (full demotion, NOT
+    DEFERRED-BANKED PROVISIONAL); previous BANKED claim falsified-prior
+    under [D-37]-Extension R2 cascade. Cite: LEDGER §3 [D-71] amendment
+    block §H AMENDED, 2026-05-26.
+
 **Extension 2 update (added 2026-05-13b per second convergent dual-panel overturn this session — pre-review on [D-52] option-(c) scope-lock; LEDGER [D-37]-Extension 2 update):**
 
 R13 + R14 banked as binding. R15 candidate deferred pending next-session
@@ -454,10 +476,25 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     mismatch is exactly the class of inherited-claim-without-re-verification
     R15 was banked for).
 
-29. **Gate-construction-vs-production-framing audit (PROMOTED
-    candidate → BANKED 2026-05-24 per [D-68] amendment positive
-    operational test).** Every smoke / pre-flight
-    / contract-assertion gate, before dispatch, must be checked that:
+29. **Gate-construction-vs-production-framing audit (CANDIDATE per
+    R29-promotion panel verdict 2026-05-26 (b) NEGATIVE; full demotion
+    from BANKED).** Status history: candidate-banked at [D-67] 2026-05-24;
+    promoted candidate → BANKED at [D-68] amendment 2026-05-24 on K2
+    re-spec positive operational test; demoted BANKED → candidate-banked
+    at [D-70] backstop-remediation 2026-05-26 per panel N1 (R29 failed to
+    fire on Rev 5.1 §0.9 F2 landing); promoted candidate-banked → BANKED
+    again at [D-71] §H 2026-05-26 on MDE-block "successful prevention"
+    claim; **demoted BANKED → CANDIDATE (full demotion, NOT
+    DEFERRED-BANKED PROVISIONAL) at R29-promotion panel verdict
+    2026-05-26 (b) NEGATIVE — [D-71] §H banking marked falsified-prior
+    under [D-37]-Extension R2 cascade**. R29 has produced ZERO confirmed
+    successful preventions since the [D-68] candidate-banking. Re-banking
+    requires (i) two-part rule-text amendment landed below AND (ii) one
+    PROSPECTIVE design-time catch on a fresh gate (not remediation of
+    ε=0.05 case).
+
+    Every smoke / pre-flight / contract-assertion gate, before dispatch,
+    must be checked that:
 
     (i) its measured quantity is in the same units / framing as the
         production metric it proxies (e.g., dimensionless ratio vs
@@ -468,22 +505,73 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
         same units AND at the same band / k-range / redshift as the
         production metric.
 
-    Mis-framed gates produce either **false halts** (this banking event —
-    K2 absolute-variance gate halted Stage 1 redo on a comparison
+    **Rule-text amendment 2026-05-26 (two-part, both required; R29 must
+    satisfy both for re-banking)**:
+
+    (i) **PI-proposed (unit-chain derivation explicit)**: Frame-of-
+        measurement audit extends to **observable-unit-chain framing**.
+        Any gate threshold ε derived from an external observational
+        anchor must have its unit-chain from anchor-observable to
+        gate-observable explicitly written out in the gate construction.
+        If the chain crosses a nonlinear forward model (e.g., FGPA
+        exp(−τ) saturation, RSD broadening, instrumental LSF), the
+        unit-transfer is NOT free and the threshold is presumed
+        unanchored until the chain is derived. **Concrete example**: the
+        ε=0.05 case at [D-71] §H — Boera+2019 5% P_F-observational-floor
+        was applied to density-variance-ratio gate observable without
+        deriving the unit chain through FGPA β≈1.6 + exp(−τ) saturation
+        + RSD/LSF/continuum-fitting bias; the chain is not
+        monotone-Lipschitz (5% in P_F-space could correspond to ~1% to
+        \>\>100% variance-ratio).
+
+    (ii) **Panel-added 2026-05-26 (load-bearing, closes (a) rule-
+         laundering escape hatch permanently)**: R29's in-line check is a
+         **design-time obligation discharged at gate-construction
+         commit**; post-spec panel catches do NOT retire the design-time
+         obligation and do NOT count as R29 successful preventions. They
+         count as R29 failures partially mitigated by other discipline
+         (panel-review, K-discharge cycles).
+
+    Mis-framed gates produce either **false halts** (the K2 absolute-
+    variance gate at [D-68] halted Stage 1 redo on a comparison
     production never makes) or **false passes** (the original CPU
     pre-flight v1 1.1-decade-margin claim, which compared
     un-prefactored fGPA to prefactored L1 — same shape failure, opposite
-    sign). Either failure mode wastes review cycles and/or invites
-    [D-37]-rule-(a)-violation downstream framing.
+    sign; AND the ε=0.05 MDE-block "CLEARED" at job 203337 which
+    PASSed against a wrong-unit threshold). Either failure mode wastes
+    review cycles and/or invites [D-37]-rule-(a)-violation downstream
+    framing.
 
-    Meta-pattern motivating banking: three "gate uses units/framing
-    different from production" issues in this track (R20-v1 on (b)
-    jobid 202259 false-positive 2026-05-22; K1+K2 panel HOLD on (3)
-    pre-flight v1 2026-05-24; K2 wrong-frame halt on (3) pre-flight
-    v2 2026-05-24). Pattern is gate-construction-discipline, not
-    physics. Trigger one more gate-framing failure → BANKED.
+    Meta-pattern (sighting history including falsified-prior promotions):
+    R20-v1 on (b) jobid 202259 false-positive 2026-05-22; K1+K2 panel
+    HOLD on (3) pre-flight v1 2026-05-24; K2 wrong-frame halt on (3)
+    pre-flight v2 2026-05-24; Rev 5.1 §0.9 F2 landing where R29 failed
+    to fire ([D-70] N1 2026-05-26); ε=0.05 MDE-block construction at
+    a225437 where R29 failed to fire pre-spec at gate-construction time
+    (K6 + R29-promotion panels 2026-05-26).
 
-    Cite: LEDGER §3 [D-68] block, 2026-05-24.
+    Cite: LEDGER §3 [D-68] block 2026-05-24 (banking); [D-70] amendment
+    block 2026-05-26 (first demotion); [D-71] §H 2026-05-26 (falsified-
+    prior promotion); [D-71] amendment block §H AMENDED 2026-05-26 (full
+    demotion to CANDIDATE + rule-text amendment).
+
+**Sequence note**: R30 (PI-brief grep-discipline, BANKED at LEDGER §3 [D-70] Rev 5.1 absorption 2026-05-25) and R31 (cross-section noun-consistency, DEFERRED-BANKED with sighting #1/#2/#3 at LEDGER §3 [D-70]/[D-71] 2026-05-26) are banked in LEDGER but not yet codified as numbered rule-entries here. Codification deferred to next governance batch alongside R31 sharpened-text addendum (per [D-71] amendment block "R31 third sighting" 2026-05-26). Numbering jumps R29 → R32 with that gap acknowledged.
+
+32. **Panel-cycle-discipline as banking precondition (DEFERRED-CANDIDATE
+    2026-05-26 per R29-promotion panel ruling 4; first sighting per R12).**
+    Post-spec narrow-discharge panel cycles are mandatory before any
+    banking promotion lands. Reasoning: if K6 panel discharge IS what
+    caught the R29-failure-mode at [D-71] §H (it was — panel ruling
+    verbatim), then the discipline that enabled the catch is panel-
+    cycle-discipline, NOT R29 itself. That discipline is currently
+    unbanked-but-load-bearing — governance gap. R12 second-sighting-
+    cross-track required before R32 promotes to BANKED (per R12
+    amendment 2026-05-26 — and now under the tighter "sighting later
+    revealed broken → reset to zero" clause). PI-only sign-off,
+    deferred panel review per R28 PROVISIONAL default.
+
+    Cite: LEDGER §3 [D-71] amendment block §H 2026-05-26 R32-candidate
+    sub-bullet.
 
 ## CVPR submission goal (active near-term mission, 2026-05-11 → submission)
 

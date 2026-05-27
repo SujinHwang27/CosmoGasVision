@@ -169,7 +169,7 @@ Stage 1a scope-lock: P1 ONLY (no P2/P3/P4 cross-physics). Cross-physics testing 
 - **R26 (in-session re-verification)**: discharged for this design-doc layer per §9 review-trail (re-read `nerf.py`, `pipeline.py`, `submit_juno_stage1a_1b.sh`, LEDGER §3 [D-71]); FORWARD obligation for ρ-field cache re-verify at infra-manager dispatch.
 - **R27 (5-stage ladder)**: HOLDS unchanged.
 - **R28 (PI dispatch-sequence rung count vs design-doc artifact count)**: SPEC'd per §8 multi-rung dispatch chain. PROVISIONAL until panel APPROVE.
-- **R29 (gate-construction-vs-production-framing audit)**: HOLDS — all M0/M1/M2 gates inherit [D-70] Rev 5.1 + amendment v2 + [D-71] frame-matched specifications (F1-β dual R_real, F4 Δ_seed framing, Wilcoxon H1='greater', MDE-block ε=0.05 anchored Boera+2019, σ_seed full_n10 source). No new gate construction in this doc.
+- **R29 (gate-construction-vs-production-framing audit)**: **CANDIDATE** per R29-promotion panel verdict 2026-05-26 (b) NEGATIVE (full demotion from BANKED; previous banking falsified-prior — see §10.H). Discipline still applied to all M0/M1/M2 gates as standard best-practice, but no rule-citation-as-prerequisite. Specifically per §10.E ε-anchor demotion: this Rev 1.1 does NOT inherit ε=0.05; operative ε is `10 × μ_frozen = 2.4e-5` on `var_pred(500)/var_truth(500)` primary observable per panel #3 + PI absorption path (a) anchored to gate observable (no nonlinear forward-model bridge required).
 - **R30 (brief-discipline grep evidence)**: HOLDS — §9 review-trail cites exact file:line evidence with grep/Read commands.
 - **R31 (cross-section noun-consistency, banked at [D-70])**: HOLDS — "SIREN" / "(1c)" / "Sine activations" used consistently; CLI flag `--arch siren` matches doc-prose `(1c) SIREN`.
 - **[D-37] rule (a) observation-first**: HOLDS — §0 leads with the (1b) FALSIFICATION observation and the orthogonality argument as the load-bearing claim, NOT with the (1c)-PASS strengthening narrative.
@@ -239,3 +239,150 @@ Per R27 panel-pre-review precedence + R28 single-rung-per-dispatch discipline, t
 | K5 contingency wording ranking (1c) above (1d) | LEDGER §3 [D-71] §G | SURVIVES |
 
 No commits, no code changes, no HPC dispatch from this design-doc landing per R28 + R15-PROVISIONAL.
+
+---
+
+## §10 — Rev 1 → Rev 1.1 AMENDMENT BLOCK (D71 Panel + K6 Panel absorption, 2026-05-26)
+
+**Status update**: Revision 1.1 PROVISIONAL pending defense-panel re-review on this amendment block; no HPC dispatch until panel APPROVE. R15+R28 PROVISIONAL (unchanged).
+
+D71 Rev 1 defense-panel returned NEEDS-WORK with 4 BLOCKING + 5 NEEDS-WORK + 5 PROBE. K6 narrow-discharge panel (parallel cycle on (1b) per [D-71] §F) ALSO returned NEEDS-WORK with 3 KILLER + 4 SERIOUS + 1 PROBE — findings flow back into (1c) Rev 1.1 per LEDGER §3 [D-71] amendment block "Forward obligations register" 2026-05-26.
+
+**Rev 1 §B/§C/§7 wording preserved above for audit trail; operative readings replaced as below.**
+
+### §10.A — D71 Panel B1 (PE → SIREN wiring categorical error): RESOLVED via path (α) DROP PE
+
+Rev 1 §1.5 spec'd `raw coords → PE_L10 (63-dim Fourier encoding) → SIREN body`. Canonical SIREN replaces PE — Sine activations ARE the frequency expansion. Stacking gives effective first-layer frequency ω₀=30 × 2^9π ≈ 48,000 → 5 OOM above Sitzmann derivation regime. Categorical methodological error per panel B1.
+
+**Operative §1.5 wiring (replaces Rev 1 §1.5 table)**:
+- **Layer 0 input**: raw normalized coords (3-dim, ∈ [−1, +1] after the existing unit-cube → [−1,+1] re-map). **NO PE in front of SIREN.**
+- **Layer 0 init**: `U(−1/in_dim, +1/in_dim)` where `in_dim = 3 + g_dim + e_dim` (functional in fan_in per N1; for Stage 1a P1 with `g=None, e_p=None`, `in_dim = 3`).
+- **Layers 1..7**: Sine, `U(−√(6/fan_in)/ω₀, +√(6/fan_in)/ω₀)`, ω₀=30 (canonical Sitzmann hidden ω₀ — NOTE: Rev 1 had ω₀=1 for hidden; corrected per canonical Sitzmann SIREN recipe).
+- **Out layer**: linear, default init (Kaiming-uniform `a=√5` per `nn.Linear`).
+- **Density head**: Softplus unchanged (`out[..., 0]`).
+- Explicit doc note: "PE_L10 deliberately omitted; Sine activations subsume frequency-basis role per Sitzmann+2020 §3."
+
+This also resolves K3 (ω₀ transfer risk simplifies dramatically against raw coords∈[−1,+1] closer to Sitzmann calibrated regime), N1 (functional fan_in landed), and tightens N5 (fewer init-variance failure modes).
+
+### §10.B — D71 Panel B2 (R10 head-axis incompleteness): RESOLVED via path (β) — head-ablation rung 4.5
+
+§0.6 §3 admits Softplus head c≈0 stable-basin remains hypothesized failure mode for (1c); §0.6 asserts orthogonality holds IFF (1b) failure was body-side-dominated; no evidence (1b) was body-dominated vs head-dominated. If head-dominated, swapping body (1b→1c) discharges non-cause and (γ)-reuse is illegitimate.
+
+**Operative §7 re-route**: (1c) FAIL + R-b-pre2 firing condition does **NOT** auto-falsify (γ); routes through head-vs-supervision disambiguation FIRST.
+
+**New rung 4.5 — head-ablation pilot** (inserted into §8 between rung 4 and 5; was numbered as new rung-after-Juno in PI absorption; lands as 4.5 in §8 dispatch chain):
+- 1-seed pilot: current `(1c) body + direct-linear head (drop Softplus)` + same (γ) loss. ~30 min CPU OR single short Juno rung.
+- **PASS** (direct-linear head + (γ) escapes void-floor basin): head was load-bearing failure cause; (γ) survives R10 reuse contract; (1c) FAIL is re-attributed to Softplus head, NOT (γ) loss.
+- **FAIL** (direct-linear head + (γ) still void-floor): head ⊥ body confirmed; (γ) supervision-class falsification holds; routes to (δ) supervision-pivot.
+- Pre-commit: "(1c) FAIL + R-b-pre2 firing alone does NOT discharge (γ); rung 4.5 head-ablation is **mandatory** before (δ)."
+
+This is the missing R10 orthogonality argument — written in advance per contract.
+
+### §10.C — D71 Panel B3 (every-seed trigger asymmetry): RESOLVED via trichotomy
+
+Rev 1 §7 trigger "(1c) FAIL + R-b-pre2 every-seed (10/10)" was asymmetric vs (1b)'s `median(Δ_seed) ≤ 0` robust statistic. Systematically under-commits to (γ) falsification.
+
+**Operative §7 trigger (replaces Rev 1 §7 wording)**:
+
+> **"IF Juno n=10 Wilcoxon test on primary observable returns FAIL AND MDE-block CLEARS:**
+> **(i) R-b-pre2 fires in ≥7/10 seeds** (matched to (1b) median ≤ 0 robustness; ~70% quorum tolerates 3-seed stochasticity) → **route to rung 4.5 head-vs-supervision disambiguation** (per §10.B). After rung 4.5 verdict + rung 4.6 P2 spot-check (per §10.E), (γ) class-falsification triggers IFF head-ablation FAIL AND P2 spot-check confirms.
+> **(ii) R-b-pre2 fires in ≤3/10 seeds** → (γ) NOT falsified; route to panel for taxonomy of which body-axis attribute (Sine, init, ω₀) is load-bearing (resolves P5).
+> **(iii) R-b-pre2 fires in 4-6/10 seeds (indeterminate band)** → routes to panel ruling, no auto-dispatch. **If (γ) falsification triggers → (δ) supervision-pivot enters routing stack as next architectural-axis candidate."**
+
+Symmetric to (1b) tolerance for seed stochasticity; closes falsifiability-asymmetry loophole.
+
+### §10.D — D71 Panel B4 (lr cargo-cult): RESOLVED via new rung 1.5 lr pre-flight
+
+§1.3 justified lr_max=1e-4 via Sitzmann+2020 §4.1 photometric default. Cosmological log-density spans 5 decades vs Sitzmann 1-decade photometric output. Cargo-cult risk: lr may be too low to escape void-floor basin in 500 steps → kinetic failure mistaken for architectural failure.
+
+**New rung 1.5 — lr sensitivity pre-flight** (inserted into §8 between rung 1 and 2):
+- 3 seeds × 3 lr {5e-5, 1e-4, 5e-4} = 9 runs, (1c) SIREN body (per §10.A wiring) under (γ), 500 steps each on CPU (~30 min CPU per panel estimate).
+- Metric: void-floor escape proxy — `min(Bin-D pred) > void_floor_threshold` after 500 steps; default threshold `log₁₀(ρ/⟨ρ⟩) > -1.0`.
+- **Outcome**:
+  - lr=1e-4 escapes ≥1 seed → scope-lock §1.6 to lr=1e-4 for Juno dispatch; Sitzmann default vindicated for cosmology.
+  - lr=1e-4 fails 3/3 but lr=5e-4 escapes ≥1 → re-spec §1.6 lr_max=5e-4 with explicit "Sitzmann default re-tuned for 5-decade output" note.
+  - All 9 fail → R29 gate-construction failure; (1c) FAIL attribution at Juno-tier would have been kinetic, not architectural — fresh panel cycle for arch re-spec.
+
+This also discharges K6 panel finding #1 forward obligation on lr-axis-coverage-on-(1b)-skip-rich (per LEDGER §3 [D-71] amendment block "Forward obligations register"): rung 1.5 lr pre-flight runs on (1c) body, not (1b), but per [D-37]-ext rule 5 symmetric-disclosure the lr-axis-coverage status is now disclosed-and-discharged-forward rather than declared-but-not-probed.
+
+### §10.E — N1-N5 + K6 #4/#6 absorption
+
+**N1 (functional fan_in)**: ABSORBED in §10.A wiring spec — `in_dim = 3 + g_dim + e_dim` functional.
+
+**N2 (M2 AND-gate α-correction)**: ABSORBED — explicit Bonferroni α=0.025 per Bin-D sub-clause when both (i) and (ii) AND-gate at M2. Cite [D-70] Rev 5.1 amendment v2 paragraph that introduced AND-gate as the precedent; α-correction was implicit; now made explicit.
+
+**N3 (Bin-D necessary-not-sufficient)**: ABSORBED — §2.2 sub-clause (ii) explicitly flagged necessary-not-sufficient for void-floor-escape. New sub-clause **(iii) density-PDF KS or W2 distance** at M2 endpoint as a parallel AND-gate, citing Walther+ 2018 §3.3 / Lukić+ 2015 §3 PDF-shape recovery. Bin-D differential improvement test (ii) covers ONE signature; density-PDF shape (iii) covers complementary signature.
+
+**N4 (P2 spot-check)**: ABSORBED — new rung 4.6 in §8 dispatch chain (inserted between rung 4.5 and 5): on §7 trigger AND post-rung-4.5 head-ablation FAIL, auto-dispatch 1-seed P2 spot-check on (1c) BEFORE (δ) supervision-pivot. Cost ~30 min Juno. Disambiguates "(γ) class-falsification" from "(1c) on P1 P1-specific pathology" — converts (δ) routing from "P1-only evidence" to "P1+P2 convergent OR P1-only with P2 disambiguating."
+
+**N5 (init-time activation-statistics asserts)**: ABSORBED — §1.4 (i) integration test extended with init-time asserts per Sitzmann+2020 §3.2 targets: for fixed Gaussian input batch (size 64), assert `pre-activation std across each body layer ∈ [0.5, 2.0]` AND `post-activation std ∈ [0.4, 1.0]`. Init-variance failures trip BEFORE 30-min Juno burn.
+
+**K6 #4/#6 primary-observable swap** (per LEDGER §3 [D-71] amendment block §C primary-observable swap): (1c) gate uses `var_pred(step_N)/var_truth(step_N)` as primary load-bearing observable. Δ_seed DEMOTED to secondary direction-of-motion check with explicit caveat that σ(Δ_seed) is init-RNG-dominated (per K6 panel finding #4 evidence: r ≈ -0.99 between Δ_seed and step_0 value). MDE re-derived against σ(var-ratio at step N) — much tighter than σ(Δ_seed). The §2 M0 row + §7 pre-commit reference this primary observable.
+
+**K6 #3 ε-anchor demotion** (per LEDGER §3 [D-71] amendment block §H R29 demotion): (1c) does NOT inherit ε=0.05 unchanged. Operative ε for (1c) Rev 1.1:
+- **Path (a)** preferred — derive ε from defensible unit chain to the gate observable `var_pred/var_truth`. Candidate anchor: pre-flight B `μ_frozen = 2.4e-6` (frozen-init var-ratio); ε could be `10 × μ_frozen = 2.4e-5` (10× above frozen-init noise floor) — explicitly anchored to the gate observable, no nonlinear forward-model bridge.
+- **Path (b)** fallback — declare ε as "heuristic ceiling, not from observational anchor; gate verdict reads as 'large/small headroom against heuristic' not 'CLEARED vs observational floor.'"
+- Pre-commit Rev 1.1: **Path (a) with ε = 10 × μ_frozen = 2.4e-5** on `var_pred(500)/var_truth(500)` primary observable. Symmetric-disclosure: this is a frozen-init-anchored conservative ceiling, NOT an observational physical floor. Panel may overturn at Rev 1.1 re-review.
+
+### §10.F — OS1 K6 narrow-discharge panel cycle: RUN (parallel, completed)
+
+K6 panel ran in parallel with this amendment authoring per OS1 absorption. Verdict: NEEDS-WORK; PI absorbed into LEDGER §3 [D-71] amendment block (this session, commit pending user auth). K6 narrow-discharge ruling NOT yet APPROVE-narrow until the LEDGER amendments land.
+
+### §10.G — OS2 path-(a) reading: PI rules autonomously, user-flag landed
+
+PI reads `feedback-path-a-exhaustive` as **loss-axis-binding only**: architecture-axis walks under fixed (γ) supervision ((1b) → (1c) → (1d)) are IN-scope path-(a) work; (δ) supervision-pivot would be the loss pivot (hard stop). Surfaced as user-flag in LEDGER §7 history paragraph 2026-05-26; user ratified "yes" on the implicit reading at the auth checkpoint. PI proceeds autonomously per feedback-pi-decides.
+
+### §10.H — R29 status (per K6 panel #3 + R29-promotion panel verdict (b) NEGATIVE)
+
+**R29 status: CANDIDATE** per R29-promotion separate panel cycle (dispatched + ruled 2026-05-26 same session) verdict **(b) NEGATIVE**. **Full demotion** from BANKED, **NOT** DEFERRED-BANKED PROVISIONAL. **[D-71] §H banking marked falsified-prior** under [D-37]-Extension R2 cascade. Re-banking requires: (i) two-part rule-text amendment landed in `.claude/agents/project-architect.md` (this commit batch), AND (ii) one PROSPECTIVE design-time catch on a fresh gate (not remediation of ε=0.05 case).
+
+Panel ruled (a) POSITIVE foreclosed as rule-laundering ([D-70] N1 sin re-committed) and (c) INCONCLUSIVE foreclosed by verbatim rule-text. The "successful prevention" at job 203337 was a coincidence-PASS against wrong-unit threshold; R29 has produced ZERO confirmed successful preventions since [D-68] candidate-banking.
+
+**Two-part rule-text amendment** (lands in `.claude/agents/project-architect.md` this commit batch):
+- (i) PI-proposed: unit-chain derivation from anchor-observable to gate-observable, with nonlinear forward-model bridges named explicitly.
+- (ii) Panel-added (load-bearing, closes (a) escape hatch permanently): R29's in-line check is a **design-time obligation discharged at gate-construction commit**; post-spec panel catches do NOT count as R29 successful preventions.
+
+This (1c) Rev 1.1 spec does NOT depend on R29 status — the discipline is applied via panel review regardless. §5 R-rule audit updated to "R29 CANDIDATE (per R29-promotion panel verdict 2026-05-26 (b) NEGATIVE)."
+
+Companion governance updates landing same commit batch: R12 in-place amendment ("sighting later revealed to instantiate the rule's failure-mode RESETS sighting count to zero + invalidates parent promotion"); R32 DEFERRED-CANDIDATE entry ("post-spec narrow-discharge panel cycles are mandatory before any banking promotion lands" — first sighting, R12-second-sighting-cross-track required for BANKED).
+
+### §10.I — R31 third sighting (sharpening, NOT promotion)
+
+R31 third sighting (observable-unit-chain framing at K6 ε=0.05) — per R12 precedent within-track third sighting calls for rule-text sharpening, NOT promotion. Sharpened R31 addendum deferred to next governance batch commit on `.claude/agents/project-architect.md`. Cross-track second-sighting still owed for formal R31-strengthened promotion.
+
+### §10.J — Updated §8 dispatch chain (with new rungs 1.5 + 4.5 + 4.6)
+
+Per R28 single-rung-per-dispatch discipline + R27 ladder-count cross-check, the updated ladder:
+
+0. defense-panel pre-review on Rev 1.1 ← CURRENT GATE.
+1. core-implementer dispatch 1: extend `IGMNeRF.__init__` body_arch to add `'siren'`; raw-coords → SIREN body wiring per §10.A; integration test + estimator-equivalence test (R20 twin-gate). Init-time activation-statistics asserts per N5.
+**1.5. core-implementer dispatch (lr pre-flight)**: `scripts/d71_lr_pre_flight.py`, 9-run CPU sweep per §10.D. Outcome routes scope-lock §1.6.
+2. core-implementer dispatch 2: extend `pipeline.py` `--arch` argparse to include `'siren'`; plumb through 3 construction sites; sbatch flag `--lr_max` set per rung 1.5 outcome.
+3. infrastructure-manager dispatch: `scripts/submit_juno_stage1a_1c_siren.sh` mirror; 4-item pre-submission validation.
+4. User auth + Juno dispatch.
+**4.5. core-implementer dispatch (head-ablation pilot, CONDITIONAL on §7 trigger (i))**: `(1c) body + direct-linear head + (γ) loss` 1-seed pilot. Outcome routes (γ)-attribution vs head-attribution.
+**4.6. infrastructure-manager dispatch (P2 spot-check, CONDITIONAL on §7 trigger + rung 4.5 FAIL)**: 1-seed (1c) on P2. Disambiguates (γ) class-falsification from P1-specific pathology.
+5. Post-Juno absorption per [D-37] rule (a) observation-first + rule 5 symmetric-disclosure.
+
+Dispatch-ladder rung count = 7 (rungs 0-5 plus 1.5, 4.5, 4.6 conditional rungs). Per R27 cross-check, ladder is well-formed against the new artifact set: SIREN body wiring + lr pre-flight + argparse extension + integration test + estimator-equivalence test + activation-stats asserts + sbatch authoring + head-ablation pilot (conditional) + P2 spot-check (conditional) = 9 artifact rungs, 7 dispatched.
+
+### §10.K — Sign-off
+
+**R15+R28 PROVISIONAL** — Rev 1.1 amendment block lands but does NOT lift R15+R28 until defense-panel re-review on the amendment block APPROVEs. Until then, no HPC dispatch.
+
+**Honest framing per [D-37] rule (a)**: D71 Rev 1 had 4 BLOCKING + 5 NEEDS-WORK + 5 PROBE flaws; K6 narrow-discharge panel had 3 KILLER + 4 SERIOUS + 1 PROBE flaws that flowed back; R29-promotion separate panel ruled (b) NEGATIVE → R29 → CANDIDATE (full demotion). Rev 1.1 absorbs all of them. The (1c) SIREN candidate direction is correct (R10 orthogonality argument holds under panel review IFF rung 4.5 head-ablation runs); the wiring needed canonical-SIREN correction; gate construction needed primary-observable swap and ε-anchor demotion; R29 promotion was wrong and is now retracted. **No spin** — the absorption-block lists each panel finding and its resolution.
+
+---
+
+## §11 — MDE_ARE_COEFF=0.9 sidecar documentation (panel PROBE #7 compaction-survival)
+
+**Constant**: `MDE_ARE_COEFF = 0.9` in `scripts/d70_wilcoxon_gate.py:131`.
+
+**Provenance**: Wilcoxon signed-rank one-sided test asymptotic relative efficiency (ARE) versus paired t-test under normal-shift alternative is `3/π ≈ 0.955`. For n=10 at α=0.05 one-sided, the MDE coefficient on σ_seed is approximately `0.9` (slight adjustment from asymptotic ARE for finite-n + one-sided correction). The constant captures the post-ARE MDE factor, NOT ARE itself.
+
+**Why preserved here**: per panel PROBE #7 — the comment at code line 128 ("0.955 ⇒ MDE ≈ 0.9·σ_seed") is the derivation, but it's in a code file at risk of compaction drift. Documenting in the design doc binds the coefficient to the methodology rather than to a code comment.
+
+**Operative reading**: `MDE_estimate = MDE_ARE_COEFF * σ_seed = 0.9 * σ_seed`. The MDE-block then compares `MDE_estimate < ε_physical_escape` to authorize the gate. Per K6 panel + §10.E + §10.H: ε is now `10 × μ_frozen = 2.4e-5` (gate-observable-anchored), NOT 0.05 (P_F-observational-anchor invalid unit-chain).
+
+If a future Wilcoxon test on this gate uses a different n or α, the MDE coefficient changes (n=20 at Bonferroni α=0.025 has different ARE-adjustment factor). Re-derive before re-citing.
+
