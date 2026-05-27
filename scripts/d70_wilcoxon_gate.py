@@ -99,6 +99,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import statistics
 from scipy.stats import wilcoxon
 
 # Late-imported so unit tests can mock mlflow without requiring the real lib
@@ -116,6 +117,18 @@ except Exception:  # pragma: no cover
 ALPHA_STAGE1 = 0.05
 ALPHA_PASS_STRICT = 0.025
 ALPHA_STAGE2 = 0.025
+
+# PI B2 binding (LEDGER §3 [D-70] 2026-05-26 absorption block, ε pre-registration
+# block): physical-escape threshold on |Δ_seed|, anchored to Boera+2019 Fig. 4
+# ~5% systematic floor on observational P_F at the k-bands of interest.
+# DISTINCT from ALPHA_STAGE1 (statistical significance) — this is a domain-
+# physics floor, not an α-level.
+# R26 banking provenance: F1-β P2 smoke surfaced R_real semantic mismatch;
+# F4 redefined Δ_seed = R_real_linear(500) − R_real_linear(0); this constant
+# binds the MDE-block guard below. Wilcoxon signed-rank n=10 α=0.05 one-sided
+# ARE 0.955 ⇒ MDE ≈ 0.9·σ_seed; BLOCK condition: 0.9·σ_seed > ε.
+EPSILON_PHYSICAL_ESCAPE = 0.05
+MDE_ARE_COEFF = 0.9  # Wilcoxon signed-rank n=10 ARE for normal-shift alternative
 
 N_STAGE1 = 10
 N_STAGE2 = 20
@@ -381,6 +394,30 @@ def _wilcoxon_one_sided(deltas: List[float]) -> float:
     return float(res.pvalue)
 
 
+def _compute_sigma_seed(delta_seed_values: List[Optional[float]]) -> Tuple[float, str, int]:
+    """Compute empirical sigma_seed across per-seed Δ_seed values for MDE-block guard.
+
+    Per PI B2 binding (LEDGER §3 [D-70] 2026-05-26):
+      - Use full n=10 sample when available.
+      - Fall back to first-3-seeds only if seeds 4-10 are missing.
+      - Return (sigma_seed, source_label, n_used) where source_label ∈
+        {"full_n10", "first_3", "insufficient"}.
+
+    Uses sample standard deviation (ddof=1), matching scipy.stats and
+    statistics.stdev. statistics is preferred over numpy here so the
+    estimator is self-contained for unit-test mocking.
+    """
+    valid_values = [
+        v for v in delta_seed_values
+        if v is not None and not (math.isnan(v) or math.isinf(v))
+    ]
+    if len(valid_values) >= 10:
+        return (float(statistics.stdev(valid_values[:10])), "full_n10", 10)
+    if len(valid_values) >= 3:
+        return (float(statistics.stdev(valid_values[:3])), "first_3", 3)
+    return (float("nan"), "insufficient", len(valid_values))
+
+
 def _gate(p_stage1: float, p_stage2: Optional[float],
           n1: int, n2: Optional[int]) -> str:
     """Two-stage Bonferroni adaptive gate."""
@@ -473,7 +510,9 @@ def run_gate(tracking_uri: str,
              juno_batch_value: str = TAG_JUNO_BATCH_VALUE,
              stage2: bool = False,
              dry_run: bool = False,
-             client=None) -> Dict[str, object]:
+             client=None,
+             enforce_mde_block: bool = False,
+             mde_block_exit: bool = False) -> Dict[str, object]:
     """End-to-end harness. ``client`` is injectable for unit tests."""
     if client is None:
         if _MLFLOW_AVAILABLE:
@@ -502,6 +541,94 @@ def run_gate(tracking_uri: str,
 
     valid_deltas = [v["delta"] for v in per_seed.values()
                     if v["delta"] is not None and math.isfinite(v["delta"])]
+
+    # PI B2 binding ruling (LEDGER §3 [D-70] 2026-05-26 absorption block):
+    # MDE-block guard — refuse to compute Wilcoxon when the gate is dead-on-
+    # arrival underpowered (MDE > ε_physical_escape). Wilcoxon signed-rank
+    # n=10 α=0.05 one-sided ARE 0.955 ⇒ MDE ≈ 0.9·σ_seed; if that exceeds
+    # ε=0.05, the gate cannot detect a physically-meaningful improvement
+    # even when one exists, so the verdict-readout itself is suppressed.
+    #
+    # `enforce_mde_block=False` is the test-only opt-out used by regression
+    # tests that pre-date this guard (σ=0.1 synthetic deltas would trip the
+    # block). Production CLI keeps the default True.
+    sigma_seed, sigma_source, n_sigma = _compute_sigma_seed(valid_deltas)
+    mde_estimate = MDE_ARE_COEFF * sigma_seed
+    mde_block_payload = {
+        "enforced": bool(enforce_mde_block),
+        "epsilon_physical_escape": EPSILON_PHYSICAL_ESCAPE,
+        "mde_are_coeff": MDE_ARE_COEFF,
+        "sigma_seed": (None if math.isnan(sigma_seed) else float(sigma_seed)),
+        "sigma_source": sigma_source,
+        "sigma_n_used": n_sigma,
+        "mde_estimate": (None if math.isnan(mde_estimate) else float(mde_estimate)),
+        "verdict_blocked": False,
+        "block_reason": None,
+    }
+
+    if enforce_mde_block:
+        if sigma_source == "insufficient":
+            msg = (
+                f"BLOCK: gate underpowered — insufficient valid seeds "
+                f"(n_valid={n_sigma} < 3); halt + re-spec required"
+            )
+            print(msg, flush=True)
+            mde_block_payload["verdict_blocked"] = True
+            mde_block_payload["block_reason"] = "insufficient_seeds"
+            blocked_out = {
+                "tracking_uri": tracking_uri,
+                "experiment_name": experiment_name,
+                "filter_string": filter_string,
+                "n_runs_matched": len(runs),
+                "n_seeds_extracted": n_obs,
+                "n_valid_deltas": len(valid_deltas),
+                "verdict": "BLOCKED-MDE-UNDERPOWERED",
+                "mde_block": mde_block_payload,
+                "p_stage1": None,
+                "p_stage2": None,
+                "bin_d": None,
+                "design_doc": (
+                    "D70 Rev 5.1 §2.2 amended + PI B2 [D-70] 2026-05-26 "
+                    "absorption block (MDE-block guard)"
+                ),
+            }
+            # Always return the structured payload; CLI main() handles the
+            # non-zero exit + JSON emission. mde_block_exit is retained as a
+            # parameter for API compatibility but no longer triggers sys.exit
+            # here — keeping exits centralised in main() avoids two stdout
+            # writers stomping each other.
+            return blocked_out
+
+        if mde_estimate > EPSILON_PHYSICAL_ESCAPE:
+            msg = (
+                f"BLOCK: gate underpowered — MDE={mde_estimate:.4f} > "
+                f"ε={EPSILON_PHYSICAL_ESCAPE:.4f} (σ_seed={sigma_seed:.4f} "
+                f"from {sigma_source}); halt + re-spec required"
+            )
+            print(msg, flush=True)
+            mde_block_payload["verdict_blocked"] = True
+            mde_block_payload["block_reason"] = "mde_underpowered"
+            blocked_out = {
+                "tracking_uri": tracking_uri,
+                "experiment_name": experiment_name,
+                "filter_string": filter_string,
+                "n_runs_matched": len(runs),
+                "n_seeds_extracted": n_obs,
+                "n_valid_deltas": len(valid_deltas),
+                "verdict": "BLOCKED-MDE-UNDERPOWERED",
+                "mde_block": mde_block_payload,
+                "p_stage1": None,
+                "p_stage2": None,
+                "bin_d": None,
+                "design_doc": (
+                    "D70 Rev 5.1 §2.2 amended + PI B2 [D-70] 2026-05-26 "
+                    "absorption block (MDE-block guard)"
+                ),
+            }
+            if mde_block_exit:
+                print(json.dumps(blocked_out, indent=2, default=str), flush=True)
+                sys.exit(1)
+            return blocked_out
 
     # Choose the n for stage classification: if stage2 flag set, expect n_20.
     n_target = N_STAGE2 if stage2 else N_STAGE1
@@ -548,6 +675,7 @@ def run_gate(tracking_uri: str,
         "p_stage2": p_stage2,
         "verdict": verdict,
         "bin_d": bin_d_result,
+        "mde_block": mde_block_payload,
         "design_doc": "D70 Rev 5.1 §2.2 amended + PI F1-β/F4 (2026-05-25)",
         "framing_note": (
             "Per-seed delta = R_real_linear(max_steps) − R_real_linear(0) "
@@ -586,6 +714,12 @@ def main(argv: Optional[List[str]] = None) -> int:
                         "exist at the configured URI; do not write output.")
     p.add_argument("--output-json", default=None,
                    help="Path to write the full verdict payload.")
+    p.add_argument("--no-mde-block", action="store_true",
+                   help="Disable the PI B2 MDE-block guard (LEDGER §3 [D-70] "
+                        "2026-05-26). Default: guard ENFORCED. Use only with "
+                        "explicit PI authorization — disabling allows the gate "
+                        "to rule even when MDE > ε_physical_escape, which "
+                        "violates the absorption-block binding.")
     args = p.parse_args(argv)
 
     result = run_gate(
@@ -596,6 +730,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         juno_batch_value=args.juno_batch,
         stage2=args.stage2,
         dry_run=args.dry_run,
+        enforce_mde_block=(not args.no_mde_block),
+        mde_block_exit=(not args.no_mde_block),
     )
 
     print(json.dumps(result, indent=2, default=str))
@@ -604,6 +740,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                                                      default=str))
 
     verdict = result["verdict"]
+    if verdict == "BLOCKED-MDE-UNDERPOWERED":
+        return 1
     return 0 if verdict == "PASS" else (1 if verdict == "MARGINAL" else 2)
 
 
