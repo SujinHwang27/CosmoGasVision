@@ -122,6 +122,15 @@ N_STAGE2 = 20
 
 # Canonical metric + tag keys (verified in-session against pipeline.py /
 # submit_juno_stage1a_1b.sh — see module docstring).
+#
+# PI F1-β + F4 (2026-05-25): the gate observable is `m3_r_real_linear`
+# (linear-space Var(ρ_θ)/Var(ρ_truth)), NOT the log-space R_real used in
+# pre-F1-β builds. Boera+2019 5% observational floor lives in linear-
+# space P_F units; gating on log-space R_real conflated frames.
+# `m3_r_real_log` (== legacy m3_r_real) retained as diagnostic for
+# pre-flight C drift continuity.
+METRIC_R_REAL_LINEAR = "m3_r_real_linear"
+METRIC_R_REAL_LOG = "m3_r_real_log"
 METRIC_VAR_PRED = "m3_var_pred_log"
 METRIC_VAR_TRUTH = "m3_var_truth_log"
 METRIC_BIN_D = "s3_log_mse_bin_D"
@@ -134,6 +143,17 @@ TAG_ARCH_VALUE = "skip-rich-mlp"
 TAG_JUNO_BATCH = "juno_batch"
 TAG_JUNO_BATCH_VALUE = "stage1a-1b-skiprich"
 TAG_SEED = "seed"
+TAG_ABORT_REASON = "abort_reason"
+TAG_ABORT_REASON_NONE = "none"
+
+# PI F4 (2026-05-25) Δ_seed baseline source: linear-space variance ratio
+# expected from a frozen-init MLP (no training). Per pre-flight B
+# empirical observation, the linear-space ratio sits near 2.4e-6 for the
+# canonical n_grid=64 / crop_size=8 / m3_n_crops=100 grid. Used as a
+# fallback baseline ONLY when the per-run step-0 metric is missing
+# (legacy runs predating the F1-β step-0 M3 emission). Live runs use
+# the per-run step-0 metric, not this constant.
+FROZEN_INIT_R_REAL_LINEAR_PRIOR = 2.4e-6
 
 DEFAULT_EXPERIMENT_NAME = "CosmoGasVision/NeRF"
 DEFAULT_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
@@ -176,7 +196,19 @@ def _stage1a_filter_string(arch_value: str = TAG_ARCH_VALUE,
 
 def _search_stage1a_runs(client, experiment_name: str,
                          filter_string: str) -> List:
-    """Return the list of stage-1a runs matching the canonical filter."""
+    """Return the list of stage-1a runs matching the canonical filter,
+    further filtered to abort_reason ∈ {"none", MISSING}.
+
+    PI F2-α (2026-05-25): the `abort_reason` tag is post-N3 (2026-05-26)
+    machinery; historical runs from before the N3 patch will not carry
+    the tag at all. The harness MUST treat a MISSING `abort_reason` tag
+    as semantically equivalent to ``abort_reason = "none"`` (no abort
+    occurred — back-compat for legacy runs), while explicit
+    `abort_reason = "<flag_name>"` values still gate the run out.
+
+    This filter is applied post-search because MLflow's filter language
+    does not natively express "tag absent OR equal to X".
+    """
     exp = client.get_experiment_by_name(experiment_name)
     if exp is None:
         raise RuntimeError(
@@ -188,7 +220,19 @@ def _search_stage1a_runs(client, experiment_name: str,
         filter_string=filter_string,
         max_results=2 * N_STAGE2,  # ample headroom; gate later
     )
-    return runs
+    # F2-α: keep abort_reason ∈ {"none", MISSING, "", None}
+    kept = []
+    for r in runs:
+        ar = r.data.tags.get(TAG_ABORT_REASON)
+        if ar is None or ar == "" or ar == TAG_ABORT_REASON_NONE:
+            kept.append(r)
+        else:
+            print(
+                f"[d70_wilcoxon] INFO: run {r.info.run_id} excluded "
+                f"(abort_reason='{ar}').",
+                file=sys.stderr,
+            )
+    return kept
 
 
 def _last_metric_at(client, run_id: str, key: str,
@@ -213,14 +257,25 @@ def _extract_per_seed_metrics(client, runs,
                               max_steps: int) -> Dict[int, Dict[str, float]]:
     """Build per-seed payload from the canonical metrics.
 
+    PI F1-β + F4 (2026-05-25): the gate observable is the linear-space
+    R_real, and Δ_seed = R_real_linear(max_steps) − R_real_linear(0).
+    The step-0 value is read from the per-run MLflow log (pipeline.py
+    emits m3_r_real_linear at step 0 post-F1-β). For legacy runs missing
+    the step-0 metric, fall back to FROZEN_INIT_R_REAL_LINEAR_PRIOR
+    (Δ_seed_baseline_source = "frozen_init_prior") and surface the
+    substitution in the per-seed payload for honest-reporting audit.
+
     Returns a dict keyed by integer seed:
       {seed: {
         "run_id": str,
-        "var_pred": float | None,    # m3_var_pred_log @ step=max_steps
+        "var_pred": float | None,        # m3_var_pred_log @ max_steps
         "var_truth": float | None,
-        "r_real": float | None,      # var_pred / var_truth
-        "delta": float | None,       # r_real - 1.0  (IMPROVE direction)
-        "bin_d": float | None,       # s3_log_mse_bin_D @ step=max_steps
+        "r_real": float | None,          # legacy log-space ratio (back-compat)
+        "r_real_linear": float | None,   # m3_r_real_linear @ max_steps
+        "r_real_linear_step0": float | None,
+        "delta_baseline_source": "per_run_step0" | "frozen_init_prior" | None,
+        "delta": float | None,           # F4: r_real_linear − baseline
+        "bin_d": float | None,
         "bin_b": float | None,
       }, ...}
     Runs missing the `seed` tag are skipped with a stderr warning.
@@ -254,12 +309,38 @@ def _extract_per_seed_metrics(client, runs,
                              step=max_steps)
         bb = _last_metric_at(client, r.info.run_id, METRIC_BIN_B,
                              step=max_steps)
+        r_real_lin_end = _last_metric_at(
+            client, r.info.run_id, METRIC_R_REAL_LINEAR, step=max_steps,
+        )
+        r_real_lin_0 = _last_metric_at(
+            client, r.info.run_id, METRIC_R_REAL_LINEAR, step=0,
+        )
 
-        r_real = None
-        delta = None
+        # Back-compat: legacy log-space r_real for diagnostic only.
+        r_real_log = None
         if vp is not None and vt is not None and vt > 0:
-            r_real = vp / vt
-            delta = r_real - 1.0
+            r_real_log = vp / vt
+
+        # F4 Δ_seed: linear-space, improvement-over-frozen-init baseline.
+        delta = None
+        baseline_source: Optional[str] = None
+        if r_real_lin_end is not None and math.isfinite(r_real_lin_end):
+            if (r_real_lin_0 is not None
+                    and math.isfinite(r_real_lin_0)):
+                delta = r_real_lin_end - r_real_lin_0
+                baseline_source = "per_run_step0"
+            else:
+                delta = (
+                    r_real_lin_end - FROZEN_INIT_R_REAL_LINEAR_PRIOR
+                )
+                baseline_source = "frozen_init_prior"
+                print(
+                    f"[d70_wilcoxon] WARN: run {r.info.run_id} missing "
+                    f"step-0 m3_r_real_linear; fell back to "
+                    f"FROZEN_INIT_R_REAL_LINEAR_PRIOR="
+                    f"{FROZEN_INIT_R_REAL_LINEAR_PRIOR:.3e}.",
+                    file=sys.stderr,
+                )
 
         if seed in out:
             print(
@@ -271,7 +352,10 @@ def _extract_per_seed_metrics(client, runs,
             "run_id": r.info.run_id,
             "var_pred": vp,
             "var_truth": vt,
-            "r_real": r_real,
+            "r_real": r_real_log,
+            "r_real_linear": r_real_lin_end,
+            "r_real_linear_step0": r_real_lin_0,
+            "delta_baseline_source": baseline_source,
             "delta": delta,
             "bin_d": bd,
             "bin_b": bb,
@@ -464,12 +548,17 @@ def run_gate(tracking_uri: str,
         "p_stage2": p_stage2,
         "verdict": verdict,
         "bin_d": bin_d_result,
-        "design_doc": "D70 Rev 5.1 §2.2 amended",
+        "design_doc": "D70 Rev 5.1 §2.2 amended + PI F1-β/F4 (2026-05-25)",
         "framing_note": (
-            "Per-seed delta = R_real(step=max_steps) − 1.0; step-0 baseline "
-            "for m3_var_*_log is not logged by pipeline.py train_pretrain "
-            "(M3 fires only at max_steps). Null hypothesis: R_real = 1.0 "
-            "(variance recovery)."
+            "Per-seed delta = R_real_linear(max_steps) − R_real_linear(0) "
+            "per PI F4. Step-0 R_real_linear is per-run when the pipeline "
+            "emits it (post-F1-β builds); legacy runs fall back to "
+            f"FROZEN_INIT_R_REAL_LINEAR_PRIOR="
+            f"{FROZEN_INIT_R_REAL_LINEAR_PRIOR:.3e} with "
+            "delta_baseline_source='frozen_init_prior' annotated per-seed. "
+            "Wilcoxon H1: median(Δ_seed) > 0 (improvement; "
+            "alternative='greater'). Linear-space ratio chosen per Boera+"
+            "2019 5% observational floor framing."
         ),
     }
     return out

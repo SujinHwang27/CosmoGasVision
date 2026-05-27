@@ -107,7 +107,21 @@ def _make_run(seed: int, var_pred: float, var_truth: float,
               arch: str = gate.TAG_ARCH_VALUE,
               juno_batch: str = gate.TAG_JUNO_BATCH_VALUE,
               stage: str = gate.TAG_STAGE_VALUE,
-              max_steps: int = 500) -> FakeRun:
+              max_steps: int = 500,
+              r_real_linear_end: Optional[float] = None,
+              r_real_linear_step0: Optional[float] = None,
+              abort_reason: Optional[str] = "none",
+              include_abort_tag: bool = True) -> FakeRun:
+    """Build a FakeRun.
+
+    PI F1-β: emits `m3_r_real_linear` at both step 0 and step max_steps
+    when those arguments are provided. Defaults preserve the legacy
+    var_pred/var_truth log-space surface so back-compat is intact.
+
+    F2-α: `abort_reason` tag defaults to "none". Pass
+    ``include_abort_tag=False`` to simulate a legacy run lacking the
+    post-N3 tag entirely.
+    """
     tags = {
         gate.TAG_STAGE: stage,
         gate.TAG_ARCH: arch,
@@ -115,6 +129,8 @@ def _make_run(seed: int, var_pred: float, var_truth: float,
         gate.TAG_SEED: str(seed),
         "model_type": "nerf",
     }
+    if include_abort_tag and abort_reason is not None:
+        tags[gate.TAG_ABORT_REASON] = abort_reason
     metrics: Dict[str, List[FakeMetric]] = {
         gate.METRIC_VAR_PRED: [FakeMetric(step=max_steps, value=var_pred)],
         gate.METRIC_VAR_TRUTH: [FakeMetric(step=max_steps, value=var_truth)],
@@ -123,6 +139,14 @@ def _make_run(seed: int, var_pred: float, var_truth: float,
         metrics[gate.METRIC_BIN_D] = [FakeMetric(step=max_steps, value=bin_d)]
     if bin_b is not None:
         metrics[gate.METRIC_BIN_B] = [FakeMetric(step=max_steps, value=bin_b)]
+    if r_real_linear_end is not None:
+        metrics[gate.METRIC_R_REAL_LINEAR] = [
+            FakeMetric(step=max_steps, value=r_real_linear_end),
+        ]
+        if r_real_linear_step0 is not None:
+            metrics[gate.METRIC_R_REAL_LINEAR].insert(
+                0, FakeMetric(step=0, value=r_real_linear_step0),
+            )
     return FakeRun(
         info=FakeRunInfo(run_id=f"run-{seed:02d}"),
         data=FakeRunData(tags=tags),
@@ -133,15 +157,30 @@ def _make_run(seed: int, var_pred: float, var_truth: float,
 def _build_runs(deltas: List[float],
                 bin_d_offset_per_seed: Optional[List[float]] = None,
                 truth_var: float = 1.0,
-                max_steps: int = 500) -> List[FakeRun]:
-    """One run per seed. R_real = 1.0 + delta ⇒ var_pred = truth_var * R_real."""
+                max_steps: int = 500,
+                baseline: float = 0.0) -> List[FakeRun]:
+    """One run per seed.
+
+    Builds runs such that per-seed Δ_seed under the F4 formula
+    (R_real_linear(max_steps) − R_real_linear(0)) equals the input
+    delta. Sets R_real_linear(0) = `baseline`, R_real_linear(max_steps)
+    = `baseline + delta`.
+
+    Legacy log-space surface (var_pred/var_truth ⇒ r_real_log) is also
+    emitted (var_pred = truth_var * (1+delta)) for diagnostic continuity
+    with pre-F1-β assertions.
+    """
     runs = []
     for i, d in enumerate(deltas):
-        r_real = 1.0 + d
-        vp = truth_var * r_real
+        r_real_log = 1.0 + d
+        vp = truth_var * r_real_log
         bd = (1.0 + (bin_d_offset_per_seed[i] if bin_d_offset_per_seed else 0.0))
-        runs.append(_make_run(seed=i, var_pred=vp, var_truth=truth_var,
-                              bin_d=bd, bin_b=1.0, max_steps=max_steps))
+        runs.append(_make_run(
+            seed=i, var_pred=vp, var_truth=truth_var,
+            bin_d=bd, bin_b=1.0, max_steps=max_steps,
+            r_real_linear_end=baseline + d,
+            r_real_linear_step0=baseline,
+        ))
     return runs
 
 
@@ -314,14 +353,145 @@ def test_seed_pairing_preserved():
         assert result["per_seed"][str(i)]["delta"] == pytest.approx(d, rel=1e-9)
 
 
+def test_missing_abort_reason_tag_included_per_f2_alpha():
+    """PI F2-α (2026-05-25): legacy runs that pre-date the N3 abort_reason
+    tag-emission patch are missing the tag entirely. The harness MUST
+    treat MISSING `abort_reason` as semantically equivalent to
+    `abort_reason = "none"` and include the run in the n=10 sample.
+    """
+    rng = np.random.default_rng(2026)
+    deltas = rng.normal(loc=2 * 0.1, scale=0.1, size=10).tolist()
+    runs = []
+    for i, d in enumerate(deltas):
+        # Half the runs are "legacy" — no abort_reason tag at all.
+        include_tag = (i % 2 == 0)
+        r_real_log = 1.0 + d
+        runs.append(_make_run(
+            seed=i, var_pred=r_real_log, var_truth=1.0,
+            bin_d=1.0, bin_b=1.0,
+            r_real_linear_end=d, r_real_linear_step0=0.0,
+            include_abort_tag=include_tag,
+        ))
+    client = FakeClient(runs)
+    result = gate.run_gate(
+        tracking_uri="http://fake",
+        experiment_name="CosmoGasVision/NeRF",
+        max_steps=500,
+        client=client,
+    )
+    # All 10 runs must be retained — legacy runs are included as
+    # implicit "no abort".
+    assert result["n_runs_matched"] == 10, result
+    assert result["n_seeds_extracted"] == 10, result
+
+
+def test_explicit_abort_reason_non_none_excludes_run():
+    """A run with `abort_reason = "rb_pre3_flag"` must be excluded by
+    the harness; only abort_reason ∈ {"none", MISSING} pass through.
+    """
+    rng = np.random.default_rng(7777)
+    deltas = rng.normal(loc=2 * 0.1, scale=0.1, size=10).tolist()
+    runs = []
+    for i, d in enumerate(deltas):
+        ar = "rb_pre3_flag" if i == 4 else "none"
+        r_real_log = 1.0 + d
+        runs.append(_make_run(
+            seed=i, var_pred=r_real_log, var_truth=1.0,
+            bin_d=1.0, bin_b=1.0,
+            r_real_linear_end=d, r_real_linear_step0=0.0,
+            abort_reason=ar,
+        ))
+    client = FakeClient(runs)
+    result = gate.run_gate(
+        tracking_uri="http://fake",
+        experiment_name="CosmoGasVision/NeRF",
+        max_steps=500,
+        client=client,
+    )
+    # Seed 4 was aborted; it must be absent from per_seed.
+    assert "4" not in result["per_seed"], result["per_seed"].keys()
+    assert result["n_runs_matched"] == 9
+
+
+def test_f4_delta_uses_linear_baseline_per_run():
+    """PI F4 (2026-05-25): Δ_seed = R_real_linear(max_steps) −
+    R_real_linear(0), pulled per-run from MLflow when both step-0
+    and max_steps emissions are present.
+    """
+    deltas_target = [0.05, 0.10, 0.15, 0.20, 0.25,
+                     0.30, 0.35, 0.40, 0.45, 0.50]
+    # Use non-zero baseline to ensure the harness subtracts step-0,
+    # not 1.0 (legacy log-space framing).
+    baseline = 2.4e-6
+    runs = _build_runs(deltas_target, baseline=baseline)
+    client = FakeClient(runs)
+    result = gate.run_gate(
+        tracking_uri="http://fake",
+        experiment_name="CosmoGasVision/NeRF",
+        max_steps=500,
+        client=client,
+    )
+    for i, d in enumerate(deltas_target):
+        per = result["per_seed"][str(i)]
+        assert per["delta_baseline_source"] == "per_run_step0", per
+        assert per["delta"] == pytest.approx(d, abs=1e-12), per
+        assert per["r_real_linear_step0"] == pytest.approx(baseline,
+                                                            abs=1e-12)
+
+
+def test_f4_delta_falls_back_to_frozen_init_prior_when_step0_missing():
+    """When the step-0 m3_r_real_linear emission is absent (legacy run
+    from before the F1-β step-0 M3 patch), the harness substitutes
+    FROZEN_INIT_R_REAL_LINEAR_PRIOR and surfaces the substitution via
+    delta_baseline_source='frozen_init_prior'.
+    """
+    rng = np.random.default_rng(9001)
+    deltas = rng.normal(loc=2 * 0.1, scale=0.1, size=10).tolist()
+    runs = []
+    for i, d in enumerate(deltas):
+        # Linear end-of-run value = frozen-prior + d so the harness's
+        # fallback Δ should recover d.
+        r_real_end = gate.FROZEN_INIT_R_REAL_LINEAR_PRIOR + d
+        runs.append(_make_run(
+            seed=i, var_pred=1.0 + d, var_truth=1.0,
+            bin_d=1.0, bin_b=1.0,
+            r_real_linear_end=r_real_end,
+            r_real_linear_step0=None,  # legacy: step-0 not logged
+        ))
+    client = FakeClient(runs)
+    result = gate.run_gate(
+        tracking_uri="http://fake",
+        experiment_name="CosmoGasVision/NeRF",
+        max_steps=500,
+        client=client,
+    )
+    for i, d in enumerate(deltas):
+        per = result["per_seed"][str(i)]
+        assert per["delta_baseline_source"] == "frozen_init_prior", per
+        assert per["delta"] == pytest.approx(d, abs=1e-12)
+        assert per["r_real_linear_step0"] is None
+
+
+def test_wilcoxon_alternative_greater_for_improve_h1():
+    """PI F4: H1 is median(Δ_seed) > 0 = improvement; the harness
+    must call scipy.stats.wilcoxon with alternative='greater'.
+    """
+    import inspect
+    src = inspect.getsource(gate._wilcoxon_one_sided)
+    assert "alternative=\"greater\"" in src or \
+        "alternative='greater'" in src, src
+
+
 def test_missing_metric_skips_seed_gracefully():
-    """A run with no m3_var_pred_log metric must yield delta=None and
+    """A run with no m3_r_real_linear metric must yield delta=None and
     not crash the harness."""
     rng = np.random.default_rng(13)
     deltas = rng.normal(loc=2 * 0.1, scale=0.1, size=10).tolist()
     runs = _build_runs(deltas)
-    # Wipe the var_pred metric on seed 3.
+    # F1-β: F4 Δ_seed pulls from m3_r_real_linear; wipe both that and
+    # the legacy var_pred surface to simulate a fully-missing run.
     runs[3]._metrics.pop(gate.METRIC_VAR_PRED)
+    runs[3]._metrics.pop(gate.METRIC_R_REAL_LINEAR)
     client = FakeClient(runs)
     result = gate.run_gate(
         tracking_uri="http://fake",

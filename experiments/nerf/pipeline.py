@@ -304,6 +304,36 @@ def parse_args(argv=None):
                    type=int, default=100,
                    help="[D-69] M3 held-out crop sample size for R_real. "
                         "Default 100 per K3 calibration (band derived at this n).")
+    # [D-70 Rev 5.1 §0.9 F2] R-b-pre* backstop dispatch mode (PI 2026-05-26):
+    # the absolute 0.1-Var-ratio (R-b-pre1) / loss-realism (R-b-pre2) /
+    # NaN-frac (R-b-pre3) backstops are demoted to OBSERVATION FLAGS, not
+    # gates. Default 'warn' = print flag + MLflow tag + continue. 'raise' =
+    # legacy hard-fail (back-compat for Stage-0 smoke). 'disabled' = silent
+    # (MLflow tag still set). Operative Stage-1a gate is the Wilcoxon
+    # signed-rank Δ_seed = R_real(step=500) − 1.0 endpoint test.
+    p.add_argument("--rb-pre1-mode", dest="rb_pre1_mode",
+                   type=str, default="warn",
+                   choices=["warn", "raise", "disabled"],
+                   help="[D-70 Rev 5.1 §0.9 F2] Dispatch mode for the "
+                        "R-b-pre1 constant-density-basin observation flag. "
+                        "Default 'warn' (Rev 5.1 framing).")
+    p.add_argument("--rb-pre2-mode", dest="rb_pre2_mode",
+                   type=str, default="warn",
+                   choices=["warn", "raise", "disabled"],
+                   help="[D-70 Rev 5.1 §0.9 F2] Dispatch mode for the "
+                        "R-b-pre2 loss-decreased-but-realism-failed "
+                        "observation flag. Default 'warn'.")
+    p.add_argument("--rb-pre3-mode", dest="rb_pre3_mode",
+                   type=str, default="raise",
+                   choices=["warn", "raise", "disabled"],
+                   help="[D-70 Rev 5.1 §0.9 F2 + panel B3 split] Dispatch "
+                        "mode for the R-b-pre3 NaN/Inf-ring-buffer "
+                        "observation flag. Default 'raise' (numerical "
+                        "phenomena: NaN at step 100 is undefined behavior "
+                        "that contaminates downstream gradient statistics "
+                        "and R_real(500); silent-continue would corrupt "
+                        "the Wilcoxon harness). R-b-pre1/2 stay 'warn' "
+                        "(modeling phenomena, non-gating).")
     p.add_argument("--zero-shot-eval-physics", dest="zero_shot_eval_physics",
                    type=str, default=None,
                    help="[D-69] Stage 1b sub-step 1 — load a checkpoint via "
@@ -558,11 +588,21 @@ def _pretrain_m3_eval(model, rho_field_torch, n_crops, crop_size, generator,
     var_truth_log = float(log_truth_all.var(unbiased=True).item())
     var_pred_lin = float(raw_pred_all.var(unbiased=True).item())
     var_truth_lin = float(raw_truth_all.var(unbiased=True).item())
-    R_real = var_pred_log / max(var_truth_log, 1e-30)
+    # PI F1-β (2026-05-25): emit BOTH linear-space and log-space R_real.
+    # - R_real_linear is the canonical gate observable (Boera+2019 5% floor
+    #   is in linear-space P_F observational units).
+    # - R_real_log preserves the historical K3-band log-domain accounting
+    #   for pre-flight C drift comparison continuity.
+    # R_real (legacy key) is kept as alias of R_real_log for back-compat.
+    R_real_linear = var_pred_lin / max(var_truth_lin, 1e-30)
+    R_real_log = var_pred_log / max(var_truth_log, 1e-30)
+    R_real = R_real_log
 
     model.train()
     return {
         "R_real": R_real,
+        "R_real_linear": R_real_linear,
+        "R_real_log": R_real_log,
         "var_pred_log": var_pred_log,
         "var_truth_log": var_truth_log,
         "var_pred_lin": var_pred_lin,
@@ -685,6 +725,59 @@ def _pretrain_load_rho_field(loader, physics_id, redshift, n_grid, device):
 # ---------------------------------------------------------------------------
 # [D-69] Stage-1a density-pretraining training loop
 # ---------------------------------------------------------------------------
+
+def _rb_pre_dispatch(flag_name: str, msg: str, mode: str,
+                     mlflow_active: bool = True) -> None:
+    """[D-70 Rev 5.1 §0.9 F2] R-b-pre* backstops are OBSERVATION FLAGS, not gates.
+
+    The OLD-framing absolute 0.1 Var-ratio threshold for R-b-pre1 (and the
+    sister conditions for R-b-pre2/3) was retired by D70 Rev 5.1 §0.9 F2
+    absorption (panel B2 K3-disease finding). The operative Stage 1a gate
+    is the Wilcoxon signed-rank Δ_seed = R_real(step=500) − 1.0 endpoint
+    test; runtime hard-raises block the gate from being measured and so
+    violate R29 (gate-construction-vs-production-framing audit).
+
+    Parameters
+    ----------
+    flag_name : str
+        MLflow tag name (e.g. 'rb_pre1_flag').
+    msg : str
+        Human-readable observation string.
+    mode : str
+        'warn'     -> print OBSERVATION FLAG line, continue training (default).
+        'raise'    -> legacy hard-fail (back-compat for Stage-0 smoke).
+        'disabled' -> suppress even the print (MLflow tag still set).
+
+    Always logs the flag to MLflow (when active) as a tag for downstream
+    Wilcoxon-harness visibility.
+    """
+    # MLflow tag emission BEFORE any raise so downstream harness sees it
+    # even on the legacy crash path.
+    #
+    # Post-panel N3 (PI 2026-05-26): also emit `abort_reason` back-compat
+    # tag so the Wilcoxon harness can keep filtering
+    # `tags.abort_reason = "none"` to exclude aborted runs from the n=10
+    # sample. On raise -> `abort_reason = flag_name`; on warn/disabled ->
+    # `abort_reason = "none"` (each successive flag re-affirms "none",
+    # semantically correct: no abort happened).
+    if mlflow_active:
+        try:
+            mlflow.set_tag(flag_name, msg)
+            if mode == "raise":
+                mlflow.set_tag("abort_reason", flag_name)
+            else:
+                mlflow.set_tag("abort_reason", "none")
+        except Exception:
+            pass
+    if mode == "raise":
+        raise RuntimeError(msg)
+    if mode != "disabled":
+        print(
+            f"[D-69 pretrain] OBSERVATION FLAG "
+            f"(Rev 5.1 §0.9, non-gating): {flag_name}: {msg}",
+            flush=True,
+        )
+
 
 def train_pretrain(args):
     """Stage-1a density-pretraining feasibility loop (D-69 design Rev 5).
@@ -818,6 +911,43 @@ def train_pretrain(args):
         if mlflow_active:
             mlflow.log_metric("L_pre", L_pre_step0, step=0)
 
+        # ---- Step-0 M3 baseline (PI F1-β + F4 2026-05-25). Provides
+        # frozen-init R_real_linear baseline so the Wilcoxon harness can
+        # compute Δ_seed = R_real_linear(max_steps) − R_real_linear(0)
+        # per the F4 redef. No weight update; consumes m3_rng so the
+        # baseline crops are held out from training. ----
+        m3_step0 = _pretrain_m3_eval(
+            model, rho_field_torch,
+            n_crops=args.pretrain_m3_n_crops,
+            crop_size=args.pretrain_crop_size,
+            generator=m3_rng, device=device,
+        )
+        print(
+            f"[D-69 M3] step 0: R_real_linear={m3_step0['R_real_linear']:.4e} "
+            f"R_real_log={m3_step0['R_real_log']:.4e} "
+            f"var_pred_log={m3_step0['var_pred_log']:.4e} "
+            f"var_truth_log={m3_step0['var_truth_log']:.4e} "
+            f"var_pred_lin={m3_step0['var_pred_lin']:.4e} "
+            f"var_truth_lin={m3_step0['var_truth_lin']:.4e}",
+            flush=True,
+        )
+        if mlflow_active:
+            mlflow.log_metric("m3_r_real", m3_step0["R_real_log"], step=0)
+            mlflow.log_metric("m3_r_real_linear",
+                              m3_step0["R_real_linear"], step=0)
+            mlflow.log_metric("m3_r_real_log",
+                              m3_step0["R_real_log"], step=0)
+            mlflow.log_metric("m3_var_pred_log",
+                              m3_step0["var_pred_log"], step=0)
+            mlflow.log_metric("m3_var_truth_log",
+                              m3_step0["var_truth_log"], step=0)
+            mlflow.log_metric("m3_var_pred_lin",
+                              m3_step0["var_pred_lin"], step=0)
+            mlflow.log_metric("m3_var_truth_lin",
+                              m3_step0["var_truth_lin"], step=0)
+        # Free held tensors before training loop.
+        del m3_step0
+
         # ---- Training loop ----
         for step in range(1, args.max_steps + 1):
             optimizer.zero_grad(set_to_none=True)
@@ -844,13 +974,15 @@ def train_pretrain(args):
                     msg = (
                         f"R-b-pre3: numerical instability (nan/inf fraction "
                         f"{frac:.6f} over last {NAN_WINDOW} steps exceeds "
-                        f"{NAN_FRAC_LIMIT}); aborting @ step {step}."
+                        f"{NAN_FRAC_LIMIT}) @ step {step}."
                     )
                     if mlflow_active:
                         mlflow.set_tag("rb_pre3_triggered", "true")
-                        mlflow.set_tag("abort_reason", "R-b-pre3")
-                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
-                    raise RuntimeError(msg)
+                    _rb_pre_dispatch(
+                        flag_name="rb_pre3_flag", msg=msg,
+                        mode=getattr(args, "rb_pre3_mode", "warn"),
+                        mlflow_active=mlflow_active,
+                    )
 
             loss = _pretrain_loss(rho_theta_mb, rho_truth_mb)
             loss.backward()
@@ -940,9 +1072,11 @@ def train_pretrain(args):
                     )
                     if mlflow_active:
                         mlflow.set_tag("rb_pre1_triggered", "true")
-                        mlflow.set_tag("abort_reason", "R-b-pre1")
-                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
-                    raise RuntimeError(msg)
+                    _rb_pre_dispatch(
+                        flag_name="rb_pre1_flag", msg=msg,
+                        mode=getattr(args, "rb_pre1_mode", "warn"),
+                        mlflow_active=mlflow_active,
+                    )
 
             # ---- M2 + M3 hooks @ step max_steps ----
             if step == args.max_steps:
@@ -968,16 +1102,32 @@ def train_pretrain(args):
                 )
                 m3_verdict = _m3_verdict(m3["R_real"])
                 print(
-                    f"[D-69 M3] step {step}: R_real={m3['R_real']:.4f} "
-                    f"(var_pred_log={m3['var_pred_log']:.4e}, "
-                    f"var_truth_log={m3['var_truth_log']:.4e}) "
+                    f"[D-69 M3] step {step}: "
+                    f"R_real_linear={m3['R_real_linear']:.4e} "
+                    f"R_real_log={m3['R_real_log']:.4e} "
+                    f"var_pred_log={m3['var_pred_log']:.4e} "
+                    f"var_truth_log={m3['var_truth_log']:.4e} "
+                    f"var_pred_lin={m3['var_pred_lin']:.4e} "
+                    f"var_truth_lin={m3['var_truth_lin']:.4e} "
                     f"[{m3_verdict}]",
                     flush=True,
                 )
                 if mlflow_active:
+                    # Legacy m3_r_real preserved as log-space alias
+                    # for back-compat with pre-F1-β consumers.
                     mlflow.log_metric("m3_r_real", m3["R_real"], step=step)
-                    mlflow.log_metric("m3_var_pred_log", m3["var_pred_log"], step=step)
-                    mlflow.log_metric("m3_var_truth_log", m3["var_truth_log"], step=step)
+                    mlflow.log_metric("m3_r_real_linear",
+                                      m3["R_real_linear"], step=step)
+                    mlflow.log_metric("m3_r_real_log",
+                                      m3["R_real_log"], step=step)
+                    mlflow.log_metric("m3_var_pred_log",
+                                      m3["var_pred_log"], step=step)
+                    mlflow.log_metric("m3_var_truth_log",
+                                      m3["var_truth_log"], step=step)
+                    mlflow.log_metric("m3_var_pred_lin",
+                                      m3["var_pred_lin"], step=step)
+                    mlflow.log_metric("m3_var_truth_lin",
+                                      m3["var_truth_lin"], step=step)
                     mlflow.set_tag("m3_verdict", m3_verdict)
 
                 # S3 per-bin diagnostic at M2 step.
@@ -1014,9 +1164,11 @@ def train_pretrain(args):
                     )
                     if mlflow_active:
                         mlflow.set_tag("rb_pre2_triggered", "true")
-                        mlflow.set_tag("abort_reason", "R-b-pre2")
-                    print(f"[D-69 pretrain] ABORT: {msg}", flush=True)
-                    raise RuntimeError(msg)
+                    _rb_pre_dispatch(
+                        flag_name="rb_pre2_flag", msg=msg,
+                        mode=getattr(args, "rb_pre2_mode", "warn"),
+                        mlflow_active=mlflow_active,
+                    )
 
             # Checkpoint at intervals for downstream Stage 1b sub-step 1 use.
             if (args.checkpoint_interval > 0
@@ -1107,11 +1259,17 @@ def eval_pretrain_zero_shot(args):
         )
         verdict = _m3_verdict(m3["R_real"])
         print(
-            f"[D-69 zero-shot] R_real={m3['R_real']:.4f} [{verdict}]",
+            f"[D-69 zero-shot] "
+            f"R_real_linear={m3['R_real_linear']:.4e} "
+            f"R_real_log={m3['R_real_log']:.4e} [{verdict}]",
             flush=True,
         )
         if mlflow_active:
             mlflow.log_metric("m3_zero_shot_r_real", m3["R_real"])
+            mlflow.log_metric("m3_zero_shot_r_real_linear",
+                              m3["R_real_linear"])
+            mlflow.log_metric("m3_zero_shot_r_real_log",
+                              m3["R_real_log"])
             mlflow.set_tag("m3_zero_shot_verdict", verdict)
 
 
