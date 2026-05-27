@@ -1,0 +1,152 @@
+{
+  "tracking_uri": "http://127.0.0.1:5000",
+  "experiment_name": "CosmoGasVision/NeRF",
+  "filter_string": "tags.stage = '1a-density-pretrain' AND tags.body_arch = 'skip-rich-mlp' AND tags.juno_batch = 'stage1a-1b-skiprich'",
+  "n_runs_matched": 11,
+  "n_seeds_extracted": 10,
+  "n_valid_deltas": 10,
+  "per_seed": {
+    "9": {
+      "var_pred": 0.0009994234424084425,
+      "var_truth": 1.5814392566680908,
+      "r_real": 0.0006319708064627862,
+      "r_real_linear": 1.749323208011786e-07,
+      "r_real_linear_step0": 1.4498047907118809e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -1.2748724699107023e-06,
+      "bin_d": 6.335277080535889,
+      "bin_b": 0.5609559416770935,
+      "run_id": "d34eeeb15727481987535748ac503ff5"
+    },
+    "8": {
+      "var_pred": 0.0008803154923953116,
+      "var_truth": 1.6045588254928589,
+      "r_real": 0.0005486339786420186,
+      "r_real_linear": 4.0337164116370255e-08,
+      "r_real_linear_step0": 1.91542312539082e-05,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -1.9113894089791832e-05,
+      "bin_d": 6.665441513061523,
+      "bin_b": 0.604403018951416,
+      "run_id": "c9e813bdd89d4c52aa03b23a294551c2"
+    },
+    "7": {
+      "var_pred": 0.0009500478045083582,
+      "var_truth": 1.583882212638855,
+      "r_real": 0.0005998222575689605,
+      "r_real_linear": 4.617163775741179e-08,
+      "r_real_linear_step0": 2.4820777053675507e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -2.435906067610139e-06,
+      "bin_d": 6.491231918334961,
+      "bin_b": 0.540952742099762,
+      "run_id": "22a52666ea07467884b57d6a87a3d09b"
+    },
+    "6": {
+      "var_pred": 0.0012734008487313986,
+      "var_truth": 1.5550628900527954,
+      "r_real": 0.000818874179865591,
+      "r_real_linear": 3.4537315990466613e-07,
+      "r_real_linear_step0": 2.084843853806918e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -1.7394706939022518e-06,
+      "bin_d": 6.340003967285156,
+      "bin_b": 0.589392900466919,
+      "run_id": "6737b7a64a034a18a70e9e7ef01390d5"
+    },
+    "5": {
+      "var_pred": 0.0010972877498716116,
+      "var_truth": 1.5302906036376953,
+      "r_real": 0.0007170453424096176,
+      "r_real_linear": 2.0553991556302792e-07,
+      "r_real_linear_step0": 9.624434017622724e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -9.418894102059697e-06,
+      "bin_d": 6.199977397918701,
+      "bin_b": 0.5313630104064941,
+      "run_id": "bcd62533682b435f894c701fd1345486"
+    },
+    "4": {
+      "var_pred": 0.0008956384845077991,
+      "var_truth": 1.5691787004470825,
+      "r_real": 0.000570768953371989,
+      "r_real_linear": 1.7259002009053512e-07,
+      "r_real_linear_step0": 7.27374508376998e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -7.101155063679445e-06,
+      "bin_d": 6.373809337615967,
+      "bin_b": 0.5586968660354614,
+      "run_id": "1532d8440c094b3dbb64cdf88ae83642"
+    },
+    "3": {
+      "var_pred": 0.0010616559302434325,
+      "var_truth": 1.555091142654419,
+      "r_real": 0.0006826969179640936,
+      "r_real_linear": 2.2976309865860586e-07,
+      "r_real_linear_step0": 5.883855331083287e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -5.654092232424681e-06,
+      "bin_d": 6.354419708251953,
+      "bin_b": 0.5885761976242065,
+      "run_id": "c59064961b1f496589f4353a3454bf21"
+    },
+    "2": {
+      "var_pred": 0.0009674933389760554,
+      "var_truth": 1.5789446830749512,
+      "r_real": 0.0006127468234617876,
+      "r_real_linear": 4.43266703545009e-08,
+      "r_real_linear_step0": 9.904412523407348e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -9.860085853052847e-06,
+      "bin_d": 6.790250301361084,
+      "bin_b": 0.6361120939254761,
+      "run_id": "a018864e407f470db361e539e9f36ffb"
+    },
+    "1": {
+      "var_pred": 0.0009078510338440537,
+      "var_truth": 1.5935088396072388,
+      "r_real": 0.0005697182289040938,
+      "r_real_linear": 4.9552085195835007e-08,
+      "r_real_linear_step0": 2.561339889092523e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -2.511787803896688e-06,
+      "bin_d": 6.566051006317139,
+      "bin_b": 0.5618582367897034,
+      "run_id": "c4134eab01ab4db3833daf8b04ccf317"
+    },
+    "0": {
+      "var_pred": 0.0009550644899718463,
+      "var_truth": 1.5904642343521118,
+      "r_real": 0.0006004941634923965,
+      "r_real_linear": 4.3852769494138704e-08,
+      "r_real_linear_step0": 8.97138074819334e-06,
+      "delta_baseline_source": "per_run_step0",
+      "delta": -8.927527978699202e-06,
+      "bin_d": 6.806920051574707,
+      "bin_b": 0.617978572845459,
+      "run_id": "d26fd62647a14017a339a437b0055fd0"
+    }
+  },
+  "p_stage1": 1.0,
+  "p_stage2": null,
+  "verdict": "FAIL",
+  "bin_d": {
+    "verdict": "FAIL",
+    "excluded_fraction": 0.0,
+    "n_valid": 10,
+    "p_value": 1.0
+  },
+  "mde_block": {
+    "enforced": true,
+    "epsilon_physical_escape": 0.05,
+    "mde_are_coeff": 0.9,
+    "sigma_seed": 5.450329474544585e-06,
+    "sigma_source": "full_n10",
+    "sigma_n_used": 10,
+    "mde_estimate": 4.905296527090126e-06,
+    "verdict_blocked": false,
+    "block_reason": null
+  },
+  "design_doc": "D70 Rev 5.1 \u00a72.2 amended + PI F1-\u03b2/F4 (2026-05-25)",
+  "framing_note": "Per-seed delta = R_real_linear(max_steps) \u2212 R_real_linear(0) per PI F4. Step-0 R_real_linear is per-run when the pipeline emits it (post-F1-\u03b2 builds); legacy runs fall back to FROZEN_INIT_R_REAL_LINEAR_PRIOR=2.400e-06 with delta_baseline_source='frozen_init_prior' annotated per-seed. Wilcoxon H1: median(\u0394_seed) > 0 (improvement; alternative='greater'). Linear-space ratio chosen per Boera+2019 5% observational floor framing."
+}
