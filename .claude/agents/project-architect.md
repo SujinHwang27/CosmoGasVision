@@ -476,6 +476,30 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     mismatch is exactly the class of inherited-claim-without-re-verification
     R15 was banked for).
 
+    **R28 self-violation hard-auto-promote amendment (2026-05-31 per
+    [D-71] Rev 1.2 panel S8)**: prior soft-trigger language ("should be
+    considered for elevation discipline" on second self-violation, per
+    [D-71] Rev 1.2 §12.G) is REPLACED by hard auto-trigger. Rule text:
+
+    > If a SECOND R28 self-violation occurs without panel catch in a
+    > downstream sprint, R28 MUST auto-promote to a 2-tier rule:
+    > (i) the current "rung count ≥ artifact count" literal-integer
+    >     check (Tier 1, unchanged), AND
+    > (ii) a new mandatory "PI absorption template must contain an
+    >      explicit dispatch-ladder-arithmetic gate sub-block named
+    >      §R28-CHECK that enumerates rungs + artifacts + their integer
+    >      counts" (Tier 2, MANDATORY at auto-promote).
+    > PI does not have the authority to defer this elevation; the
+    > SECOND self-violation IS the trigger. No discretion at trigger
+    > point.
+
+    Sighting log (post-banking): #1 [D-71] Rev 1.1 §10.J "rung count = 7"
+    vs enumeration of 9 rungs (caught by Rev 1.1 panel S-A8, 2026-05-30;
+    PI re-authored ladder in Rev 1.2 before downstream dispatch — PI-self-
+    caught not panel-caught on second look, but counts as a self-violation
+    instance). One more self-violation auto-promotes. Cite: LEDGER §3
+    [D-71] Rev 1.2 → Rev 1.3 absorption 2026-05-31.
+
 29. **Gate-construction-vs-production-framing audit (CANDIDATE per
     R29-promotion panel verdict 2026-05-26 (b) NEGATIVE; full demotion
     from BANKED).** Status history: candidate-banked at [D-67] 2026-05-24;

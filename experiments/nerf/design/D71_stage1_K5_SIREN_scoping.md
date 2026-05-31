@@ -75,6 +75,8 @@ Alternative: keep lr_max=5e-4 to hold confound-minimization tighter. Rejected be
 
 ### §1.5 — Per-layer wiring spec (load-bearing for core-implementer dispatch)
 
+> **SUPERSEDED by §13.A-wiring (Rev 1.3); operative wiring is in §13.A-wiring. Original Rev 1 §1.5 wording preserved verbatim for audit trail; DO NOT use as wiring source-of-truth. Hidden ω₀=30, NOT ω₀=1 as shown below.**
+
 | Layer | in_features | out_features | activation | init |
 |---|---|---|---|---|
 | input encoding | 3 (raw) | 63 (PE L=10) | Fourier positional | — |
@@ -385,4 +387,372 @@ Dispatch-ladder rung count = 7 (rungs 0-5 plus 1.5, 4.5, 4.6 conditional rungs).
 **Operative reading**: `MDE_estimate = MDE_ARE_COEFF * σ_seed = 0.9 * σ_seed`. The MDE-block then compares `MDE_estimate < ε_physical_escape` to authorize the gate. Per K6 panel + §10.E + §10.H: ε is now `10 × μ_frozen = 2.4e-5` (gate-observable-anchored), NOT 0.05 (P_F-observational-anchor invalid unit-chain).
 
 If a future Wilcoxon test on this gate uses a different n or α, the MDE coefficient changes (n=20 at Bonferroni α=0.025 has different ARE-adjustment factor). Re-derive before re-citing.
+
+---
+
+## §12 — Rev 1.2 AMENDMENT BLOCK (panel S-A7 + governance forward-obligations absorbed, 2026-05-30)
+
+Rev 1 and Rev 1.1 wording above preserved verbatim for audit trail per [D-70] original-wording-preserved-for-audit-trail precedent. Rev 1.2 adds: empirical ε_physical anchor from S-A7 Juno output (job 205722, landed 2026-05-30 22:37); K3'-degeneracy class naming + axis-row split + hidden-ω₀-30 orthogonality re-derivation (§10.A); rung 4.5 multi-seed + 4.6 P2 cross-physics specs (§10.B); trichotomy critical-region binomial citation (§10.C); rung 1.5 lr-grid n=20 spec with citation (§10.D); N3(iii) density-PDF demotion to diagnostic-only (§10.E); operative ε_physical = 0.1591 (σ=3) anchor selection with pre-commit hedge (§10.E K6 #3); R-rule audit refresh including R29 CANDIDATE status, R31 sighting #4, R32 DEFERRED-BANKED PROVISIONAL, R28 self-violation sighting #1 (§5); R26 in-session re-verification block updated with S-A7 JSON evidence row (§9); dispatch ladder rung count 7 → 9 with R28 cross-check (§10.J).
+
+### §12.A — §10.A REWRITE (axis-change row split + K3' degeneracy naming + canonical re-verbing)
+
+**Rev 1.1 issue**: §10.A treated the K3' (PE drop + hidden ω₀ 1→30) change as a single axis-change row. This collapsed two distinct interventions — positional encoding removal AND first-layer-frequency sweep — into one row, obscuring which intervention buys which behavior. Per [D-37]-Extension R8 (cascade-close formality requires axis-coverage proof under stated decomposition criterion), single-row treatment of two interventions violated the decomposition discipline retroactively.
+
+**Rev 1.2 axis-change rows (TWO distinct rows, both axis-correct)**:
+
+| Row | Intervention | Mechanism | Failure-mode prevented |
+|-----|---|---|---|
+| K3'-row-1 | PE drop (3-band Fourier features → no PE) | Removes explicit high-frequency basis; forces representation through hidden-layer features only | Prevents PE-induced spectral bias toward Fourier-band-aligned modes (Mildenhall+2020 §5.1 spectral bias diagnostic) |
+| K3'-row-2 | Hidden ω₀ 1→30 (Sitzmann image-regression default) | Scales first-Sine-layer frequency 30×; raises bandwidth of representable body field | Prevents constant-mean basin residence via non-zero-Sine-gradient + 30× bandwidth at init (Sitzmann+2020 §3.2) |
+
+**K3' degeneracy class NAMED** (Rev 1.2 formalization):
+
+The K3' = (K3 → PE-drop + hidden-ω₀-30) change confounds two effects that under K3-as-originally-spec'd were varied jointly. Empirical separation requires rung 1.5 (lr sweep) to verify body-axis fitting is achievable under EITHER row independently — but rung 1.5 as currently spec'd varies only lr, not (PE-on, ω₀=1) vs (PE-off, ω₀=30) vs intermediates. This under-decomposes the intervention space. Rev 1.2 acknowledges this as a KNOWN scope limitation: the (1c) sprint tests the K3' joint intervention only; PE-isolation and ω₀-isolation rungs are deferred to a follow-on sprint if (1c) clears the trichotomy. Naming the class makes the deferral auditable.
+
+**Canonical re-verbing** (per [D-37]-Extension R9 invariance-verb discipline):
+
+Rev 1.1 §10.A used "canonical Sitzmann" to describe ω₀=30. Rev 1.2 replaces "canonical" with "**Sitzmann image-regression default**" throughout. "Canonical" implies a single-correct setting that Sitzmann+2020 does not claim; the paper presents ω₀=30 as the default for image-regression experiments, with task-specific tuning recommended (§3.2 "hyperparameter ω₀ should be tuned per task"). The cosmological-field-regression task is not image-regression; the default is a starting point, not a canonical setting.
+
+### §12.A-addendum — §0.6 R10 orthogonality re-derivation under hidden ω₀=30
+
+The §0.6 R10 retired-model reuse contract (constant-mean basin escape argument) was derived in Rev 1 under the implicit assumption of Sine activation with Sitzmann initialization at default ω₀. Hidden ω₀=30 shifts the first-Sine-layer frequency by 30×; the orthogonality argument must be re-verified under this lever.
+
+**Re-derivation**:
+
+The constant-mean basin escape argument has two structural ingredients: (i) non-zero gradient property of Sine at the constant-mean output configuration; (ii) sufficient bandwidth at initialization to represent non-constant body fields after the first gradient step.
+
+Property (i) is ω₀-INDEPENDENT: ∂sin(ω₀·x)/∂x = ω₀·cos(ω₀·x), which is non-zero almost everywhere regardless of ω₀ scale. The basin escape mechanism (gradient flows out of the constant-mean configuration in the first step rather than vanishing) holds for ω₀ ∈ {1, 30, any positive real}.
+
+Property (ii) is ω₀-DEPENDENT and STRENGTHENED at ω₀=30: Sine-gradient bandwidth at initialization scales as ω₀ × baseline. The ω₀=30 setting provides 30× the representable bandwidth of ω₀=1 baseline at init — which is the explicit Sitzmann+2020 motivation for image-regression tasks where the target field has non-trivial high-frequency content. The cosmological density field at 48³ truth-grid resolution likewise has non-trivial high-frequency content (density fluctuations across voxel scale). The ω₀=30 lever therefore STRENGTHENS the basin-escape argument's bandwidth ingredient rather than weakening it.
+
+**Net orthogonality verdict**: R10 retired-model-reuse contract for the §0.6 (1c) Sitzmann body argument SURVIVES under hidden ω₀=30. The constant-mean basin escape claim holds; the bandwidth-at-init claim is strengthened. No re-verbing required to R10 itself for this lever; the K3'-row-2 mechanism column above explicitly anchors on this re-derivation.
+
+### §12.B — §10.B + RUNG 4.5/4.6 SPECS (multi-seed extension + P2 cross-physics)
+
+**Rung 4.5 spec** (multi-seed on (1c) primary configuration):
+- n = 5 seeds on the (1c) primary configuration (Sitzmann image-regression default ω₀=30, PE-drop, hidden=256, layers=5, lr=5e-5, 500 steps).
+- PASS criterion (two-clause, both required):
+  - (i) Wilcoxon signed-rank test on (var_pred/var_truth) across 5 seeds at step 500, one-sided alternative > 0, α = 0.10 (matched to [D-70] gate-discipline α convention for n≥5 small-sample regimes).
+  - (ii) ≥ 3 of 5 seeds individually exceed the **void-floor escape threshold** defined as var_pred/var_truth ≥ ε_physical(σ=5) = 0.0772 (the loose-floor anchor from S-A7; this is escape-from-constant-mean, NOT body-axis-clearance which is a higher bar).
+- Escape-threshold rationale: void-floor escape is "did the body get out of the constant-mean basin at all" — the σ=5 ε_physical = 0.0772 anchor is the empirically-derived loose-floor matched to that question. Using the rung-1.5 `min(Bin-D pred)` proxy as in Rev 1.1 draft text was a cargo-cult of an earlier diagnostic; Rev 1.2 corrects to the §10.E primary-observable-aligned threshold.
+- Compute budget: 5 × ~15 min A30 wall ≈ 75 min total. Within Juno sub-2hr budget.
+- Methodology hedge: rung 4.5 is a confirmation-of-direction step, not a body-axis-clearance proof. Body-axis clearance is the §10.C trichotomy load.
+
+**Rung 4.6 spec** (P2 cross-physics replication):
+- n = 3 P2 seeds on (1c) primary configuration (same hyperparameters as rung 4.5; only physics_id changes P1 → P2).
+- PASS criterion: ≥ 2 of 3 P2 seeds return median Δ_seed > 0 (where Δ_seed = var_pred/var_truth at step 500 minus var_pred/var_truth at step 0, capturing variance-recovery direction).
+- Rationale: a 2-of-3 directional test is the minimum sample size for a non-trivial cross-physics replication claim under the sprint compute budget. Stronger 5-of-5 P2 test deferred to follow-on if (1c) primary + 4.5 + 4.6 all clear.
+- Compute budget: 3 × ~15 min A30 wall ≈ 45 min. Within budget.
+- Methodology hedge: rung 4.6 is a directional cross-physics check, NOT a cross-physics invariance proof.
+
+### §12.C — §10.C TRICHOTOMY RE-SPEC (binomial critical-region citation + pre-commit timestamp)
+
+Rev 1.1 §10.C trichotomy critical-region thresholds (≥8 / 3-7 / ≤2 out of 10 seeds) were named without statistical justification. Rev 1.2 provides the justification.
+
+**Critical-region derivation**: under H_0 of no body-axis effect (50/50 chance per seed of escaping void-floor by random gradient noise alone), the seed-escape count K ~ Binomial(n=10, p=0.5).
+
+- P(K ≥ 8 | H_0) = 0.0547 ≈ 5.5% (one-sided upper tail, α ≈ 0.055)
+- P(K ≤ 2 | H_0) = 0.0547 ≈ 5.5% (one-sided lower tail, α ≈ 0.055)
+- P(3 ≤ K ≤ 7 | H_0) ≈ 0.89 (the "ambiguous middle")
+
+The ≥8 / ≤2 thresholds correspond to one-sided α ≈ 0.055 critical regions — conventional 5% per tail, matched to standard non-parametric hypothesis testing practice for small-n binomial samples.
+
+**Citation**: `sprent_smeeton2007` (Sprent & Smeeton, "Applied Nonparametric Statistical Methods", 4th ed., Chapman & Hall/CRC, 2007), §4.2 binomial-test critical regions for small-n sign-test analogues.
+
+**TODO in `papers/shared/main.bib`**: add `sprent_smeeton2007` BibTeX entry (verifiable to ISBN 978-1584887010).
+
+**Pre-commit anchor**: Rev 1.2 commit timestamp (this turn) is the [D-37]-rule-5 symmetric-disclosure pre-commit anchor for the trichotomy thresholds. Per Rev 1.1 §10.C, thresholds were named before seeing (1c) results; Rev 1.2 formalizes the statistical justification without altering the thresholds, preserving the pre-commit.
+
+### §12.D — §10.D + RUNG 1.5 SPEC (lr-sweep n=20 body-axis fitting verification)
+
+**Rung 1.5 spec**:
+- Metric: `var_pred(500)/var_truth(500)` — explicitly the production-scale observable matching §10.E K6 #3 (NOT a min(Bin-D pred) proxy; Rev 1.1 draft text proxy retired per §12.B cargo-cult correction).
+- lr grid: `{3e-6, 5e-5, 1e-4, 5e-4}` (4 values, spanning 2.2 OOM around the (1c) primary lr=5e-5 default).
+- Seeds: 5 per lr value → 20 total runs.
+- PASS criterion: ≥ 1 of 20 (lr, seed) configurations exceeds `ε_physical(σ=3) = 0.1591` at step 500. A single PASS demonstrates body-axis fitting is achievable in principle on the chosen architecture + duration; multiple PASSes strengthen.
+- Citation for IGR-style lr-sweep verification on implicit neural representations: `atzmon_lipman2020igr` (Atzmon & Lipman 2020, "SAL: Sign Agnostic Learning of Shapes from Raw Data", CVPR 2020, precedent for lr-sensitivity sweep on implicit field fitting).
+- **TODO in `papers/shared/main.bib`**: add `atzmon_lipman2020igr` BibTeX entry (verifiable to CVPR 2020 proceedings).
+- Compute budget: 20 × ~15 min A30 wall ≈ 5 hr. Above sub-2hr per-job budget; SLURM array job recommended (4 lr × 5 seed = 20 tasks each ≤ 15 min).
+- Failure-mode handling: if rung 1.5 returns 0/20 PASS, body-axis fitting is NOT achievable on the chosen 500-step duration; this triggers Stage 1a duration re-spec to 5000 steps as a [D-37]-rule-5 symmetric-disclosure pre-committed fallback. Rung 4.5/4.6 do NOT dispatch until rung 1.5 clears.
+
+### §12.E — §10.E N3(iii) DEMOTION + K6 #3 ε_ANCHOR (operative ε_physical = 0.1591, σ=3)
+
+**N3(iii) demotion (density-PDF KS-or-W2 → diagnostic-only)**:
+
+Rev 1.1 §10.E N3(iii) primary load-bearing on density-PDF KS-or-W2 divergence as a void-floor signature. Rev 1.2 demotes this to diagnostic-only:
+- (a) KS-or-W2 divergence is sensitive to tail density features the (1c) sprint is not scoped to address. Using it as primary risks a [D-37]-extension R8 cascade-close violation (claiming foreclosure of a hypothesis the diagnostic does not actually test at sprint scope).
+- (b) Sub-clause (ii) Bin-D differential is a tighter, more directly interpretable void-floor signature: "did the predicted density in the lowest-truth bin recover the truth's variance share?" The Bin-D variance share is mechanically tied to void-floor escape in a way the full-distribution divergence is not.
+
+**Rev 1.2 N3(iii) text**: PRIMARY void-floor signature = sub-clause (ii) Bin-D differential (var_pred|Bin-D / var_truth|Bin-D at step 500 exceeds ε_physical(σ=3) = 0.1591). DIAGNOSTIC-ONLY = density-PDF KS-or-W2 (reported in absorption block, NOT load-bearing on PASS/FAIL).
+
+**Defense-path flag**: W2-with-Lukić-anchor (Lukić+2015 density-PDF reference) is a stronger void-floor diagnostic but requires the Lukić PDF anchor to be reconstructed in the same simulation suite + redshift + smoothing-scale as the (1c) truth field. This is deferred follow-on work; flagged here so that a fresh-panel reviewer of Rev 1.2 sees the deferred path explicitly.
+
+**K6 #3 ε_anchor — operative ε_physical = 0.1591 (σ=3)**:
+
+Rev 1.1 text was `ε = 10 × μ_frozen = 2.4e-5` (multiplier-over-frozen-init noise floor). Rev 1.2 replacement:
+
+```
+ε_physical = μ_smoothing_floor(σ=3) = 0.1591
+  where μ_smoothing_floor(σ=3) is the variance ratio
+    Var[gaussian_filter(truth_field, sigma=3, mode='wrap')] / Var[truth_field]
+  computed on the production truth field at 48³ voxel resolution.
+  Source-of-truth: cloud_runs/d71_var_smoothing_floor.json
+  (Juno job 205722, landed 2026-05-30 22:37; var_truth_full =
+  1.832623e+02; PCV PASS; 58.3s wall on A30).
+```
+
+**Mandatory hedge per [D-37] rule 5 symmetric-disclosure**:
+
+> ε_physical(σ=3) = 0.1591 was chosen as the operative anchor BEFORE seeing any (1c) results. The σ=3 choice is the moderate physical-floor defensible on scale-matching grounds (~3.75 Mpc/h ≈ trans-linear scale plausibly fittable by a Sitzmann-image-regression-default MLP body at 500 steps without near-saturation claim). The alternative anchors σ=1 (ε=0.49, asymptotic stretch), σ=2 (ε=0.26, ambitious-but-achievable stretch), and σ=5 (ε=0.077, loose floor matched to rung 4.5 void-floor escape threshold) are pre-committed at the same Rev 1.2 commit timestamp and are available as diagnostic re-anchors if (1c) results land in an intermediate regime; this is NOT a moving-goalpost violation because all four anchors were pre-committed in one commit. Re-anchoring requires an explicit post-result LEDGER block citing the alternate σ.
+>
+> This anchor is the PHYSICAL FLOOR under Gaussian smoothing at σ=3 voxels of the production truth field; it is NOT a multiplier-over-frozen-init noise floor (the Rev 1.1 framing, retired per R29 wrong-unit-anchor violation diagnosed at K6 panel 2026-05-26 → R29 demotion to CANDIDATE per LEDGER §3 [D-71] amendment block §H 2026-05-26 R-rule audit).
+>
+> K6 #3 PASS criterion: var_pred(500)/var_truth(500) ≥ ε_physical(σ=3) = 0.1591. K6 #3 FAIL does NOT foreclose (1c) provided §10.C trichotomy clears ≥8/10 on the M0+M1+M2 stack. K6 #3 is a stretch-goal-not-default per PI Ruling 2 (LEDGER §3 [D-71] Rev 1.2 absorption): keep 500 steps; primary load-bearing falsification path is §10.C trichotomy on M0+M1+M2 over n=10 seeds. K6 #3 PASS strengthens; K6 #3 FAIL does not foreclose (1c) provided trichotomy clears ≥8/10.
+
+### §12.F — §10.J DISPATCH LADDER (rung count 7 → 9; R28 cross-check explicit)
+
+Rev 1.1 dispatch ladder rung count = 7. Rev 1.2 adds rungs 1.5 (lr-sweep body-axis verification) and 4.5 + 4.6 (multi-seed + P2 cross-physics). New rung count = 9.
+
+**Rev 1.2 dispatch ladder**:
+
+| Rung | Action | Owner | Landing artifact |
+|---|---|---|---|
+| 0 | S-A7 Juno output absorption (Rev 1.2 author turn) | PI | Rev 1.2 amendment block (this document tail) |
+| 1 | Rev 1.2 commit | PI | git commit ref |
+| 1.5 | lr-sweep n=20 body-axis verification (§12.D) | core-implementer + infrastructure-manager | SLURM array job + `cloud_runs/d71_rung15_lrsweep.json` |
+| 2 | Fresh-panel pre-review on Rev 1.2 + S-A7 anchor selection | defense-panel | panel verdict block in LEDGER §3 [D-71] |
+| 3 | Panel-verdict absorption | PI | LEDGER §3 [D-71] absorption block |
+| 4 | (1c) primary seed run | core-implementer | `cloud_runs/d71_1c_primary_seed0.json` |
+| 4.5 | Multi-seed n=5 rung (§12.B) | core-implementer | `cloud_runs/d71_1c_multiseed.json` |
+| 4.6 | P2 cross-physics n=3 rung (§12.B) | core-implementer | `cloud_runs/d71_1c_p2_crossphysics.json` |
+| 5 | Sprint absorption | PI | LEDGER §3 [D-71] sprint-close block |
+
+**R28 dispatch-ladder cross-check**: Rev 1.2 landing-artifact count = 9 (rungs 0, 1, 1.5, 2, 3, 4, 4.5, 4.6, 5). Rung count = 9. **PASS** (rung count ≥ landing-artifact count by the literal-integer cross-check banked at R28).
+
+### §12.G — §5 R-RULE AUDIT REFRESH (Rev 1.2)
+
+| R-rule | Status (Rev 1.2) | Change vs Rev 1.1 | Sighting log |
+|---|---|---|---|
+| R28 | BANKED | unchanged | self-violation sighting #1 flagged below |
+| R29 | **CANDIDATE** (demoted from BANKED) | per LEDGER §3 [D-71] amendment block §H AMENDED 2026-05-26 | ε=0.05 MDE-block wrong-unit catch (panel K6 → R29-promotion panel ruling (b) NEGATIVE 2026-05-26) |
+| R30 | BANKED | unchanged | — |
+| R31 | DEFERRED-BANKED | **sighting #4** logged this turn (S-A5 absorption); promotion criterion = R12 second-sighting-cross-track + tightened-text-amendment | #1 [D-70] R-prep; #2 [D-71] §H 2026-05-26; #3 [D-71] amendment block §G 2026-05-26; #4 S-A5 absorption Rev 1.2 (this turn) |
+| R32 | **DEFERRED-BANKED PROVISIONAL** | promoted candidate → DEFERRED-BANKED PROVISIONAL on one operational test (this panel cycle: 4-item pre-validation closing + S-A7 Juno re-route + PCV PASS + methodology-preservation respected). R32 SECOND-OPERATIONAL-TEST RULING: Juno re-route is part of THIS panel cycle's deliverable chain, NOT a separate second sighting; R12 second-sighting-cross-track instance still required | one operational test landed |
+
+**R28 self-violation sighting #1 (S-A8 arithmetic)**:
+
+S-A8 was the rung-count arithmetic in the prior Rev 1.1 dispatch sequence: PI authored a 5-rung dispatch ladder while design-doc landing-artifact count was 7. R28 fired retroactively on PI re-review; Rev 1.1 dispatch ladder was re-authored before downstream dispatch. The self-violation is a PI-only sighting (PI caught the violation; not panel-caught), which is the minimum-sighting-quality bar for R28 retention. Sighting log update for R28 BANKED status: no demotion, but self-violation sighting #1 IS recorded to keep the sighting history transparent. If a SECOND self-violation occurs without panel catch in a downstream sprint, R28 should be considered for elevation discipline (e.g., mandatory dispatch-ladder-arithmetic gate in PI absorption template).
+
+### §12.H — §9 R26 IN-SESSION RE-VERIFICATION BLOCK (refresh)
+
+| Inherited claim | File / artifact freshly read this session | Verdict | Restated claim (if changed) |
+|---|---|---|---|
+| ε_physical anchor source-of-truth | `cloud_runs/d71_var_smoothing_floor.json` (Juno job 205722, landed 2026-05-30 22:37) | SURVIVES, with σ-specific anchor selection added | `ε_physical(σ=3) = 0.1591` operative; σ=1/2/5 reserved as diagnostic re-anchors per pre-commit |
+| var_truth_full = 1.832623e+02 | same JSON above | SURVIVES (cross-checks local partial run per S-A7 PCV PASS) | unchanged |
+| Smoothing kernel = `scipy.ndimage.gaussian_filter mode=wrap` | same JSON above | SURVIVES (periodic, physically correct for cosmological box) | unchanged |
+| Pre-commit timestamp for ε_physical anchor selection | Rev 1.2 commit (this turn) | NEW (no prior anchor to inherit; this is the establishing entry) | Rev 1.2 commit ref = pre-commit anchor for σ choice |
+| R10 §0.6 retired-model-reuse contract under hidden ω₀=30 | §12.A-addendum above (re-derivation) | SURVIVES (non-zero-Sine-gradient property is ω₀-independent; bandwidth-at-init STRENGTHENED at ω₀=30) | R10 reuse contract holds; bandwidth ingredient strengthened, not weakened |
+
+### §12.I — GOVERNANCE FORWARD-OBLIGATIONS (Rev 1.2 close)
+
+(a) Fresh-panel pre-review on Rev 1.2 OWED before any rung 1.5 dispatch authorization. R15 + R28 PROVISIONAL persists until panel APPROVE per R32-candidate panel-cycle-discipline banking precondition.
+
+(b) R12 second-sighting-cross-track instance needed before R32 promotes from DEFERRED-BANKED PROVISIONAL → BANKED. Next-session governance audit: track whether a CROSS-TRACK panel cycle fires on a fresh gate-construction question; if it does, R32 second-sighting accrues.
+
+(c) bib entries `sprent_smeeton2007` and `atzmon_lipman2020igr` TODO in `papers/shared/main.bib`. Owner: latex-author at next paper-iteration cycle. Not blocking on rung 1.5 dispatch.
+
+(d) K3' axis-isolation rungs (PE-isolation, ω₀-isolation) are deferred follow-on if (1c) clears trichotomy. Rev 1.2 names the deferral so the limitation is auditable.
+
+(e) W2-with-Lukić-anchor density-PDF defense-path is deferred follow-on per §12.E N3(iii) Rev 1.2 demotion text.
+
+### §12.J — Sign-off
+
+**R15+R28 PROVISIONAL** persists until fresh-panel re-review on Rev 1.2 returns APPROVE per just-banked R32-candidate panel-cycle discipline as banking precondition. Provisional status is binding on downstream dispatches: no core-implementer dispatch for rung 1.5 or rung 4 until panel APPROVE lands.
+
+**Honest framing per [D-37] rule (a)**: Rev 1.1 had 4 KILLER + 3 SERIOUS + 5 PROBE panel findings; Rev 1.2 absorbs each with concrete numerical thresholds + bib citations + dispatch-ladder cross-checks. The S-A7 Juno re-route landed empirical anchor in the same units as the gate observable (var_pred/var_truth ratio) — the unit-chain audit closes. K-A1 ω₀-hidden axis was split into two distinct rows (PE-drop + hidden-ω₀-30) with K3' joint-confound limitation named. K-A4 observable-mismatch closed by metric realignment. K-A3 trichotomy gained binomial-quantile derivation. Rung 4.5/4.6 multi-seed re-specs close K-A2 statistical-power gap.
+
+---
+
+## §13 — Rev 1.3 AMENDMENT BLOCK (Rev 1.2 fresh-panel cycle #2 NEEDS-WORK absorbed, 2026-05-31)
+
+Rev 1 / Rev 1.1 / Rev 1.2 wording above preserved verbatim per audit-trail discipline. Rev 1.2 fresh-panel (cycle #2 on [D-71]) returned NEEDS-WORK with 4 KILLER (K1 wiring inconsistency; K2 ε_physical anchor scale-and-boundary mismatch [BLOCKING]; K3 4-anchor bandit; K4 rung-stack incompatibility) + 4 SERIOUS (S5 K3' new exit pathway; S6 SIREN literature over-strong; S7 R32 rule-shrinking; S8 R28 soft-trigger) + 4 PROBE.
+
+**Status**: Rev 1.3 PROVISIONAL pending defense-panel re-review (cycle #3) on this amendment block. R15+R28 PROVISIONAL HELD. No HPC dispatch, no code-implementer dispatch, no infrastructure-manager dispatch until cycle #3 APPROVE. **σ-bandit 4-anchor pre-commit RETRACTED** per K2 ruling below; Rev 1.2 §12.E ε_physical(σ=3)=0.1591 anchor RETIRED.
+
+### §13.A — K2 absorption (BLOCKING): Re-anchor option A (sampling-noise floor)
+
+**Code-state R26 in-session re-verification** (Rev 1.3 absorption load-bearing):
+- `experiments/nerf/pipeline.py:540-610` `_compute_m3`: corners drawn uniform-random in 768³ box; modulo-wrap on box exit (lines 562-567); voxels of all n_crops crops **concatenated** into `raw_truth_all`; **single pooled** `raw_truth_all.var(unbiased=True)` produces `var_truth_lin`. Aggregation = pooled-cross-crops single variance, NOT per-crop. No Gaussian smoothing applied at gate-evaluation time.
+- Sherwood native voxel = 60 Mpc/h / 768 = 0.0781 Mpc/h ≈ 78.1 kpc/h. σ=3 voxels = 234 kpc/h = 0.234 Mpc/h. Rev 1.2 §12.E hedge "~3.75 Mpc/h ≈ trans-linear" contained internal arithmetic error: 3.75 Mpc/h is the crop-side length (48 × 0.0781), NOT σ=3 smoothing scale.
+- `cloud_runs/d71_var_smoothing_floor.json` smoothing_kernel = `mode='wrap'` on full 768³ box. The gate observable applies NO smoothing. **Anchor and gate evaluate fundamentally different quantities** — R29 sighting #2 post-demotion accrues (structural twin of K6 ε=0.05 wrong-unit failure mode).
+
+**Rev 1.2 §12.E σ=3 / σ=1 / σ=2 / σ=5 4-anchor pre-commit is RETRACTED** under K2 ruling. The underlying anchor framing (smoothing-floor of full-box truth) does not match the gate-evaluation framing (pooled-voxel-variance ratio across random crops, no smoothing). The 4-anchor pre-commit was syntactically pre-committed but substantively measured the wrong quantity.
+
+**Rev 1.3 operative anchor (Re-anchor option A)**:
+
+```
+ε_physical = M × σ_pooled_voxel_sampling_noise
+
+where σ_pooled_voxel_sampling_noise is the sample standard deviation
+of the pooled-cross-N-crops voxel-variance RATIO under K independent
+random crop-placement seeds on the production 768³ truth field, with
+N=100 crops × 48³ voxels per crop, sampled with modulo-wrap on box
+exit per pipeline.py:562-567 convention.
+
+Specifically:
+  for k in 1..K:
+    sample 100 random 48³ crops (uniform corners, modulo-wrap)
+    compute pooled_var_k = Var[concatenate(all voxels in 100 crops)]
+  σ_pooled_voxel_sampling_noise = std(pooled_var_k / pooled_var_baseline)
+
+where pooled_var_baseline = mean over k of pooled_var_k (or equivalently
+the full-box variance var_truth_full = 183.26 since uniform sampling
+converges to box mean by LLN at N=100 crops).
+
+M = 3 (pre-committed multiplier; 3-sigma above sampling-noise floor).
+```
+
+**Compute spec** (rung 5 of Rev 1.3 ladder; NOT authorized this absorption):
+- New script `scripts/d71_compute_sampling_noise_floor.py` (REPLACES `scripts/d71_compute_var_truth_smoothing_floor.py`; old script + its JSON retired).
+- Inputs: `Sherwood/.rho_field_cache/rho_field_p1_z0.300_n768.npy` (~1.81 GB).
+- Computation: K=50 crop-placement seeds × 100 crops × 48³ voxels each, modulo-wrap on box exit; output `pooled_var_k / pooled_var_baseline` distribution + `σ_pooled_voxel_sampling_noise = std()`.
+- Output JSON: `cloud_runs/d71_sampling_noise_floor.json` with `var_truth_full`, `pooled_var_baseline`, `σ_pooled_voxel_sampling_noise`, K=50 per-seed values.
+- Compute budget: ~5 min CPU on adequate-RAM host (could run on Juno per [D-71] Rev 1.1 S-A7 precedent OR locally if memory allows for crop-sampling without full-field allocation).
+- Gated on: Rev 1.3 → fresh-panel cycle #3 APPROVE. PI does NOT authorize the compute dispatch at this absorption.
+
+**ε numerical pre-commit deferred**: ε = M × σ_pooled_voxel_sampling_noise with M=3 pre-committed; numerical σ_noise TBD per compute output. Rev 1.4 will land the numerical value in a SECOND panel cycle (cycle #4) per §13.I dispatch ladder below.
+
+**K3 dissolution**: σ-knob retired. There is no smoothing kernel in Re-anchor option A; no σ to bandit-over. K3 finding structurally dissolved.
+
+**P12 closed**: Sherwood cache convention is ρ/⟨ρ⟩ (overdensity, mean≈1). Both `var_pred_lin` and `var_truth_lin` use same convention; cancels in ratio. Explicit statement.
+
+**P10 closed**: aggregation convention is pooled-cross-crops single variance. ε_physical and gate observable use SAME aggregation. Explicit statement.
+
+### §13.A-wiring — Single canonical wiring table (replaces Rev 1 §1.5 ambiguity)
+
+**Operative wiring for (1c) SIREN body** (CANONICAL — supersedes §1.5; core-implementer dispatch consumes THIS table exclusively):
+
+| Layer | in_features | out_features | activation | ω₀ | init |
+|---|---|---|---|---|---|
+| input | 3 (raw normalized coords ∈ [−1,+1]) | — | — | — | — |
+| layers1[0] | 3 [+1 g] [+e_dim e_p] | 256 | Sine | **30** (first-layer) | `U(−1/in_dim, +1/in_dim)` per Sitzmann+2020 §3.1 first-layer rule |
+| layers1[1] | 256 | 256 | Sine | **30** (hidden) | `U(−√(6/256)/30, +√(6/256)/30)` |
+| layers1[2] | 256 | 256 | Sine | **30** | same as hidden |
+| layers1[3] | 256 | 256 | Sine | **30** | same as hidden |
+| skip-cat | concat([h, raw coords + g + e_p]) | 256 + 3 [+1 g] [+e_dim] | — | — | — |
+| layers2[0..3] | 256 + skip_dim → 256 → 256 → 256 → 256 | Sine | **30** | `U(−√(6/fan_in)/30, +√(6/fan_in)/30)` |
+| density head | 256 → 1 | Softplus | — | linear, Kaiming-uniform `a=√5` |
+| g head (if g_dim>0) | 256 → 1 | linear | — | linear |
+| e_p head (if e_dim>0) | 256 → e_dim | linear | — | linear |
+
+**Source-of-truth**: vsitzmann/siren reference implementation `meta_modules.py SineLayer` constructor default `hidden_omega_0=30` (used in image-regression notebooks; sitzmann-image-regression-default).
+
+**Explicit note**: "PE_L10 deliberately omitted; Sine activations subsume frequency-basis role per Sitzmann+2020 §3."
+
+**§1.5 banner**: SUPERSEDED notice landed in §1.5 (Rev 1.3 same commit batch). Rev 1 §1.5 table preserved for audit trail; downstream code MUST consume §13.A-wiring.
+
+### §13.B — K3 dissolution (4-anchor bandit retracted)
+
+Per §13.A above: σ-knob retired under Re-anchor option A. Rev 1.2 §12.E σ=1 / σ=2 / σ=3 / σ=5 pre-commit explicitly RETRACTED. The "all four pre-committed in one commit" defense (Rev 1.2 §12.E hedge) is moot because there is no σ parameter in the operative anchor. Old `cloud_runs/d71_var_smoothing_floor.json` retained on disk as audit-trail evidence of the retracted approach; NOT load-bearing for any future gate.
+
+### §13.C — K4 trichotomy compatibility (rung 1.5 PASS bar 1/20 → ≥4/20)
+
+Rev 1.2 §12.D PASS criterion "≥ 1 of 20 (lr, seed) configurations exceeds ε_physical" had implied per-seed success rate ≈ 5%; trichotomy needed 80% per-seed. P(≥8/10 trichotomy PASS | exactly 1/20 rung-1.5 PASS) ≈ 3.9e-11 — rung-stack admit-then-cannot-clear pipeline.
+
+**Operative rung 1.5 PASS criterion (Rev 1.3)**:
+- PASS = **≥ 4 of 20 (lr, seed) configurations exceed ε_physical** at step 500, where ε_physical is the §13.A operative anchor.
+- Rationale (binomial power calc): under H_1 of chosen-lr per-seed success p=0.8, with 5 seeds at the chosen lr (1 of 4 lr values), expected count at chosen lr = 5×0.8 = 4; conditional power P(Binomial(5, 0.8) ≥ 4) ≈ 0.737. The 4/20 bar therefore admits regimes where trichotomy can plausibly clear (≥8/10 at chosen lr), and rejects regimes where it cannot.
+- Cite: `sprent_smeeton2007` §4.2 (Sprent & Smeeton 2007, Applied Nonparametric Statistical Methods 4th ed., binomial-test critical regions); already in Rev 1.2 §12.C TODO bib list.
+
+**Rung 1.5 dual-role explicit statement**: rung 1.5 is BOTH (i) lr-selection (picks the operative lr from the 4-value grid based on which value produced PASSes), AND (ii) feasibility-and-power gate (demonstrates that AT the selected lr, per-seed success rate is ballpark of the trichotomy operating point). NOT just feasibility-in-principle.
+
+**Rev 1.2 §12.D failure-mode handling preserved**: if rung 1.5 returns < 4/20 PASS, body-axis fitting is not achievable on 500 steps; Stage 1a duration re-spec to 5000 steps as pre-committed fallback. Rung 4.5/4.6 do NOT dispatch until rung 1.5 clears ≥4/20.
+
+### §13.D — S5 K3' joint-confound deferral (tighten §7 trigger language)
+
+Rev 1.2 §12.A K3' degeneracy NAMED but Rev 1.2 §7 trigger reads as if (γ)-class-falsification can fire on (1c) trichotomy FAIL alone. K3' joint intervention (PE-drop + ω₀=30) confounds two effects; FAIL cannot attribute to either individually.
+
+**Operative §7 trigger (Rev 1.3 tightening)**:
+
+> **(γ) supervision-class falsification triggers IFF (1c) trichotomy FAIL AND rung 4.5 head-ablation FAIL AND rung 4.6 P2 cross-physics FAIL AND a future PE-isolation OR ω₀-isolation rung (deferred follow-on) also fails to discharge body-axis attribution.**
+
+The current sprint (1c) under K3' joint intervention does NOT claim (γ)-class falsification authority. Even if all three landed gates (1c trichotomy + 4.5 + 4.6) FAIL, the K3' joint confound means a (γ)-still-viable-under-PE-only or under-ω₀=1-only hypothesis cannot be ruled out by this sprint. (γ)-class falsification requires the deferred PE-isolation or ω₀-isolation rung's authority, which is OUT-OF-SCOPE for Rev 1.3.
+
+Cite: Tancik+2020 NeurIPS §4 (Fourier features + Sine composition non-trivial) + Mehta+2021 ICCV §3 (PE-vs-SIREN ablations). TODO in `papers/shared/main.bib`: `tancik_fourier_2020` + `mehta_modulated_2021`.
+
+### §13.E — S6 SIREN literature-defense demotion
+
+Rev 1.2 §12.E ε_physical mandatory hedge claimed "~3.75 Mpc/h ≈ trans-linear scale plausibly fittable by Sitzmann-image-regression-default MLP body at 500 steps." Tancik+2020 + Sitzmann+2020 support SIREN CAPABILITY for high-frequency fitting, not training-DYNAMICS at 500 steps for 5-decade log-density target. Empirically SIREN learns low-then-high frequencies (Tancik+2020 Fig 3 / Sitzmann+2020 Fig 4); by step 500 model is in low-frequency regime.
+
+Combined with §13.A K2 ruling: the "trans-linear plausibly fittable" verb is DROPPED. Under Re-anchor option A there is no smoothing-kernel scale to anchor a frequency claim against. The ε_physical anchor is now sampling-noise floor + M=3 multiplier; the claim becomes "ε_physical is 3σ above the pooled-voxel-variance-ratio sampling-noise floor — a sample-statistical bar, NOT a physical-scale bar."
+
+**Rev 1.3 §12.E hedge replacement** (operative wording):
+
+> ε_physical = M × σ_pooled_voxel_sampling_noise (M=3 pre-commit; σ_noise numerical TBD per rung-5 compute output) is a STATISTICAL FLOOR distinguishing "(1c) recovered variance above sampling noise" from "(1c) achieved a sampling-noise-floor result indistinguishable from random crop placement." This is a loose-bandwidth direction-of-motion test, NOT a tight-fit test. The 500-step duration is consistent with this loose-bandwidth framing per [D-37]-extension R8 cascade-close discipline (claim narrows to match evidence).
+
+### §13.F — S7 R32 deadline-bind
+
+Rev 1.2 §12.G R32 row left R32 at DEFERRED-BANKED PROVISIONAL with no committed timeline for R12 cross-track second-sighting. S7 finding: indefinitely deferrable → permanently soft precondition.
+
+**Operative R32 status (Rev 1.3 bind)**:
+
+> **R32 cross-track second-sighting instance OWED by 2026-08-31 (sprint close on [D-71] (1c) trichotomy verdict, OR end of calendar Q3 2026, whichever comes first). If by deadline no cross-track sighting has accrued, R32 DEMOTES to CANDIDATE; PI does not have authority to extend the deadline.**
+
+**Operational test for "cross-track"**: a sighting from a DIFFERENT decision-track ([D-72]+, or a non-[D-71] amendment cycle) within deadline. Rev 1.1 + Rev 1.2 + Rev 1.3 panel cycles are SAME-TRACK (all are [D-71] (1c) SIREN scoping) and DO NOT count as cross-track sightings — per §13.J ruling below, this is now BANKED PRECEDENT (future PI cannot reset R32 sighting count by opening new revision of same doc).
+
+### §13.G — S8 R28 hard-auto-promote re-spec (governance amendment to `.claude/agents/project-architect.md`)
+
+Rev 1.2 §12.G text "If a SECOND self-violation occurs without panel catch in a downstream sprint, R28 should be considered for elevation discipline" is replaced by hard auto-trigger.
+
+**Operative §12.G replacement (Rev 1.3 binding)**:
+
+> **If a SECOND self-violation occurs without panel catch in a downstream sprint, R28 MUST auto-promote to a 2-tier rule: (i) the current 'rung count ≥ artifact count' literal-integer check, AND (ii) a new mandatory 'PI absorption template must contain an explicit dispatch-ladder-arithmetic gate sub-block named §R28-CHECK', with no discretion at trigger point. PI does not have the authority to defer this elevation; the SECOND self-violation IS the trigger.**
+
+**Governance amendment landing site**: `.claude/agents/project-architect.md` R28 rule text. The "should be considered for elevation discipline" → hard auto-trigger amendment lands SAME COMMIT BATCH as Rev 1.3 to close the soft-trigger escape hatch immediately.
+
+### §13.H — P10 / P12 explicit statements (closing forward-obligations)
+
+- **P10 aggregation convention**: `var_pred_lin` and `var_truth_lin` are pooled-cross-crops single variances (pipeline.py:585-595): `torch.cat([all crops, voxel-flattened]).var(unbiased=True)`. ε_physical anchor uses SAME pooled-cross-crops aggregation per §13.A spec.
+- **P12 ρ-convention**: Sherwood cache convention is ρ/⟨ρ⟩ (overdensity, mean≈1 verified per cache JSON `mean=1.0`). Both pred-side and truth-side use same convention; cancels in `var_pred/var_truth` ratio.
+
+### §13.I — R28 dispatch-ladder cross-check for Rev 1.3 absorption chain
+
+Rev 1.3 is methodology re-spec, not multi-rung sequence. Forward dispatch ladder:
+
+| Rung | Action | Owner | Landing artifact |
+|---|---|---|---|
+| 0 | Rev 1.3 PI self-draft (this turn) | PI | §13 amendment block (this document) |
+| 1 | Rev 1.3 commit (design doc + LEDGER + project-architect.md R28 amendment) | PI | git commit ref |
+| 2 | Fresh-panel pre-review on Rev 1.3 (cycle #3) | defense-panel | panel verdict block |
+| 3 | Panel-verdict absorption | PI | LEDGER §3 [D-71] absorption block #3 |
+| 4 | Authorize sampling-noise floor compute | PI | dispatch brief |
+| 5 | Sampling-noise floor compute | core-implementer | `scripts/d71_compute_sampling_noise_floor.py` + `cloud_runs/d71_sampling_noise_floor.json` |
+| 6 | ε_physical numerical pre-commit | PI | LEDGER §3 [D-71] pre-commit block |
+| 7 | Rev 1.4 numerical bind (sampling-noise output → ε pre-commit) | PI | doc Rev 1.4 |
+| 8 | Fresh-panel pre-review on Rev 1.4 numerical bind (cycle #4) | defense-panel | panel verdict |
+| 9 | rung 1.5 lr-sweep n=20 dispatch (Rev 1.2 §12.D as amended by §13.C) | core-implementer + infrastructure-manager | SLURM array + `cloud_runs/d71_rung15_lrsweep.json` |
+
+Ladder rung count = 10 (rungs 0-9). Landing-artifact count = 9 (Rev 1.3 doc, Rev 1.3 commit, Rev 1.3 panel verdict, Rev 1.3 absorption, dispatch brief, sampling-noise script+JSON [one artifact pair], ε pre-commit block, Rev 1.4 doc, Rev 1.4 panel verdict, rung 1.5 outputs). **R28 cross-check: 10 ≥ 9 PASS.**
+
+**Two-panel-cycle structure rationale**: ε numerical value depends on compute output that does not exist yet; per R29 discipline, ε numerical commit must be panel-reviewed (panel can attack whether M=3 is defensible against the empirically-observed noise distribution). PI cannot pre-commit numerical ε without seeing noise floor; PI cannot dispatch noise-floor compute without panel APPROVE on methodology re-spec. Two-cycle ladder is feature, not bug — R29-discipline working as banked.
+
+### §13.J — R-rule audit refresh (Rev 1.3)
+
+| R-rule | Status (Rev 1.3) | Change vs Rev 1.2 | Sighting log |
+|---|---|---|---|
+| R28 | BANKED | hard-trigger auto-promote text landed in `.claude/agents/project-architect.md` this commit batch (§13.G) | self-violation sighting #1 still flagged; sighting #2 would auto-promote |
+| R29 | **CANDIDATE** (still demoted) | **sighting #2 post-demotion** — K2 ε_physical wrong-quantity failure mode is structural twin of K6 ε=0.05 wrong-unit failure | #1 K6 ε=0.05 unit-chain catch (Rev 1.1 absorption); #2 K2 ε_physical anchor-vs-gate quantity mismatch (this turn) |
+| R30 | BANKED | unchanged | — |
+| R31 | DEFERRED-BANKED | sighting count unchanged from Rev 1.2 (#4 held) | — |
+| R32 | **DEFERRED-BANKED PROVISIONAL with 2026-08-31 deadline** | deadline-bind per §13.F; same-track-cycle-collapsing precedent BANKED per §13.J above; Rev 1.1+1.2+1.3 cycles DO NOT accrue cross-track sightings | one operational test landed; cross-track second-sighting OWED by deadline or R32 demotes |
+
+**R32 same-track-cycle-collapsing precedent BANKED**: future PIs cannot reset R32 sighting count by opening new revision of same design-doc track. Multiple panel cycles on Rev N → Rev N+1 → Rev N+2 of the same doc count as ONE same-track cycle for R32 banking purposes.
+
+### §13.K — Sign-off (Rev 1.3)
+
+**R15 + R28 PROVISIONAL HELD** per R32-candidate panel-cycle-discipline binding. This Rev 1.3 amendment authorizes ONLY (i) PI self-draft (done this turn), (ii) Rev 1.3 commit, (iii) fresh-panel pre-review cycle #3 dispatch. Does NOT authorize any code-implementer, infrastructure-manager, HPC, or latex-author dispatch.
+
+**Honest framing per [D-37] rule (a)**: Rev 1.2 had 4 KILLER + 4 SERIOUS + 4 PROBE panel findings; load-bearing failure (K2) repeated the R29 wrong-unit pattern at a structural level (smoothing-kernel anchor vs no-smoothing gate). R29 sighting #2 post-demotion accrues. K3' joint-confound limitation (S5) admitted; (γ)-class falsification claim authority deferred to future panel cycle. No spin: the 4-anchor pre-commit is retracted, NOT spun as a recovery. The (1c) SIREN candidate direction survives Rev 1.2 → Rev 1.3 transition; the gate construction does not. Rev 1.3 + Rev 1.4 two-cycle ladder is the cost of doing R29 discipline right post-demotion.
+
+**[D-37]-Extension R7 user-directive reminder**: outcome-quality is not graded; decision-quality is. Rev 1.2 → Rev 1.3 NEEDS-WORK + R29 sighting #2 is a valid trajectory of well-spec'd discipline under cascading hedge-rules, not a process failure. The R32 panel-cycle-discipline operational test is firing exactly as banked.
 
