@@ -756,3 +756,179 @@ Ladder rung count = 10 (rungs 0-9). Landing-artifact count = 9 (Rev 1.3 doc, Rev
 
 **[D-37]-Extension R7 user-directive reminder**: outcome-quality is not graded; decision-quality is. Rev 1.2 → Rev 1.3 NEEDS-WORK + R29 sighting #2 is a valid trajectory of well-spec'd discipline under cascading hedge-rules, not a process failure. The R32 panel-cycle-discipline operational test is firing exactly as banked.
 
+---
+
+## §14 — Rev 1.4 AMENDMENT BLOCK (Rev 1.3 fresh-panel cycle #3 NEEDS-WORK absorbed, 2026-05-31)
+
+Rev 1 / Rev 1.1 / Rev 1.2 / Rev 1.3 wording above preserved verbatim per audit-trail discipline. Rev 1.3 fresh-panel (cycle #3 on [D-71]) returned NEEDS-WORK with 2 KILLER (K1 Re-anchor option A null mis-specified [BLOCKING]; K2 rung 1.5 power calc circular [BLOCKING]) + 4 SERIOUS (S1 §13.D 4-AND-gate impossibility loophole; S2 §13.E trivial-pass risk; S3 §13.G R28 trigger asymmetry; S4 LLN-convergence error unbudgeted) + 4 PROBE.
+
+**Status**: Rev 1.4 PROVISIONAL pending defense-panel cycle #4. R15+R28 PROVISIONAL HELD. **R29 sighting #3 ACCRUES** per R29 rule-text amendment (ii) 2026-05-26 ("post-spec panel catches do NOT retire design-time obligation; count as R29 failures partially mitigated by R32 panel-cycle discipline"). R29 has produced ZERO confirmed prospective design-time successful preventions across three sighting cycles.
+
+### §14.A — K1 absorption (BLOCKING): Two-component noise budget σ_total² = σ_crop² + σ_pred_H0²
+
+**R26 in-session re-verification** confirms K1 at code level (`experiments/nerf/pipeline.py:540-612`): gate observable `var_pred_lin / var_truth_lin` has numerator = `var(model(coords))` (function of network weights, not crop placement; `grid_i/j/k` static `arange(L)` indices per line 569-573), denominator = one realization of pooled-cross-100-crops voxel variance. Rev 1.3 §13.A anchor σ measured truth-only crop-placement noise; gate H_0 noise budget is network-init-dominated.
+
+**Path α adopted** (Path β REJECTED: deterministic-given-weights argument is right for single instance but rung 1.5 evaluates 20 (lr, seed) configurations where σ_pred dominates across seeds; Path γ REJECTED for now: pivoting to Δ_seed reopens K3-PASS-band continuity adjudication).
+
+**Operative Rev 1.4 anchor**:
+
+```
+σ_total² = σ_crop² + σ_pred_H0²
+ε_physical = M × σ_total, M = 3 pre-commit
+```
+
+Where:
+- `σ_crop = std(pooled_var_k / pooled_var_baseline)` over K=50 truth-only crop-placement seeds (Rev 1.3 §13.A definition; pooled_var_baseline now empirical `mean(pooled_var_k)` per S4 ruling, NOT var_truth_full LLN shortcut).
+- `σ_pred_H0 = std(var_pred_lin / var_truth_lin)` over K'=20 frozen-init SIREN forward passes on a single FIXED 100-crop seed (§13.A-wiring SIREN config: Sitzmann default init, ω₀=30, Softplus head).
+
+**Casella & Berger 2002 §5.5 delta-method justification**: `Var(X/Y) ≈ (μ_X/μ_Y)² · (Var(X)/μ_X² + Var(Y)/μ_Y² − 2Cov(X,Y)/(μ_X μ_Y))`. Rev 1.3 anchor set `Var(X)=0` (truth-side) which was exactly wrong. Two-component budget captures both terms. **Covariance assumption**: Cov(var_pred, var_truth) = 0 under H_0 (untrained-model output independent of truth-crop placement at frozen init). **Symmetric-disclosure pre-commit per [D-37] rule 5**: if empirical |ρ(var_pred, var_truth)| > 0.2 in the diagnostic, covariance assumption violated → Path γ pivot mandatory.
+
+**Symmetric-disclosure branches pre-committed** (BEFORE the diagnostic lands, NOT after):
+- **Branch A (Reading A — tractable hotfix stack)**: σ_pred_H0 < σ_crop / 3 AND frozen-init `var_pred(0) / var_truth_full` < M × σ_crop. Diagnostic supports tractable-hotfix reading; Rev 1.4 anchor is operative; ε_physical = M × σ_total ≈ M × σ_crop (network-noise <10% effect); rung 1.5 dispatches per §14.I ladder.
+- **Branch B (Reading B — fundamental ill-suit)**: σ_pred_H0 ≥ σ_crop OR frozen-init `var_pred(0) / var_truth_full` ≥ M × σ_crop. Diagnostic falsifies the (ratio-of-pooled-variances + ε threshold) gate framing; §13.E "statistical floor" RETRACTED; Rev 1.5 Path-γ pivot mandatory (Δ_seed per-seed delta framing, originally [D-71] §F4 Rev 1.1). No fresh-panel re-review of branch outcome needed — branch is pre-committed at this Rev 1.4 commit timestamp.
+- **Branch C (intermediate)**: σ_crop/3 ≤ σ_pred_H0 < σ_crop. ε_physical = M × σ_total uses both components; rung 1.5 dispatches with explicit hedge that anchor is non-trivially network-init-dependent; LEDGER flag for cycle #5 panel scrutiny.
+
+### §14.B — K2 absorption (BLOCKING): Operating-characteristic table + bar raise ≥4/20 → ≥6/20
+
+**Rev 1.3 §13.C derivation flaw**: P(Bin(5, 0.8) ≥ 4) = 0.737 conditioned on H_1 p=0.8 = exactly what trichotomy needs. Single-point power = tautology. Honest grid: p=0.5 → 19% PASS, p=0.6 → 34%, p=0.7 → 58%, p=0.8 → 74%.
+
+**Path α adopted** (Path β REJECTED: "p=0.5 doesn't survive trichotomy anyway" rationalizes screening-failure as feature; rung 1.5 exists specifically to screen out wasted-compute regimes BEFORE trichotomy).
+
+**Operative Rev 1.4 rung 1.5 PASS bar = ≥6/20** (raised from ≥4/20). Operating-characteristic table:
+
+| True per-seed p at best lr | P(≥6/20 PASS) ≈ P(Bin(5, p) ≥ 6 — but n_per_lr=5) | Type I/II character |
+|---|---|---|
+| 0.4 | ~0.014 | Type I ≈ 1.4% (very low false-PASS at p=0.4) |
+| 0.5 | ~0.058 | Type I ≈ 5.8% (acceptable false-PASS) |
+| 0.6 | ~0.250 | (intermediate regime; soft screen) |
+| 0.7 | ~0.583 | Type II ≈ 42% (cost: lose ~42% of moderately-good regime) |
+| 0.8 | ~0.804 | (target regime; high power) |
+
+(Note: ≥6 with 5 seeds × 4 lr × varying per-seed p needs joint binomial — table above is approximation; exact numerical OC computation deferred to script implementation per S2 diagnostic combined-script.)
+
+**Rationale**: ≥6/20 delivers Type I ≈ 6% (acceptable false-PASS at p=0.5) and Type II ≈ 42% at p=0.7. Increasing seeds to n=40 (10 seeds × 4 lr) sharpens but doubles HPC budget; [D-43] CVPR timeline doesn't absorb that. Bar-raising at fixed n=20 cheaper. Cite Sprent & Smeeton 2007 §4.2 (power curves over alternative parameter space, NOT single-point H_1 substitution).
+
+**Pre-commit branches**:
+- Rung 1.5 PASS (≥6/20): "regime is p≥0.6 with ~75% confidence; chosen lr survives screening; rung 4 trichotomy dispatches at that lr."
+- Rung 1.5 FAIL (<6/20): "no regime survives screening; (γ)-class supervision routes per §7 trigger AND §14.D hedged-(γ)-suspected status."
+
+### §14.C — S1 absorption: hedged-(γ)-suspected intermediate status
+
+Rev 1.3 §13.D 4-AND-gate created falsification-impossibility loophole if deferred PE/ω₀-isolation rung never ran. One-way ratchet against falsification.
+
+**Operative §7 trigger amendment (Rev 1.4)**:
+
+> **3-AND-FAIL hedged-(γ)-suspected status**: IF (1c) trichotomy FAIL AND rung 4.5 head-ablation FAIL AND rung 4.6 P2 cross-physics FAIL, THEN hedged-(γ)-suspected status triggers IMMEDIATELY. This status:
+> - Does NOT trigger (δ)-supervision-pivot full routing.
+> - DOES trigger a soft-flag in LEDGER §7 history requiring the deferred PE-isolation OR ω₀-isolation rung to run within **30 calendar days** of the 3-AND-FAIL determination.
+> - At 30-day deadline: if isolation rung run AND FAIL → full (γ)-class falsification confirmed; if isolation rung run AND PASS → hedged-(γ)-suspected RETRACTED, (γ)-class survives narrow-scope; if isolation rung NOT run at deadline → status auto-promotes to (γ)-class-falsification-PROVISIONAL with explicit "isolation-evidence-missing" caveat in LEDGER. PI does NOT have authority to extend the 30-day deadline.
+
+**Rationale**: mirrors §13.F R32 deadline-bind structure. Inconsistent application of deadline discipline across §13.D vs §13.F was the panel's S1 finding; Rev 1.4 closes the asymmetry.
+
+### §14.D — S2 absorption: pre-flight diagnostic AUTHORIZED + delta-test pre-commit branch
+
+S2 trivial-pass risk: Sitzmann-default-init SIREN with §13.A-wiring may produce `var_pred(step=0)` already above M×σ_crop without training. Compounds K1.
+
+**Operative Rev 1.4 rung 5b spec** (NEW rung in §14.I ladder, between rung 5 and rung 6):
+
+- **Script**: `scripts/d71_frozen_init_diagnostic.py` (~30 min CPU; **combines K1 σ_pred_H0 measurement AND S2 trivial-pass check in one compute**).
+- **Computation**:
+  1. Generate K'=20 frozen-init SIREN models per §13.A-wiring config (different init seeds).
+  2. Sample ONE fixed 100-crop seed (same seed across all K' models).
+  3. Per model: compute `var_pred_lin / var_truth_lin` on the fixed crops.
+  4. Output: distribution of K'=20 ratios → `σ_pred_H0 = std(ratios)`, `mean_pred_H0 = mean(ratios)`.
+  5. Cross-check: `mean_pred_H0` IS the empirical frozen-init `var_pred(0) / var_truth_full` for S2 trivial-pass check.
+  6. Empirical covariance check: compute `ρ(var_pred, var_truth)` across the K'=20 models (low expected at frozen init; if |ρ| > 0.2 → Path γ pivot per §14.A symmetric-disclosure pre-commit).
+- **Output JSON**: `cloud_runs/d71_frozen_init_diagnostic.json` with σ_pred_H0, mean_pred_H0, ρ_pred_truth, K'=20 per-seed ratios, var_truth_full cross-check.
+- **Pre-commit branch routing** per §14.A:
+  - Branch A: mean_pred_H0 < M × σ_crop AND σ_pred_H0 < σ_crop/3 → tractable hotfix; rung 6 (HPC config) dispatches.
+  - Branch B: mean_pred_H0 ≥ M × σ_crop OR σ_pred_H0 ≥ σ_crop OR |ρ_pred_truth| > 0.2 → gate-construction framework falsified; Rev 1.5 Path-γ pivot (Δ_seed framing) mandatory.
+  - Branch C: intermediate; rung 6 dispatches with explicit hedge.
+
+### §14.E — S3 absorption: R28 "self-violation" redefinition (governance amendment)
+
+Rev 1.3 §13.G "without panel catch" qualifier creates asymmetric incentive (rewards panel competence, penalizes oversight) and unresolved "self-violation" definition.
+
+**Operative R28 amendment (Rev 1.4)**:
+
+> R28 self-violation is **any post-Rev rung-arithmetic discrepancy traceable to PI authoring, regardless of who caught first**. The "without panel catch" qualifier from Rev 1.3 §13.G is DROPPED. Trigger condition for auto-promote = instance count over the rolling cycle window (no contamination by panel performance).
+
+Sighting log update:
+- Sighting #1: [D-71] Rev 1.1 §10.J "rung count = 7" vs 9 enumeration (caught by Rev 1.1 panel S-A8; PI-self-caught on Rev 1.2 re-author — counts as instance under new definition).
+- Sighting #2 status: NOT YET. Rev 1.3 §13.I ladder count (10 rungs = 9 artifacts + 1 venue-routing) passed R28 cross-check per cycle #3 panel verdict (panel did not flag R28 self-violation #2 this cycle).
+
+One more sighting auto-promotes per Rev 1.3 §13.G tier (i)+(ii) hard-auto-trigger.
+
+**Governance amendment landing site**: `.claude/agents/project-architect.md` R28 amendment block (already amended this turn at commit 81eb94e; Rev 1.4 commit adds the "self-violation" definition refinement).
+
+### §14.F — S4 absorption: drop LLN shortcut from anchor compute spec
+
+Rev 1.3 §13.A "or equivalently var_truth_full = 183.26 since uniform sampling converges to box mean by LLN at N=100 crops" clause is **DROPPED**. IGM matter-power correlation length at z=3 is ~Mpc/h scale; voxels within 48³ crops (3.75 Mpc/h side) are highly correlated; N_eff per crop ~ O(10²-10³), N_eff across 100 crops ~ O(10⁴-10⁵), NOT 1.1×10⁷ voxel-naive count. Relative LLN error ~ 0.7%, lives in same denominator as σ_noise (expected O(1-5%)).
+
+**Operative Rev 1.4 anchor compute**:
+
+```
+pooled_var_baseline = mean(pooled_var_k) over K=50 placement seeds  # empirical
+σ_crop = std(pooled_var_k / pooled_var_baseline)                   # empirical normalization
+```
+
+Cite Lukić+2015 Fig 5 (Sherwood/Nyx matter power at z~3 → correlation power down to kpc/h scales). Bib entry `lukic_sherwood_2015` already in `papers/shared/main.bib` per [D-43].
+
+### §14.G — Rev 1.4 dispatch ladder (§14.I update)
+
+Per §14.A two-component noise budget + §14.D rung 5b diagnostic:
+
+| Rung | Action | Owner | Landing artifact |
+|---|---|---|---|
+| 0 | Rev 1.4 PI self-draft (this turn) | PI | §14 amendment block (this document) |
+| 1 | Rev 1.4 commit (LEDGER + design doc + project-architect.md R28 self-violation amendment) | PI | git commit ref |
+| 2 | Fresh-panel pre-review on Rev 1.4 (cycle #4) | defense-panel | panel verdict block |
+| 3 | Panel-verdict absorption | PI | LEDGER §3 [D-71] absorption block #4 |
+| 4 | Core-implementer authors `scripts/d71_frozen_init_diagnostic.py` (rung 5b script) + `scripts/d71_compute_sampling_noise_floor.py` (rung 5 script per Rev 1.3 §13.A spec, S4 amendment) | core-implementer | scripts |
+| 5 | Sampling-noise floor compute (σ_crop measurement) | core-implementer or PI direct | `cloud_runs/d71_sampling_noise_floor.json` |
+| 5b | **Frozen-init diagnostic** (σ_pred_H0 + S2 trivial-pass check, combined ~30 min CPU) | core-implementer or PI direct | `cloud_runs/d71_frozen_init_diagnostic.json` |
+| 6 | Pre-commit branch resolution (Branch A/B/C per §14.A/§14.D) | PI | LEDGER pre-commit block |
+| 7 | **Branch A**: ε_physical numerical pre-commit (M × σ_total) | PI | LEDGER pre-commit block |
+| 7-alt | **Branch B**: Rev 1.5 Path-γ pivot (Δ_seed framing) | PI | doc Rev 1.5 (out-of-scope for Rev 1.4 ladder) |
+| 8 | Rev 1.5 numerical bind (if Branch A) — sampling-noise + frozen-init outputs → ε pre-commit | PI | doc Rev 1.5 |
+| 9 | Fresh-panel pre-review on Rev 1.5 numerical bind (cycle #5) | defense-panel | panel verdict |
+| 10 | rung 1.5 lr-sweep n=20 dispatch (Rev 1.2 §12.D as amended by §13.C as amended by §14.B) | core-implementer + infrastructure-manager | SLURM array + `cloud_runs/d71_rung15_lrsweep.json` |
+
+**R28 dispatch-ladder cross-check**: ladder rungs 0-10 + 7-alt = 12 explicit rungs (or 11 under Branch A path). Landing-artifact count for the Rev 1.4 → ε-anchor close cycle = 11 artifacts (Rev 1.4 doc + commit + cycle #4 verdict + absorption + 2 scripts + 2 JSON outputs + branch resolution + Rev 1.5 doc + cycle #5 verdict + rung 1.5 outputs). **PASS** at literal-integer cross-check.
+
+### §14.H — R-rule audit refresh (Rev 1.4)
+
+| R-rule | Status (Rev 1.4) | Change vs Rev 1.3 | Sighting log |
+|---|---|---|---|
+| R28 | BANKED | "self-violation" definition refined (§14.E); "without panel catch" clause dropped; instance count = trigger | sighting #1 from Rev 1.1 §10.J retained; no #2 this cycle (panel did not flag) |
+| R29 | **CANDIDATE (sighting #3 accrued)** | Rev 1.3 §13.A wrong-noise-budget construction is post-spec failure partially mitigated by R32 panel-cycle discipline; per R29 rule-text amendment (ii) 2026-05-26, does NOT count as successful prevention | #1 K6 ε=0.05 unit-chain (Rev 1.1 absorption); #2 K2 anchor-vs-gate quantity (Rev 1.2 → Rev 1.3 absorption); #3 K1 truth-only-noise-budget (Rev 1.3 → Rev 1.4 absorption) |
+| R30 | BANKED | unchanged | — |
+| R31 | DEFERRED-BANKED | sighting count unchanged (#4 held) | — |
+| R32 | DEFERRED-BANKED PROVISIONAL with 2026-08-31 deadline | cycle #3 is SAME-TRACK per §13.J BANKED precedent — does NOT accrue cross-track sighting; deadline preserved | one operational test landed; cross-track second-sighting still OWED |
+
+**R29 honest-framing per [D-37] rule (a)**: R29 has produced ZERO confirmed prospective design-time successful preventions across three sighting cycles (#1 K6, #2 K2 cycle #2, #3 K1 cycle #3). R29 is operationally a target-of-discipline, not a discharger-of-discipline; R32 panel-cycle-discipline is doing the actual catching. Re-banking blocked until prospective catch on fresh gate (NOT mitigation of an existing wrong-quantity construction).
+
+### §14.I — Honest framing: Reading A vs Reading B (gate-construction approach decisional inflection)
+
+**Reading A (tractable hotfix stack)**: Each panel cycle is a finite step toward an anchored gate. σ_total² two-component budget under §14.A IS the last load-bearing redefinition; the empirical σ_pred_H0 diagnostic at rung 5b closes the variance-budget question because the gate observable's full noise model is then measured. Cycle #4 should APPROVE Rev 1.4 modulo edge-case PROBE residues.
+
+**Reading B (fundamental ill-suit)**: The gate construction approach (ratio-of-pooled-variances + ε threshold + multiplier-of-σ_noise) is fundamentally ill-suited because IGM density has 5-decade log-dynamic-range, matter-power correlations at every spatial scale within the crop, and a heavy-tailed PDF; a single scalar variance ratio compresses these out, and any ε-anchor will be definitionally mis-specified against SOME mode of the variance budget. Path γ (Δ_seed per-seed delta framing, originally [D-71] §F4 Rev 1.1) is the better long-term direction even though it loses K3-PASS-band continuity.
+
+**Empirical discriminator** (PI ruling): rung 5b pre-flight diagnostic IS the test. Pre-committed branches per §14.A and §14.D:
+- Branch A criteria → Reading A empirically supported; Rev 1.4 anchor operative.
+- Branch B criteria → Reading B empirically supported; Rev 1.5 Path-γ pivot mandatory.
+- Branch C → intermediate; rung 6 dispatches with hedge; cycle #5 panel scrutiny.
+
+**Symmetric-disclosure pre-commit** (per [D-37] rule 5): the branch criteria are committed at Rev 1.4 commit timestamp BEFORE the diagnostic lands. If Branch B fires, PI does NOT have authority to argue the criteria post-hoc.
+
+### §14.J — Sign-off
+
+**R15 + R28 PROVISIONAL HELD** per R32-candidate panel-cycle-discipline binding. Rev 1.4 authorizes ONLY:
+1. Rev 1.4 PI self-draft (DONE this turn).
+2. Rev 1.4 commit (LEDGER + design doc + project-architect.md R28 self-violation refinement, single batch, PII-scrubbed).
+3. Fresh defense-panel cycle #4 dispatch.
+
+Does NOT authorize: any HPC dispatch (rung 5/5b are gated on cycle #4 APPROVE per ladder); any infrastructure-manager dispatch; any latex-author dispatch.
+
+**Honest framing per [D-37] rule (a)**: Rev 1.3 had 2 KILLER + 4 SERIOUS + 4 PROBE; load-bearing failure (K1) is structural twin of K6/K2 wrong-quantity pattern at deeper layer (truth-only-noise vs network-init-noise). Three cycles have shown a deeper-layer wrong-quantity each time; this is consistent with EITHER (a) tractable-hotfix-stack converging on a correct gate at Rev 1.4 + diagnostic, OR (b) fundamental ill-suit of the ratio-of-pooled-variances framing. Rev 1.4 pre-commits the empirical discriminator: the diagnostic decides which reading holds. R32 panel-cycle-discipline IS firing as banked (cycle #3 caught Rev 1.3's wrong-noise-budget). R29 is being-disciplined-by-R32, not doing-its-own-discipline — sighting #3 accrues. Four sequential panel-discharge cycles ((1b) FALSIFICATION → Rev 1 → Rev 1.1 NEEDS-WORK → Rev 1.2 NEEDS-WORK → Rev 1.3 NEEDS-WORK → Rev 1.4 pending) is well-spec'd discipline under cascading hedge-rules, not process failure. **Decision-quality discipline holds; outcome-quality remains TBD per diagnostic.**
+

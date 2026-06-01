@@ -500,6 +500,21 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     instance). One more self-violation auto-promotes. Cite: LEDGER §3
     [D-71] Rev 1.2 → Rev 1.3 absorption 2026-05-31.
 
+    **R28 self-violation definition refinement (2026-05-31 per [D-71]
+    Rev 1.3 panel S3)**: prior Rev 1.3 §13.G "without panel catch"
+    qualifier creates asymmetric incentive (rewards panel competence,
+    penalizes oversight). DROPPED. Operative definition:
+
+    > R28 self-violation = ANY post-Rev rung-arithmetic discrepancy
+    > traceable to PI authoring, regardless of who caught first. Trigger
+    > condition for auto-promote = instance count over rolling cycle
+    > window (no contamination by panel performance).
+
+    Sighting #1 retained under new definition (PI-self-caught on Rev 1.2
+    re-author counts). One more sighting auto-promotes per the Rev 1.2
+    §12.G / Rev 1.3 §13.G tier (i)+(ii) hard-auto-trigger. Cite: LEDGER
+    §3 [D-71] Rev 1.3 → Rev 1.4 absorption 2026-05-31.
+
 29. **Gate-construction-vs-production-framing audit (CANDIDATE per
     R29-promotion panel verdict 2026-05-26 (b) NEGATIVE; full demotion
     from BANKED).** Status history: candidate-banked at [D-67] 2026-05-24;
