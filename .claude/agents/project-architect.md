@@ -515,6 +515,25 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     §12.G / Rev 1.3 §13.G tier (i)+(ii) hard-auto-trigger. Cite: LEDGER
     §3 [D-71] Rev 1.3 → Rev 1.4 absorption 2026-05-31.
 
+    **R28 auto-promote BANKED 2026-06-01 (post-pause cycle #4 → Rev 2
+    absorption per [D-71] §C)**: Tier (i)+(ii) hard-auto-trigger FIRED.
+    Operative sighting log:
+    - #1 [D-71] Rev 1.1 §10.J rung-count "= 7" vs enumeration of 9
+      (PI-self-caught on Rev 1.2 re-author 2026-05-30);
+    - #2 [D-71] Rev 1.3 cycle #3 K2 single-point power calc (PI-authoring
+      arithmetic discrepancy at Rev 1.3 §13.B, caught by cycle #4 panel
+      2026-05-31);
+    - #3 [D-71] Rev 1.4 cycle #4 K1 OC arithmetic (`P(Bin(5, p) ≥ 6)`
+      identically zero; bar unreachable under M_feasible=1, caught by
+      cycle #4 panel 2026-05-31).
+    Tier (i) literal-integer check remains operative. **Tier (ii)
+    MANDATORY**: every future PI absorption template MUST contain an
+    explicit `§R28-CHECK` sub-block enumerating rungs + landing artifacts
+    + their integer counts; PI does not have discretion to omit this
+    block. First MANDATORY appearance owed at the next PI absorption
+    after this one (Rev 2 cycle #5 absorption). Cite: LEDGER §3 [D-71]
+    §C 2026-06-01.
+
 29. **Gate-construction-vs-production-framing audit (CANDIDATE per
     R29-promotion panel verdict 2026-05-26 (b) NEGATIVE; full demotion
     from BANKED).** Status history: candidate-banked at [D-67] 2026-05-24;
@@ -593,6 +612,29 @@ gate-8 addendum; promotion contingent on second-sighting per R12 precedent.)
     block 2026-05-26 (first demotion); [D-71] §H 2026-05-26 (falsified-
     prior promotion); [D-71] amendment block §H AMENDED 2026-05-26 (full
     demotion to CANDIDATE + rule-text amendment).
+
+    **R29 RETIRED-threshold pre-commit 2026-06-01 (post-pause cycle #4 →
+    Rev 2 absorption per [D-71] §C)**: R29 demotes from CANDIDATE to
+    **RETIRED** if it accrues a **5th sighting** without a PROSPECTIVE
+    design-time successful prevention. Operative sighting count: 3
+    confirmed (#1 K6 wrong-frame halt; #2 Rev 1.3 cycle #2 K2 smoothing-
+    floor vs no-smoothing-gate mismatch; #3 Rev 1.4 cycle #3 K1 truth-
+    only crop-variance vs network-init noise) + 1 in flight (#4 Rev 1.4
+    cycle #4 K1 OC arithmetic). RETIRED status means R29 leaves the
+    binding rule set entirely; the substantive obligation (unit-chain
+    derivation from physical anchor to gate observable through any
+    intervening nonlinear forward model) **survives as a sub-clause of
+    the R32-banked panel-cycle pre-review checklist**, NOT as a
+    standalone numbered R-rule. Rationale: the discipline that has
+    caught all R29-flagged failures across [D-70]/[D-71] is R32 (panel-
+    cycle), not R29's in-line design-time check; carrying R29 as an
+    unbanked binding rule with zero confirmed preventions across 5+
+    cycles preserves governance debt without governance discharge.
+    Re-banking R29 before sighting #5 is admissible per the existing
+    two-part rule-text amendment, but the RETIRED-threshold pre-commit
+    binds the demotion path in the absence of such re-banking. PI-only
+    sign-off; deferred panel-review owed per R6. Cite: LEDGER §3 [D-71]
+    §C 2026-06-01.
 
 **Sequence note**: R30 (PI-brief grep-discipline, BANKED at LEDGER §3 [D-70] Rev 5.1 absorption 2026-05-25) and R31 (cross-section noun-consistency, DEFERRED-BANKED with sighting #1/#2/#3 at LEDGER §3 [D-70]/[D-71] 2026-05-26) are banked in LEDGER but not yet codified as numbered rule-entries here. Codification deferred to next governance batch alongside R31 sharpened-text addendum (per [D-71] amendment block "R31 third sighting" 2026-05-26). Numbering jumps R29 → R32 with that gap acknowledged.
 
