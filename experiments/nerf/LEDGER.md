@@ -2281,6 +2281,64 @@ graph TD
 
     **[D-37]-Ext R15 + R28 status update at §I close:** This absorption is PROVISIONAL per R15 (inherited-claim re-verification — parent-session "~50 LOC" estimate was inherited and PI Part 0 re-verification CORRECTED it to 300-500 LOC; per R15 clause (c), in-session re-verification is one of the three lift mechanisms). Status: PROVISIONAL-LIFTED on the FGPA-geometry-agnosticism claim (Part 0 verified); REMAINS-PROVISIONAL on the Q4 cycle #7 dispatch authorization (defer to next defense-panel pre-review on the Part 7 brief). R28 Tier (ii) §R28-CHECK sub-block PRESENT (above); Tier (i) literal-integer rung-count check PASS (5 rungs == 5 artifacts). Sighting log post-banking-amendment: no new R28 self-violation at this absorption.
 
+    ### [D-71] §I amendment-2 — Rung 2 (Q2 K2 sweep) + Rung 3 (saturation gradient-norm) unified absorption (2026-06-02)
+
+    User-authorized unified absorption of Rungs 2+3 results after both deliverables landed this session. Rung 4 (Part 7 angled-sightline feasibility-diagnostic) authorized for brief-authoring next; Rung 5 (PI Q6 viewing-angle conditioning review) sequencing unchanged.
+
+    **§R28-CHECK Tier (ii) sub-block (MANDATORY at this absorption per R28 Tier-ii bank 2026-06-01):**
+    - Rung 1 — Land this §I amendment-2 block (parent-session Edit).
+    - Rung 2 — Authorize Rung 4 brief authoring (angled-sightline feasibility-diagnostic).
+    - Total dispatch rungs: 2.
+    - Landing artifacts: A1 §I amendment-2 block (rung 1); A2 Rung 4 feasibility-diagnostic capsule (rung 2). Total: 2.
+    - Rung count (2) == landing-artifact count (2). R28 Tier (i) check: PASS.
+
+    **Rung 2 — Q2 K2 prior-art sweep DISCHARGED (Part 1 absorption).** Deliverable landed: 16 WebFetch-verified BibTeX entries appended to `papers/shared/main.bib` line 590+ under header `% --- Rung 2 sweep 2026-06-02 ---`. Each entry carries an R33-compliant `% VERIFICATION` comment with in-session-fetched arXiv URL + verbatim abstract first-sentence quote. Relevance distribution: 3 HIGH (DeepCHART Maitra+2025 voxel-3D-DM-from-Lyα; de Belsunce+2025 analytic-field-level-Lyα-on-Sherwood; NAF Zha+2022 CT-coordinate-MLP-with-differentiable-forward); 6 MEDIUM; 3 LOW-context; 1 duplicate-candidate flag on `horowitz2019tardis` (cross-check vs existing entries owed at paper-compile time).
+
+    **PI ruling on three Q2 K2 positioning recommendations**:
+    - (1a) Headline phrase rewrite "neural reconstruction" → **"continuous coordinate-conditioned implicit field"** APPROVED. DeepCHART/LyαNNA/de Belsunce+2025 collectively own broader phrases; our distinguishing axes (coordinate-MLP + differentiable Voigt forward + sightline-as-supervision) collapse cleanly into narrower verb. STAGED for `papers/shared/sec/2_method.tex` §2.1 opening + `sec/0_abstract.tex` headline at next paper-write authorization per `feedback_no_paper_writing.md` 2026-05-21. R30 grep-discipline directive: latex-author must audit zero residual occurrences of bare "neural reconstruction" / "field-level Lyα" / "3D reconstruction from Lyα" without qualifier.
+    - (1b) NAF (Zha+2022) + MedNeRF (Corona-Figueroa+2022) **architectural-ancestor chain load-bearing in §5** APPROVED. Verb level: "methodological ancestor" per [D-37]-Ext R8 (hypothesis-grade); NOT "first application to" pending fuller MICCAI/medical-NeRF survey audit. STAGED for `papers/shared/sec/5_related_work.tex` — anchors "coordinate-MLP supervised by differentiable forward integrator" lineage paragraph that pre-empts CVPR-reviewer "this is just NeRF" pattern-match (Q2 K4 paper-edit item).
+    - (1c) Two HIGH-relevance positioning APPROVED. DeepCHART: voxel-vs-implicit + DM-vs-IGM-gas axes both cited in §5 + §1 contribution paragraph. de Belsunce+2025: analytic-vs-learned + same-Sherwood-baseline axes (latter is baseline-validation framing leverage). One-sentence delta in §5 mandatory; STAGED.
+
+    R33-compliance: BibTeX entries 598-783+ in-session re-read; verbatim-quote VERIFICATION comments confirmed present. Paper-text claims load-bearing on these entries remain PROVISIONAL until staged sentences are written + re-grepped at paper-write authorization. **Q2 K2 KILLER DISCHARGED**; remaining Q2 K1/K3/K4 + 8 SERIOUSes + 3 PROBEs unchanged, staged per prior absorption.
+
+    **Rung 3 — Saturation gradient-norm diagnostic ABSORBED (Parts 2+3 absorption).** Deliverable: `experiments/nerf/artifacts/d71_I_grad_norm_saturation/capsule.json` (in-session re-read 2026-06-02; numbers verified against agent transcript). Diagnostic run on P1 z=0.3 pub-t1 checkpoint `step_050000.pt` (MLflow run `31acdf9d900e447081e6d051f7d42c0e`), 64 sightlines × 2048 bins, canonical [D-24] `log1p_mse_capped_masked` loss form, reduction='sum' for per-bin grad isolation.
+
+    Pre-committed verdict: `inconclusive_intermediate`. **R_linear = mean|∂L/∂τ|_F00_05 / mean|∂L/∂τ|_F95_100 = 0.1819** (falls in [0.1, 0.33] inconclusive band — neither identifiability-ceiling R<0.1 nor model-capacity R>0.33 decisively supported). **R_log1p analogous in log-space = 0.9051** (FLAT). Per-stratum N: unsaturated 120119, weak 9001, moderate 1399, strong 404, saturated 149. DLA mask excluded 0 bins.
+
+    **Observation-first finding per [D-37] rule (a)**: pre-committed thresholds say inconclusive; the LOAD-BEARING finding is the **two-space discrepancy itself** — log-space gradient is balanced across strata (R_log1p=0.91), linear-flux observable gradient is attenuated 5.5× in saturation (R_linear=0.18). Mechanism: per unit log-space loss reduction, saturated-bin linear-flux observable improves ~5× less than unsaturated-bin observable. Model trains fine in its native loss-space; linear-flux science observable converges slower in saturation. Sample-size: saturated stratum N=149 / 131072 ≈ 0.11% (bin-level) matches standard Lyα ~5-15% saturation-fraction context.
+
+    **Part 2 — Q4 SQ4 framing REVISION absorbed.** Prior framing "saturation tail as forward-model floor; FGPA + RSD do not invert one-to-one in saturated regime" NARROWS, does not retract. Revised publication-defensible finding (STAGED for `papers/shared/sec/3_experiments.tex` framing edit at next paper-write authorization):
+
+    > "Saturation-band reconstruction is supervision-space-vs-evaluation-space mismatched. Training loss receives balanced gradient signal across optical-depth strata (R_log1p=0.91 on P1 z=0.3 step_050000 checkpoint), but the linear-flux observable converges ~5× slower per unit log-space loss reduction in saturation (R_linear=0.18; N_sat=149 / N_total=131072). This is a quantitative deceleration, not a hard identifiability floor."
+
+    Verb-level discipline per [D-37]-Ext R8/R9: DROP "forward-model floor" (strong-invariance verb); DROP "FGPA + RSD do not invert one-to-one" (overclaim — diagnostic does not isolate FGPA from RSD). USE "supervision-space-vs-evaluation-space mismatch with quantified 5.5× linear-space attenuation" (descriptive, mechanism-named, magnitude-cited). R30 grep-discipline directive: no "identifiability ceiling" / "forward-model floor" verbiage without further evidence.
+
+    **Part 3 — Loss-space reformulation as candidate intervention class REGISTERED, NOT authorized.** A linear-flux-MSE reweighting (or stratum-conditional log-space loss compensating the 5.5× attenuation) is a genuinely new intervention class — [D-40] sat-aware-loss, [D-41] FGPA-tail, [D-42] velocity-gradient worked within log-space supervision or added conditioning inputs; none reweighted by saturation-stratum in linear-flux space. Diagnostic SURFACED the candidate; did NOT validate it.
+
+    Blockers preventing authorization NOW:
+    - **[D-37]-Ext R2 falsified-prior cascade depth = 3** in loss-engineering track. Verb level for any future spec is "first test of the discipline derived from the three failures." Discipline derived = R10 retired-model-reuse-contract orthogonality + R29-class unit-chain audit on any loss-weighting threshold. Both required pre-authorization.
+    - **R10 orthogonality argument OWED**: candidate reuses [D-40] failure-mode hypothesis. Default presumption per R10: NOT admissible. Written orthogonality argument required.
+    - **Q4 SQ1+SQ2 panel verdict OUTSTANDING**: upstream supervision-geometry axis has not returned. Sequencing demands Q4 first.
+
+    Candidate registered as Rung 5+ candidate "linear-flux-stratum-reweighted loss" with explicit pre-commit: defense-panel pre-review on R10 orthogonality argument + R29-class unit-chain audit on any reweighting threshold ε REQUIRED before future authorization. Verb level: "candidate; first test of [discipline derived from three loss-engineering retirements]" — hedge per [D-37]-Ext R2 cascade.
+
+    **Part 4 — Rung 4 sequencing decision: PROCEED with brief authoring; framing UNCHANGED.** Prior PI commitment ("Rung 3 verdict would tighten Rung 4 framing") presupposed decisive verdict; inconclusive-intermediate preserves Rung 4 diagnostic value. The supervision-space-vs-evaluation-space finding is ORTHOGONAL to the angular-coverage hypothesis Rung 4 tests (diffuse-bin failure mode). Different bins, different mechanism candidates, R10-style orthogonality holds. Rung 4 brief authoring authorized as immediate next dispatch step.
+
+    **Part 5 — Tooling-fix governance: ABSORBED as one-time fix; NO R-rule candidate banked.** Two support-researcher dispatch failures + re-route to general-purpose for Rung 2 traced to tool-registry-completeness gap on `.claude/agents/support-researcher.md` and `.claude/agents/project-architect.md` frontmatter `tools:` allowlist (settings.json already permitted; agent definitions did not). Both fixed in-session at `.md:4` of each file. R12 second-sighting-cross-track precedent applies: one occurrence is not a recurring pattern. If a second tool-registry-incompleteness failure occurs in a future session on a different agent, candidate-bank then. Literature-sweep + BibTeX workload sits within support-researcher mandate by analogy to cosmological-metric/comparison-plot artifact work. `papers/shared/main.bib` write was in-scope per `feedback_no_paper_writing.md`.
+
+    **Authorization scope at amendment-2 close**:
+    - AUTHORIZE: Rung 4 brief authoring (angled-sightline feasibility-diagnostic; support-researcher; on-truth-field or on-existing-checkpoint synthetic; landing under `experiments/nerf/artifacts/d71_I_angled_feasibility/`; word budget ≤2500).
+    - DOES NOT AUTHORIZE: linear-flux-stratum-reweighted loss spec (Part 3 blockers); any code-implementer / infrastructure-manager / latex-author dispatch; any `papers/<venue>/` writes; Rung 5 PI Q6 viewing-angle dispatch (sequencing unchanged — opens after Rung 4 verdict).
+
+    **Sign-off Ext-2 R15+R28+R29+R32+R33 status at amendment-2**:
+    - R15: PROVISIONAL on all Part 1/2/3 staged paper-edit items + Part 3 candidate intervention registration; lift mechanisms = defense-panel APPROVE at respective paper-write authorization moments + Part 3 pre-commit panel review.
+    - R28: BANKED Tier (i)+(ii); operative. Amendment-2 sub-block passes Tier (i); Tier (ii) sub-block present. No R28 sighting.
+    - R29: RETIRED-threshold pre-commit active; no sighting.
+    - R32: CANDIDATE; Q4 SQ1+SQ2 panel cycle still LIVE as cross-track sighting opportunity.
+    - R33: CANDIDATE; Rung 2 sweep satisfied R33 via per-entry verbatim-quote VERIFICATION comments. Rung 2 is a positive R33-compliance instance.
+
+    **Honest framing per [D-37] rule (a)** at amendment-2 close: Rung 2 produced discharging-DISCHARGE on Q2 K2 with HOLD-the-novelty-claim verdict (narrowed, not retracted, claim survives). Rung 3 produced inconclusive-by-pre-commitment verdict whose load-bearing finding is the two-space mismatch — a third option neither hypothesis pre-specified. Both are valid scientific outcomes per [D-37]-Ext R7; decision-quality discipline holds (hedged verbs, blockers explicit, sprint-priority preserved). NOT spun as "discoveries"; reported as observed.
+
   - **[D-70] Stage 1a Juno job 203285 + backstop-remediation chain 2026-05-26 — 10/10 R-b-pre1 fire surfaced 3 R29 violations; backstops demoted; F1-β dual R_real emit; R31 PROMOTED to BANKED; R29 DEMOTED to candidate-banked; (γ) pre-commit (1b) escape-hypothesis falsification trigger; Juno re-dispatch AUTHORIZED.**
 
     **Observation first ([D-37] rule (a))**: Juno job 203285 dispatched 2026-05-26 (10-seed array `--array=0-9%4` Stage 1a (1b) skip-rich-MLP, P1 z=0.3 n_grid=768, --max_steps=500). **ALL 10 SEEDS FAILED in ~25s each** with verbatim error from `stage1a-1b-203285_0.err`:

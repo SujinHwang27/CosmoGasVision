@@ -585,3 +585,301 @@
   doi={10.3847/1538-4365/aace58},
   publisher={IOP Publishing}
 }
+
+% --- Rung 2 sweep 2026-06-02 ---
+% Prior-art literature sweep for the CVPR "1 NeRF per box" contribution claim.
+% Each entry below was in-session WebFetch-verified against the arXiv abstract
+% page on 2026-06-02; verbatim title + first-sentence-of-abstract recorded in
+% the % VERIFICATION line. RELEVANCE tags assess overlap with the
+% coordinate-conditioned MLP + differentiable Voigt forward integrator framing.
+
+% ----- Category A: direct Lyα-forest field-level / reconstruction competitors
+
+@article{maitra2025deepchart,
+  title        = {{DeepCHART}: Mapping the {3D} dark matter density field from {L}y$\alpha$ forest surveys using deep learning},
+  author       = {Maitra, Soumak and Viel, Matteo and Kulkarni, Girish},
+  journal      = {arXiv preprint (submitted to MNRAS)},
+  year         = {2025},
+  doi          = {10.48550/arXiv.2507.00135},
+  eprint       = {2507.00135},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: HIGH (direct competitor — Lyα forest -> 3D field reconstruction).
+% Architectural differentiation: voxel-grid 3D VAE+U-Net (supervised regression),
+% NOT a coordinate-MLP / implicit field; target is DM density, not IGM gas.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2507.00135. Verbatim abstract
+% first sentence: "We present DeepCHART (Deep learning for Cosmological
+% Heterogeneity and Astrophysical Reconstruction via Tomography), a deep
+% learning framework designed to reconstruct the three-dimensional dark matter
+% density field at redshift z=2.5 from Lyα forest spectra."
+
+@article{debelsunce2025fieldlevel,
+  title        = {Modeling the Cosmological {L}yman-$\alpha$ Forest at the Field Level},
+  author       = {de Belsunce, Roger and Ivanov, Mikhail M. and Sullivan, James M. and Akitsu, Kazuyuki and Chen, Shi-Fan},
+  journal      = {arXiv preprint},
+  year         = {2025},
+  doi          = {10.48550/arXiv.2507.00284},
+  eprint       = {2507.00284},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: HIGH (direct competitor — field-level Lyα forest forward model,
+% baselined against Sherwood). Architectural differentiation: analytic
+% perturbative forward model (no neural network); our NeRF is a learned
+% coordinate-MLP, not analytic. Closest match for "what is field-level Lyα" but
+% does not use neural-implicit machinery.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2507.00284. Verbatim abstract
+% first sentence: "The distribution of absorption lines in the spectra of
+% distant quasars, called the Lyman-α (Ly-α) forest, is a unique probe of
+% cosmology and the intergalactic medium at high redshifts and small scales."
+% Verbatim Sherwood reference: "Our model shows a remarkable performance when
+% compared with the Sherwood hydrodynamic simulations".
+
+@article{nayak2024lyanna,
+  title        = {{Ly}$\alpha${NNA}: A Deep Learning Field-level Inference Machine for the {L}yman-$\alpha$ Forest},
+  author       = {Nayak, Parth and Walther, Michael and Gruen, Daniel and Adiraju, Sreyas},
+  journal      = {Astronomy \& Astrophysics},
+  volume       = {689},
+  pages        = {A153},
+  year         = {2024},
+  doi          = {10.1051/0004-6361/202348485},
+  eprint       = {2311.02167},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: HIGH (direct competitor framing — "field-level inference Lyα").
+% Architectural differentiation: 1D ResNet on sightline spectra, infers
+% thermal-IGM parameters (T0, gamma); NOT a 3D field reconstruction and NOT a
+% coordinate-conditioned implicit field. Distinct contribution surface.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2311.02167. Verbatim abstract
+% first sentence: "The inference of astrophysical and cosmological properties
+% from the Lyman-α forest conventionally relies on summary statistics of the
+% transmission field that carry useful but limited information."
+
+@article{nayak2025lyanna2,
+  title        = {{Ly}$\alpha${NNA II}: Field-level inference with noisy {L}y$\alpha$ forest spectra},
+  author       = {Nayak, Parth and Walther, Michael and Gruen, Daniel},
+  journal      = {arXiv preprint (submitted to A\&A)},
+  year         = {2025},
+  doi          = {10.48550/arXiv.2510.19899},
+  eprint       = {2510.19899},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (follow-up to lyanna; same architecture, noise extension).
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2510.19899. Verbatim abstract
+% first sentence: "Deep learning (DL) has been shown to outperform traditional,
+% human-defined summary statistics of the Lyα forest in constraining key
+% astrophysical and cosmological parameters owing to its ability to tap into
+% the realm of non-Gaussian information."
+
+@article{huang2021deepforest,
+  title        = {Deep forest: Neural network reconstruction of the {L}yman-$\alpha$ forest},
+  author       = {Huang, Lawrence and Croft, Rupert A. C. and Arora, Hitesh},
+  journal      = {Monthly Notices of the Royal Astronomical Society},
+  volume       = {506},
+  number       = {4},
+  pages        = {5212--5222},
+  year         = {2021},
+  doi          = {10.1093/mnras/stab2041},
+  eprint       = {2009.10673},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (1D sightline reconstruction precursor, not 3D).
+% Architectural differentiation: sightline-by-sightline 1D NN that recovers tau
+% from observed flux; does not represent a 3D continuous field.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2009.10673. Verbatim abstract
+% first sentence: "We explore the use of Deep Learning to infer physical
+% quantities from the observable transmitted flux in the Lyman-alpha forest."
+
+@article{nasir2024deeplearning_igm,
+  title        = {Deep Learning the Intergalactic Medium using {L}yman-$\alpha$ Forest at $4 \leq z \leq 5$},
+  author       = {Nasir, Fahad and Gaikwad, Prakash and Davies, Frederick B. and Bolton, James S. and Puchwein, Ewald and Bosman, Sarah E. I.},
+  journal      = {Monthly Notices of the Royal Astronomical Society},
+  volume       = {534},
+  number       = {2},
+  pages        = {1299},
+  year         = {2024},
+  doi          = {10.48550/arXiv.2404.05794},
+  eprint       = {2404.05794},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (Sherwood-Relics-trained pixel-level IGM regression).
+% Architectural differentiation: CNN/ResNet pixel-wise regression of optical
+% depth-weighted density/temperature; NOT a 3D coordinate-MLP field.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2404.05794. Verbatim abstract
+% first sentence: "Unveiling the thermal history of the intergalactic medium
+% (IGM) at $4 \leq z \leq 5$ holds the potential to reveal early onset HeII
+% reionization or lingering thermal fluctuations from HI reionization."
+
+@article{cabayol2023p1d_emulator,
+  title        = {A neural network emulator for the {L}yman-$\alpha$ {1D} flux power spectrum},
+  author       = {Cabayol-Garcia, Laura and Chaves-Montero, Jon{\'a}s and Font-Ribera, Andreu and Pedersen, Christian},
+  journal      = {Monthly Notices of the Royal Astronomical Society},
+  volume       = {525},
+  number       = {3},
+  pages        = {3499--3515},
+  year         = {2023},
+  doi          = {10.1093/mnras/stad2512},
+  eprint       = {2305.19064},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: LOW (emulator of summary statistic P1D, not field reconstruction).
+% Added for related-work positioning; architectural distance from our NeRF is
+% large (regression on cosmological-state vector, not coordinate-conditioned).
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2305.19064. Verbatim abstract
+% first sentence: "The Lyman-$α$ forest offers a unique avenue for studying the
+% distribution of matter in the high redshift universe and extracting precise
+% constraints on the nature of dark matter, neutrino masses, and other
+% $\Lambda$CDM extensions."
+
+@article{hafezianzadeh2025hydroemu,
+  title        = {An {AI} super-resolution field emulator for cosmological hydrodynamics: the {L}yman-$\alpha$ forest},
+  author       = {Hafezianzadeh, Fatemeh and Zhang, Xiaowen and Ni, Yueying and Croft, Rupert A. C. and Di Matteo, Tiziana and Qezlou, Mahdi and Bird, Simeon},
+  journal      = {arXiv preprint},
+  year         = {2025},
+  doi          = {10.48550/arXiv.2507.16189},
+  eprint       = {2507.16189},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (3D baryonic-field emulator for Lyα observables, super-res).
+% Architectural differentiation: two-stage generator+emulator on 3D voxel
+% cubes, not coordinate-MLP; inputs are LR sim + HR ICs, not observed
+% sightlines.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2507.16189. Verbatim abstract
+% first sentence: "We extend our super-resolution and emulation framework for
+% cosmological dark matter simulations to include hydrodynamics."
+
+@article{jacobus2024gigaparsec,
+  title        = {A Gigaparsec-Scale Hydrodynamic Volume Reconstructed with Deep Learning},
+  author       = {Jacobus, Cooper and de Belsunce, Roger and Chabanier, Solene and Harrington, Peter and Emberson, J. D. and Luki{\'c}, Zarija and Habib, Salman},
+  journal      = {arXiv preprint},
+  year         = {2024},
+  doi          = {10.48550/arXiv.2411.16920},
+  eprint       = {2411.16920},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (Gpc-volume reconstruction for DESI/Spec-S5 Lyα forecasting,
+% hybrid physics+DL). Architecture details (CNN vs other) not in abstract;
+% framed as super-resolution-style hybrid, not coordinate-MLP.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2411.16920. Verbatim abstract
+% first sentence: "The next generation of cosmological spectroscopic sky
+% surveys will probe the distribution of matter across several Gigaparsecs
+% (Gpc) or many billion light-years."
+
+% ----- Category B: cosmological-field neural representation (non-Lyα)
+
+@article{kvasiuk2024gnncnn,
+  title        = {Reconstruction of Continuous Cosmological Fields from Discrete Tracers with Graph Neural Networks},
+  author       = {Kvasiuk, Yurii and Krywonos, Jordan and Johnson, Matthew C. and M{\"u}nchmeyer, Moritz},
+  booktitle    = {Machine Learning and the Physical Sciences Workshop, NeurIPS 2024},
+  journal      = {arXiv preprint (ML4PS @ NeurIPS 2024)},
+  year         = {2024},
+  doi          = {10.48550/arXiv.2411.02496},
+  eprint       = {2411.02496},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (continuous-field reconstruction from discrete probes, but
+% input is galaxy tracers not Lyα sightlines, and architecture is hybrid
+% GNN-CNN not coordinate-MLP). Closest "continuous field" framing match.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2411.02496. Verbatim abstract
+% first sentence: "We develop a hybrid GNN-CNN architecture for the
+% reconstruction of 3-dimensional continuous cosmological matter fields from
+% discrete point clouds, provided by observed galaxy catalogs."
+
+@inbook{chavesmontero2026review,
+  title        = {Machine Learning Techniques for Astrophysics and Cosmology: {L}yman-$\alpha$ forest},
+  author       = {Chaves-Montero, Jon{\'a}s},
+  booktitle    = {Machine Learning Techniques for Astrophysics and Cosmology},
+  publisher    = {Springer Singapore},
+  year         = {2026},
+  doi          = {10.48550/arXiv.2605.22489},
+  eprint       = {2605.22489},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: LOW (review chapter; useful as a single-citation umbrella for the
+% Lyα-ML landscape. Does not discuss NeRF / coordinate-MLP per verified content).
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2605.22489. Verbatim abstract
+% first sentence: "The Lyman-α forest refers to the series of absorption
+% features observed in the spectra of distant quasars that are produced by
+% neutral hydrogen in the intergalactic medium."
+
+% ----- Category C: medical / scientific implicit-NeRF cross-pollination
+
+@inproceedings{zha2022naf,
+  title        = {{NAF}: Neural Attenuation Fields for Sparse-View {CBCT} Reconstruction},
+  author       = {Zha, Ruyi and Zhang, Yanhao and Li, Hongdong},
+  booktitle    = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2022},
+  year         = {2022},
+  doi          = {10.1007/978-3-031-16446-0_42},
+  eprint       = {2209.14540},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: HIGH (methodological precedent — coordinate-MLP representing a
+% continuous 3D attenuation field, optimized self-supervised against projection
+% data via differentiable forward synthesis). Most architecturally analogous
+% prior work to our IGM-NeRF; CT analogue of Voigt-integrated tau supervision.
+% Cite as primary cross-pollination reference.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2209.14540. Verbatim abstract
+% first sentence: "This paper proposes a novel and fast self-supervised
+% solution for sparse-view CBCT reconstruction (Cone Beam Computed Tomography)
+% that requires no external training data." Architecture confirmation: "the
+% desired attenuation coefficients are represented as a continuous function of
+% 3D spatial coordinates, parameterized by a fully-connected deep neural
+% network."
+
+@inproceedings{coronafigueroa2022mednerf,
+  title        = {{MedNeRF}: Medical Neural Radiance Fields for Reconstructing {3D}-aware {CT}-Projections from a Single {X}-ray},
+  author       = {Corona-Figueroa, Abril and Frawley, Jonathan and Bond-Taylor, Sam and Bethapudi, Sarath and Shum, Hubert P. H. and Willcocks, Chris G.},
+  booktitle    = {IEEE Engineering in Medicine \& Biology Society (EMBC)},
+  year         = {2022},
+  doi          = {10.48550/arXiv.2202.01020},
+  eprint       = {2202.01020},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: MEDIUM (NeRF transferred to medical CT-from-X-ray; supplementary
+% cross-pollination citation alongside NAF).
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2202.01020. Verbatim abstract
+% first sentence: "Computed tomography (CT) is an effective medical imaging
+% modality, widely used in the field of clinical medicine for the diagnosis of
+% various pathologies."
+
+@article{wang2024nerfmedicalsurvey,
+  title        = {Neural Radiance Fields in Medical Imaging: A Survey},
+  author       = {Wang, Xin and Chen, Yineng and Hu, Shu and Fan, Heng and Zhu, Hongtu and Li, Xin},
+  journal      = {arXiv preprint},
+  year         = {2024},
+  doi          = {10.48550/arXiv.2402.17797},
+  eprint       = {2402.17797},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: LOW (survey; single-citation umbrella for "NeRF beyond computer
+% vision" framing in the related-work section).
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2402.17797. Verbatim abstract
+% first sentence: "Neural Radiance Fields (NeRF), as a pioneering technique in
+% computer vision, offer great potential to revolutionize medical imaging by
+% synthesizing three-dimensional representations from the projected
+% two-dimensional image data."
+
+% ----- Category D: classical baseline anchor (already-cited Horowitz TARDIS
+% upgrade — recording the verified arXiv handle for the existing main.bib
+% reference if it needs cross-checking. NOT a new citation if duplicate.)
+
+@article{horowitz2019tardis,
+  title        = {{TARDIS} Paper {I}: A Constrained Reconstruction Approach to Modeling the $z\sim2.5$ Cosmic Web Probed by {L}yman-$\alpha$ Forest Tomography},
+  author       = {Horowitz, Benjamin and Lee, Khee-Gan and White, Martin and Krolewski, Alex and Ata, Metin},
+  journal      = {The Astrophysical Journal},
+  volume       = {887},
+  number       = {1},
+  pages        = {61},
+  year         = {2019},
+  doi          = {10.3847/1538-4357/ab4d4c},
+  eprint       = {1903.09049},
+  archivePrefix= {arXiv}
+}
+% RELEVANCE: DUPLICATE-CANDIDATE — confirm against existing main.bib horowitz
+% entries before final paper compilation; if already present, drop this stub.
+% Included here for sweep completeness because Q2 K2 brief named TARDIS as the
+% classical baseline.
+% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/1903.09049. Verbatim abstract
+% first sentence: "Recent Lyman-α forest tomography measurements of the
+% intergalactic medium (IGM) have revealed a wealth of cosmic structures at
+% high redshift (z∼2.5)." Note: solver-internals (differentiable PM vs other)
+% not on abstract page; VERIFICATION-OWED for any solver-detail citation.
