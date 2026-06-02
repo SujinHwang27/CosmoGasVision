@@ -2339,6 +2339,50 @@ graph TD
 
     **Honest framing per [D-37] rule (a)** at amendment-2 close: Rung 2 produced discharging-DISCHARGE on Q2 K2 with HOLD-the-novelty-claim verdict (narrowed, not retracted, claim survives). Rung 3 produced inconclusive-by-pre-commitment verdict whose load-bearing finding is the two-space mismatch — a third option neither hypothesis pre-specified. Both are valid scientific outcomes per [D-37]-Ext R7; decision-quality discipline holds (hedged verbs, blockers explicit, sprint-priority preserved). NOT spun as "discoveries"; reported as observed.
 
+    ### [D-71] §I amendment-3 — Rung 4 brief cycle #2+#3 panel + Amendment 1+2 + CPU pre-flight result (2026-06-02, session-close capture)
+
+    Session-close capture before session-end at user direction 2026-06-02. Full PI absorption of cycle #3 panel + pre-flight result deferred to next session; this block preserves continuity.
+
+    **Rung 4 brief cycle #2 panel verdict** (commit `b19fdcc`): NEEDS-WORK. 2 KILLER (K1 SE arithmetic units error nats vs decades, 0.3-dex H0 boundary actually ~9.6σ not 6σ; K2 asymmetric-evidence framing over-strong, RSD+thermal can DECREASE band-integral) + 3 SERIOUS (S1 path-length + null-control same defect; S2 N_ax=N_ang wrong matched quantity; S3 R33 Bolton+2017 PDF-width citation incomplete) + 2 PROBE.
+
+    **PI cycle #2 absorption → Amendment 1 (A1.1-A1.8) landed on brief**: K1 → option (b) empirical bootstrap-SE at CPU pre-flight; thresholds derived from measured SE_meas (`PIVOT if |Δ| ≥ 6×SE_meas + 0.30 dex`). K2 → honest framing rewrite (ρ-only is decision, not bound). S1 → homogeneous-ρ null-control PROMOTED to §1 mandatory with `≤ 3×SE_meas` threshold. S2 → SE-matched secondary statistic. S3 → option (c) brief-time honest downgrade + option (b) MANDATORY at landing (8-octant Sherwood sub-volume jackknife discharge). P1 → modular-index lookup mandated. P2 → Set C demoted.
+
+    **Cycle #3 panel verdict**: NEEDS-WORK. 1 KILLER (Garzilli+2017 MISATTRIBUTED for RSD — paper is about thermal/Jeans-smoothing-vs-WDM-degeneracy NOT RSD; cycle #3 panel WebFetched and caught it — R33 working AS INTENDED). 2 SERIOUS (A1.4 8-octant jackknife has 7 dof, SE-of-SE ≈ 53%, spurious-fire rate 30-40%; A1.1 6σ-3σ asymmetry unjustified + A1.1→A1.3 cross-link mislabeled). 1 PROCEDURAL (R33 looser-citation fallback ruling). Walther+2019 thermal-cutoff citation WebFetch-verified APPROVE.
+
+    **PI cycle #3 absorption → Amendment 2 (A2.1-A2.7) landed on brief**: K1 → citation-free "standard Lyα IGM physics" framing; Garzilli RETRACTED; Walther+2019 stays; replacement RSD-mechanism citation (Hui&Gnedin 1997 / McDonald+2003 / Seljak 2012 candidates) verification-owed at next session. S1 → 27-cell (3³) sub-volume upgrade (dof 7→26, SE-of-SE CV 53%→28%); A1.4 RENAMED "intra-octant scatter discharge"; knob-acknowledgment paragraph added. S2 → asymmetric-decision-cost justification sentence (null false-pass leaks contamination → BLOCK; verdict false-PIVOT triggers 300-500 LOC sprint) + A1.1→A1.4 cross-link fix. PROBE → SE_meas-conditioned verdict-band table pre-committed at SE ∈ {0.01, 0.03, 0.05, 0.10} + null-control directional-decomposition secondary.
+
+    **CPU pre-flight EXECUTED 2026-06-02** (script `scripts/d71_I_angled_feasibility_preflight.py`, capsule `experiments/nerf/artifacts/d71_I_angled_feasibility_preflight/capsule.json` gitignored-local):
+    - geometric-correctness PASS (max_dev=4.441e-16, 32/32 rays)
+    - boundary-gradient PASS (31/32 boundary-crossing rays, 0 NaN gradients)
+    - SE_meas(A axis-parallel) = 0.0384 dex
+    - SE_meas(B angled) = 0.0349 dex
+    - **Δ log10 R_feas (B−A) = −0.0912 dex, 95% CI [−0.1772, +0.0167]**
+    - wall time 39.6s on local CPU
+
+    **Pre-flight interpretation (informational only; binding gate is Juno full-resolution 768³)**: SE_meas ≈ 0.035 dex falls in A2.4 SE≤0.03 row (NO-PIVOT band `|Δ| < 0.30 dex`). Measured |Δ| = 0.09 dex is ~3× below 0.30 dex NO-PIVOT bound. 95% CI lies ENTIRELY within NO-PIVOT territory. Sign is NEGATIVE — OPPOSITE direction from H1 hypothesis (which predicted angled rays catching transverse modes → HIGHER variance). **Pre-flight is weakly suggestive of NO-PIVOT**, but at 192³ downsampled resolution (4³ block-pooled from 768³ cache); high-k inertial-band modes where anisotropic structure SHOULD live are partially averaged out. The Juno full-resolution 768³ run is the binding test.
+
+    **Cycle #4 panel re-review OWED** on Amendment 2 (PI cycle #3 close-path ruling). Cycle #4 panel must clear K1+S2+S1 mandatory items before Juno HPC dispatch is authorized.
+
+    **Tool-propagation gap observed this session**: WebFetch+WebSearch added to `.claude/agents/support-researcher.md:4` and `.claude/agents/project-architect.md:4` frontmatter mid-session; agent definitions read at session START so the edits DID NOT PROPAGATE to running sub-agent dispatches. PI Cycle #2 + Cycle #3 absorptions could NOT WebFetch despite allowlist; both routed citations through looser-form fallback. Defense-panel had WebFetch from session-start (its .md had the tools field unchanged) and successfully used it including the Garzilli catch. **Next session reload should propagate the edits; PI/support-researcher should test WebFetch availability before assuming.**
+
+    **R33 verification-owed at next session**: (1) RSD-mechanism citation replacement for Garzilli+2017 (candidates: Hui&Gnedin 1997 §5, McDonald+2003 §3, Seljak 2012); (2) Walther+2019 §3 thermal-cutoff verbatim (panel WebFetched abstract already; full §3 deferred); (3) any new citations PI introduces in cycle #4 absorption.
+
+    **Sign-off Ext-2 R15+R28+R29+R32+R33 status at session close**:
+    - R15: PROVISIONAL on Amendment 1 + Amendment 2 (cycle #4 panel APPROVE = lift).
+    - R28: BANKED Tier (i)+(ii); §R28-CHECK discharged twice this session (cycle #2 + cycle #3 PI absorptions); no R28 sighting.
+    - R29: RETIRED-threshold pre-commit active; no sighting.
+    - R32: CANDIDATE; cycle #3 panel-cycle is positive evidence of panel-cycle-discipline catching R33-fallback miscitation (R12 cross-track sighting candidate — TBD at next session whether this counts as cross-track from [D-71] internal-cycle).
+    - R33: CANDIDATE; sighting #3 LOGGED this session (PI Amendment 1 Garzilli+2017 misattribution under R33-fallback; panel caught; PI Amendment 2 retracted). Cross-track second-sighting candidate logged for next-session ruling.
+
+    **Honest framing per [D-37] rule (a)** at session close: Rung 4 sprint produced 2 panel cycles + 2 PI amendments + 1 CPU pre-flight execution in this session. The R33-fallback miscitation (Garzilli) was caught by defense-panel WebFetch — the discipline working as intended. Pre-flight measurement (Δ = −0.09 dex at 192³) is weakly suggestive of NO-PIVOT but informational-only; binding gate is Juno full-resolution. [D-71] cycle #7 PAUSE-conditional verdict UNCHANGED at session close; Juno HPC remains BLOCKED until cycle #4 panel clears Amendment 2; pivot decision (PIVOT to [D-72] supervision-geometry vs RESUME [D-71] loss-construction) DEFERRED to post-Juno full-resolution result. NOT spun as "early NO-PIVOT confirmation"; reported as 192³-downsampled pre-flight observation.
+
+    **Next-session resume protocol**:
+    1. Read this LEDGER §I amendment-3 block + amendment-1 + amendment-2 + §I + cycle #1-#6 + Rev 2 history for full continuity.
+    2. Verify WebFetch tool-propagation worked at session reload (project-architect + support-researcher should now have tools).
+    3. Dispatch cycle #4 defense-panel re-review on Amendment 2 (R33 verification of RSD-mechanism citation candidate is part of cycle #4 panel attack).
+    4. If cycle #4 APPROVE: data-engineer Juno A30 dispatch authorized on full-resolution 768³ angled-sightline feasibility.
+    5. If cycle #4 NEEDS-WORK: PI cycle #4 absorption + Amendment 3 (mechanical cycle; should be short).
+
   - **[D-70] Stage 1a Juno job 203285 + backstop-remediation chain 2026-05-26 — 10/10 R-b-pre1 fire surfaced 3 R29 violations; backstops demoted; F1-β dual R_real emit; R31 PROMOTED to BANKED; R29 DEMOTED to candidate-banked; (γ) pre-commit (1b) escape-hypothesis falsification trigger; Juno re-dispatch AUTHORIZED.**
 
     **Observation first ([D-37] rule (a))**: Juno job 203285 dispatched 2026-05-26 (10-seed array `--array=0-9%4` Stage 1a (1b) skip-rich-MLP, P1 z=0.3 n_grid=768, --max_steps=500). **ALL 10 SEEDS FAILED in ~25s each** with verbatim error from `stage1a-1b-203285_0.err`:

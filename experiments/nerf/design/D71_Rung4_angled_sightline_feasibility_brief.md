@@ -254,3 +254,164 @@ Defense-panel must attack the following load-bearing claims at pre-review BEFORE
 - **R33 status**: in-session WebFetch verification NOT performed for Bolton+2017 PDF-width citation in §3; all other citations are repo-internal conventions. R33 strict-compliance may require panel ruling.
 - **Word count**: ~2450 words (under ≤2500 budget).
 - **Honest-framing compliance per [D-37] rule (a)**: observation-first framing throughout; verdict bands frozen pre-methodology; ρ-only proxy upper-bound caveat stated; structural concerns flagged for panel attack in §6.
+
+---
+
+## Amendment 1 (Cycle #2 PI absorption, 2026-06-02)
+
+Defense-panel pre-review verdict NEEDS-WORK landed 2026-06-02 (K1 + K2 KILLER; S1 + S2 + S3 STRUCTURAL; P1 + P2 PROCEDURAL). PI cycle #2 absorption rules below. The original §0–§8 text is preserved verbatim above; this amendment is additive and binding.
+
+### A1.1 — §1 pre-commit table SUPERSEDED (K1 + S1 + S2 absorption)
+
+The §1 H0 / H1 / MARGINAL numerics are SUPERSEDED. Bootstrap-SE formula √(2/N) used at §3 was unit-wrong (nats vs decades) AND inherits a Gaussian-iid assumption that does not hold for band-integrated P_F (χ²-distributed at fixed k, heavy-tailed Lyα flux PDF over rays). Replacement protocol: per-set bootstrap SE is MEASURED at CPU pre-flight (200 resamples over rays, N=768 each, on a 192³-downsampled real ρ-field AND on the §5 analytic 64³ field). Verdict numerics re-expressed against measured SE_meas:
+
+| Verdict | Primary condition | Secondary (S2) condition |
+|---|---|---|
+| PIVOT (H1) | `|Δ log10 R_feas|_primary ≥ 6×SE_meas + 0.30 dex` | sign + band-crossing agree at SE-matched N |
+| MARGINAL | `6×SE_meas ≤ |Δ| < 6×SE_meas + 0.30 dex` OR secondary disagrees | n/a — already MARGINAL |
+| NO-PIVOT (H0) | `|Δ log10 R_feas|_primary < 6×SE_meas` | sign + band-crossing agree |
+
+The 0.30-dex margin above 6×SE_meas is the physical-significance band (3.16× variance-ratio); see A1.3 for knob-anchor declaration. Old fixed 0.3 / 0.5 dex numerics REMOVED.
+
+**Mandatory homogeneous-ρ null-control (S1)** — added as binding §1 row:
+| Pre-Juno gate | Pass criterion |
+|---|---|
+| `|Δ log10 R_feas(B − A)|_{homogeneous ρ=⟨ρ⟩_box}` | ≤ 3×SE_meas |
+
+If null-control fails, structured-truth verdict UNINTERPRETABLE; Juno dispatch BLOCKED; diagnostic reopened to investigate grid-projection / path-length / Nyquist-aliasing contamination. Only clean separator of angular-coverage signal from grid-projection numerical aliasing; discharges [D-66] failure-mode class at this rung.
+
+**SE-matched secondary statistic (S2)**: after Part 1 measures per-set SE, identify N_ang' such that SE_meas(B, N_ang') ≈ SE_meas(A, N_ax=768); compute R_feas at (N_ax=768, N_ang=N_ang'). Verdict robust iff sign and band-crossing agree between primary and SE-matched.
+
+### A1.2 — §4 asymmetric-framing paragraph REWRITE (K2 absorption)
+
+The §4 asymmetric-framing paragraph is REPLACED by:
+
+> **Pre-committed framing (honest per [D-37] rule (a))**: the ρ-only proxy is informative for **decision** (proceed to full-state pipeline if signal is strong enough), but NOT a **bound** on full-hydro R_feas in either direction. RSD (peculiar-velocity smoothing, Garzilli+2017-class effect) Gaussian-convolves τ(v) in velocity space and moves variance from high-k into low-k. Thermal broadening (Doppler b varies with T, Walther+2019-class thermal-cutoff effect) attenuates small-scale structure. Both well-established Lyα-forest effects can DECREASE the band-integrated Var(P_F) over k ∈ [10⁻²·⁵, 10⁻¹·⁵] s/km under full hydro relative to ρ-only. Asymmetric framing in the prior brief version was over-strong and is RETRACTED.
+>
+> Operational consequences for verdict interpretation:
+> - PIVOT (ρ-only |Δ| ≥ H1 band): strong evidence for proceeding to full-state angled-supervision pipeline. The full hydro could land anywhere in {larger, smaller, opposite-sign} relative to ρ-only; the decision to PROCEED is justified, but the magnitude is not inherited.
+> - NO-PIVOT (ρ-only |Δ| < H0 band): weak evidence against full-state pipeline. Full hydro could plausibly still show stronger signal via RSD/thermal anisotropy contributions absent in the ρ-only proxy. Panel may rule that the full-state pipeline is still warranted to test the full version.
+> - MARGINAL: extend ρ-only diagnostic at finer angular sampling.
+
+**Citation discipline (R33)**: in-session WebFetch verification of Walther+2019 and Garzilli+2017 was attempted in this absorption dispatch; WebFetch + WebSearch returned `No such tool available` for every invocation despite project-architect.md frontmatter allowlisting both. Looser-citation forms used per R33 CANDIDATE fallback. R33 verification-owed item logged for next governance batch with WebFetch operationally restored (likely requires session-reload to pick up mid-session .md frontmatter edits).
+
+### A1.3 — §3 knob-anchor declaration (S3 absorption, brief-cycle)
+
+§3 `Threshold-substance` paragraph clause "0.5 decade is derived from ... Bolton+2017 Fig. 4 PDF-width" is REPLACED by:
+
+> 0.5 decade is set at log10(3.16) ≈ 0.5 dex, corresponding to a 3.16× variance-ratio difference between angled and axis-parallel sets. We do NOT claim physical-significance derivation for this threshold in the brief. The threshold is pre-committed before methodology execution per [D-37] rule 5 symmetric-disclosure and held fixed regardless of outcome. The earlier Bolton+2017 Fig. 4 PDF-width attribution is RETRACTED — it conflated PDF-width of the ρ field with cosmic-variance scatter in band-integrated Var(P_F), and was not in-session WebFetch-verified.
+
+### A1.4 — §5 / §7 jackknife discharge protocol (S3 absorption, landing-time)
+
+§5 CPU pre-flight is extended to include 8-octant Sherwood sub-volume jackknife. Protocol: divide the 60 Mpc/h box into 8 octant cubes of 30 Mpc/h each; for each octant, compute R_feas on 96 axis-parallel rays (N=768/8=96); compute jackknife SE_jk over the 8 R_feas values.
+
+Pre-committed gate (binding at Juno dispatch landing time, captured in §7 capsule):
+
+> If `SE_jk > log10(3.16) = 0.5 dex`, the H1 threshold is BELOW natural cosmic-variance scatter in the Sherwood box and the diagnostic is REOPENED at finer angular sampling per the MARGINAL action, independent of the measured Δ log10 R_feas value.
+
+This anchors the H1 physical-significance threshold to the same Sherwood box being measured (R29-substance: same-units same-instrument), with NO external-citation dependency.
+
+### A1.5 — §5 CPU pre-flight modular-index + boundary-gradient (P1 absorption)
+
+§5 CPU pre-flight is extended with two MANDATORY items:
+1. Periodic-wrap implementation path is FIXED to modular-index lookup (NOT 3× memory replicate). Rationale: at 768³ float32 = 2.06 GB, 3× replicate = 6.2 GB tensor before broadcast; crosses Juno A30 24-GB headroom with autograd retention. Implementation: `coords % 1.0` before `grid_sample` with `padding_mode='zeros'`, plus manual 8-corner trilinear assembly for boundary-crossing voxels.
+2. Boundary-crossing autograd verification: of the 32 angled rays sampled at CPU pre-flight, ≥4 must traverse box boundary (verified by `(coord_min < 0) | (coord_max > 1)` per ray); for those rays, `torch.autograd.grad` must return finite, non-NaN gradients at every boundary-crossing bin.
+
+### A1.6 — §2 Set C demotion (P2 absorption)
+
+Append to §2:
+
+> **Set C statistical-power note**: Set C is sample-weighted average of Sets A and B (modulo band-integral nonlinearity at metric step 9). It provides WEAK CORROBORATION, NOT an independent test, of the primary R_feas(A) vs R_feas(B) verdict. Set C is retained in the §7 capsule at zero marginal compute cost but is DEMOTED from verdict-anchor framing.
+
+### A1.7 — §8 sign-off updates
+
+§8 (Sign-off) is amended:
+- R28: this amendment IS a brief-revision; rung count = 4, landing artifacts = 8 (per PI cycle #2 §R28-CHECK absorption block). Tier (ii) appearance discharged in absorption block.
+- R29: knob-anchor declaration honest in A1.3; substance-derivation deferred to landing-time jackknife per A1.4.
+- R32: cycle #3 panel re-review owed on this Amendment 1 block.
+- R33: in-session WebFetch + WebSearch empirically unavailable this dispatch despite allowlist; verification-owed for Walther+2019, Garzilli+2017, and Bolton+2017 Fig. 4 (retracted) logged for next governance batch with tools restored. Workaround for current session: route WebFetch needs through `defense-panel` (always had tools) or `general-purpose` (catch-all) agents.
+
+### A1.8 — Absorption provenance
+
+- PI cycle #2 absorption ruling: see LEDGER §I amendment-3 (this absorption to be appended at next LEDGER batch).
+- Panel cycle #2 verdict: NEEDS-WORK, K1+K2 KILLER, S1+S2+S3 STRUCTURAL, P1+P2 PROCEDURAL.
+- R15 PROVISIONAL status: this amendment is PROVISIONAL until cycle #3 panel APPROVE; lift mechanism = explicit panel return on the amended brief.
+
+**End Amendment 1.**
+
+---
+
+## Amendment 2 (Cycle #3 PI absorption 2026-06-02)
+
+Cycle #3 defense-panel verdict: NEEDS-WORK with K1 KILLER (A1.2 Garzilli misattribution), S1 STRUCTURAL (8-octant jackknife dof deficit; A1.4 misnomer; knob-acknowledgment owed), S2 STRUCTURAL (asymmetric verdict/null bars unjustified; A1.1→A1.3 cross-link mislabeled), P1+P3 PROBE (SE-conditioned verdict-band pre-commit; null-control directional-decomposition secondary). Architecture (A1.1–A1.7) preserved; this amendment scopes to execution details only.
+
+### A2.1 — A1.2 rewrite (K1 Garzilli retraction; citation-free RSD framing)
+
+A1.2 §4 framing paragraph (Walther+2019 thermal-cutoff + Garzilli+2017 RSD attribution) is REPLACED by:
+
+> Two structural caveats remain on the ρ-only proxy as upper-bound informativeness for the angular-coverage question:
+>
+> 1. **Thermal-cutoff smoothing of P_F(k_‖)**: temperature broadens the optical-depth field along the line-of-sight via thermal Doppler broadening of the Lyα line profile, suppressing small-scale (high-k) flux power above k_thermal ~ H(z) / b_T where b_T = (2k_B T / m_p)^{1/2}. At z=0.3 with isothermal T_box ~ 10⁴ K, k_thermal ≈ 10⁻¹·³ s/km, intersecting the upper end of the inertial band [10⁻²·⁵, 10⁻¹·⁵] s/km. The ρ-only proxy with fixed T_box CANNOT modulate this cutoff per ray; angled rays through hotter filaments would see additional smoothing the proxy does not capture. Standard reference for the thermal-cutoff signature of pressure smoothing and Doppler broadening in Lyα: Walther+2019 (MNRAS 486, 769).
+>
+> 2. **Redshift-space distortion (RSD) from peculiar velocities**: peculiar velocities v_pec along the line-of-sight Gaussian-convolve τ(v) with a kernel of width ~σ_v/H(z), transferring variance between k-bins in P_F(k_‖). The ρ-only proxy sets v_pec=0; angled rays through dynamically distinct filament-vs-void regions would see direction-dependent RSD that the proxy cannot represent. This is standard Lyα IGM physics (canonical mechanism in the Lyman-alpha forest literature; specific in-session paper-citation verification owed at next governance batch per R33 — PI Amendment 1 A1.2 attribution to Garzilli+2017 RETRACTED; Garzilli+2017 [Phys Lett B 773, 258] is about thermal/Jeans-smoothing-vs-WDM-degeneracy, not RSD).
+>
+> Together these two ρ-only-proxy limitations bound the diagnostic's informativeness from ABOVE: a positive |Δ log10 R_feas| ≥ 0.5 dex measurement under the proxy is a LOWER bound on the true angular-coverage signal; a null is uninformative about the full-hydro-state case. This is the load-bearing honest-framing caveat per [D-37] rule (a) symmetric-disclosure.
+
+### A2.2 — A1.4 rename to "intra-octant scatter discharge"; 27-cell upgrade; knob-acknowledgment
+
+A1.4 §5 / §7 jackknife discharge protocol is amended as follows.
+
+**Rename**: "8-octant Sherwood sub-volume jackknife" → "27-cell (3³) sub-volume intra-octant scatter discharge." The discharge measures **intra-octant scatter, NOT cosmic-variance** — 20 Mpc/h sub-cubes cannot sample 30–60 Mpc/h box-scale modes. The rename reflects the operative quantity.
+
+**Protocol upgrade**: divide the 60 Mpc/h box into 27 sub-cubes of 20 Mpc/h each; for each sub-cube, compute R_feas on 768/27 ≈ 28 axis-parallel rays (rays-per-cube floor enforced ≥ 24, with rebalancing if a sub-cube traverses fewer); compute jackknife SE over the 27 R_feas values. dof = 26 vs prior 7; SE-of-SE coefficient of variation drops from ~53% to ~28% under true scatter ~0.4 dex.
+
+**Knob-acknowledgment paragraph** (appended to §3 `Threshold-substance` after A1.3 wording):
+
+> Honest acknowledgment: the gate `|Δ log10 R_feas| ≥ 0.5 dex` is operationally a knob anchored to an in-box statistic (intra-octant scatter from the same Sherwood box being measured), not an external observational paper. R29-substance — same-units, same-instrument framing — is honest in the sense that the threshold's unit-chain is closed within the box. It does NOT answer "why 3.16× is the right bar." The threshold is pre-committed before methodology execution per [D-37] rule 5 symmetric-disclosure and held fixed regardless of outcome.
+
+### A2.3 — A1.1 asymmetric-decision-cost sentence; A1.1→A1.4 cross-link fix
+
+§1 H1 / null gate paragraph (currently 6σ verdict / 3σ null) is amended with one justification sentence:
+
+> Asymmetric decision-cost justification: the verdict-bar (6σ at SE_meas baseline; widening per A2.4 table) and null-bar (3σ) are intentionally asymmetric because the downstream-action costs are asymmetric — a null false-pass leaks a wrong binding-axis claim into Juno HPC dispatch and Stage-7 reopens on a falsified premise, while a verdict false-PIVOT triggers a 300–500 LOC implementation sprint on [D-72]. Different error costs warrant different α levels per standard sequential-decision-theory framing.
+
+**Cross-link fix**: A1.1 previously cited A1.3 for "physical-significance band." A1.3 explicitly DISCLAIMS physical-significance derivation. The load-bearing significance argument lives in A1.4 (intra-octant scatter jackknife). All A1.1 references to A1.3 for significance band are redirected to A1.4.
+
+### A2.4 — SE_meas-conditioned verdict-band pre-commit table (PROBE absorption)
+
+Pre-committed BEFORE structured-truth run, foreclosing post-hoc band shifting:
+
+| SE_meas (dex) | NO-PIVOT band | MARGINAL band | PIVOT bar |
+|---|---|---|---|
+| 0.01 | `|Δ| < 0.30` | `[0.30, 0.50)` | `|Δ| ≥ 0.50` |
+| 0.03 | `|Δ| < 0.30` | `[0.30, 0.50)` | `|Δ| ≥ 0.50` |
+| 0.05 | `|Δ| < 0.32` | `[0.32, 0.54)` | `|Δ| ≥ 0.54` |
+| 0.10 | `|Δ| < 0.40` | `[0.40, 0.70)` | `|Δ| ≥ 0.70` |
+
+Bands widen proportionally with SE_meas to preserve the 6σ-verdict / 3σ-null asymmetric significance-cost from A2.3. At SE_meas ≤ 0.03 dex the bands collapse to the A1.1 pre-commit (sample-noise negligible relative to threshold); at SE_meas = 0.10 dex the MARGINAL band widens substantially. This table is HELD FIXED at amendment landing time; A1.5 CPU pre-flight measures SE_meas; the row matched by measured SE_meas is the binding gate for the structured-truth verdict.
+
+### A2.5 — Null-control directional-decomposition secondary (PROBE absorption)
+
+Append to §6 (binary verdict-numerics block):
+
+> Null-control directional-decomposition secondary: in addition to the primary `|Δ log10 R_feas(angled − axis)|`, report null-control's three sub-axis projections of the angled-ray set's R_feas: R_feas projected onto (x̂, ŷ, ẑ) sub-axes. Compute sign-consistency: number of sub-axes where R_feas(angled_proj) − R_feas(axis_proj) shares sign with the overall `Δ log10 R_feas`.
+>
+> Gate: if null-control sub-axis decomposition is direction-asymmetric (sign-inconsistent at ≥ 1 of 3 sub-axes regardless of magnitude), BLOCK Juno dispatch — grid-projection aliasing is suspected. If null-control is sign-consistent across all 3 sub-axes (independent of magnitude), dispatch authorized contingent on primary verdict.
+
+### A2.6 — §8 sign-off updates (Garzilli retraction + cycle-4-owed)
+
+§8 (Sign-off) is amended:
+- R28: this amendment IS a brief-revision; cycle #3 absorption §R28-CHECK Tier (ii) MANDATORY sub-block discharged in PI cycle #3 absorption.
+- R29: A2.2 retains A1.3's knob-anchor declaration; intra-octant scatter discharge per A2.2 27-cell upgrade.
+- R32: cycle #4 panel re-review OWED on this Amendment 2 (mechanical-amendment cycle).
+- R33: Garzilli+2017 misattribution at Amendment 1 A1.2 RETRACTED; replacement RSD-mechanism citation (Hui & Gnedin 1997 / McDonald+2003 / Seljak 2012 candidate set) verification-owed at next governance batch with WebFetch restored. Walther+2019 thermal-cutoff citation retained (panel cycle #3 WebFetch-verified APPROVE).
+
+### A2.7 — Absorption provenance
+
+- PI cycle #3 absorption ruling: this Amendment 2 block.
+- Panel cycle #3 verdict: NEEDS-WORK; K1 KILLER + S1+S2 STRUCTURAL + P1+P3 PROBE.
+- Cycle #3 PROCEDURAL: CPU pre-flight (A1.5) AUTHORIZED-TO-PROCEED-IN-PARALLEL with cycle #4 amendment; Juno HPC remains BLOCKED until cycle #4 panel re-review clears K1+S2+S1.
+- R15 PROVISIONAL status: this amendment is PROVISIONAL until cycle #4 panel APPROVE; lift mechanism = explicit panel return on Amendment 2.
+- Out-of-scope flags (panel-noted, not Amendment 2 scope): A1.5 modular-index `padding_mode='zeros'` boundary-corner handling (data-engineer scope concern at implementation handoff); A1.6 Set C label as "weak-corroboration" capsule (already addressed in Amendment 1); §1 truth-field-isotropy interaction with intra-octant jackknife (follow-up flag).
+
+**End Amendment 2.**
