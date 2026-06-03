@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 
+# Personal Claude Code memory (per-machine; never tracked)
+.claude-memory/
+
 # Distribution / packaging
 build/
 develop-eggs/
