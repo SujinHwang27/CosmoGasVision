@@ -2767,6 +2767,15 @@ graph TD
     grep-discipline satisfied (nerf.py:180, pipeline.py:3060-3073, probe script 77-102 re-read
     this session).
 
+  - **[D-73] amendment-1 2026-06-10 — defense-panel APPROVE-WITH-AMENDMENTS on the §E A1 gate (single capped cycle, consumed); AM-1…AM-5 absorbed; §E gate amended of record.**
+    Panel verified the harness first-hand (`scripts/d69_lr_sensitivity_probe.py:77-103,168-189,238-260`; `pipeline.py:405-530`; all 4 `d69_lr_probe` artifacts). Two KILLERs (construction defects, not design defects), both closed mechanically:
+    - **AM-1 (artifact isolation + verdict-matrix voiding)**: probe writes to `experiments/nerf/artifacts/d73_a1_head_probe/` with a `head` field in every cell JSON; `d69_lr_probe/` becomes read-only control. The harness-embedded [D-69] verdict matrix (`r_pre_at_M1 ≤ 0.5` → `ADVANCE_JUNO…`) is **VOID/non-binding** for this gate — §E ESCAPE/COLLAPSE is computed solely from `var_ratio_trajectory`.
+    - **AM-2 (spurious-fire guard)**: ESCAPE requires, at the same recorded step, median-across-seeds ratio > 0.1 **AND** median Pearson r(ρ_θ, ρ_truth) ≥ 0.2 on the fixed probe sample (null 95% bound ≈ 0.06 at n=1024); per-step corr recorded + a step-0 probe point; ratio-pass/corr-fail logged as ESCAPE-UNSTABLE and routed as COLLAPSE per [D-37] rule (a). Guards both init-variance (linear-log head at init can clear 0.1 with zero structure) and outlier-explosion (few high-log voxels dominate linear Var) channels.
+    - **AM-3 (control symmetry)**: [D-69] Softplus controls are seed-0-only on disk (verified); rerun Softplus seeds {1,2} × 3 lr (~6 CPU-min) into the new dir, else every control citation carries a seed-0-only caveat.
+    - **AM-4 (frame correction)**: §E frame citation amended to "[D-70] M0 / R-b-pre1 (linear-space)"; the "/ R_real" reference is STRUCK (R_real is log10-framed per [D-69] K3 — wrong-frame error class caught pre-execution).
+    - **AM-5 (non-blocking)**: median-of-3 ≡ 2-of-3 parenthetical; loss computed directly on `out` vs log10(ρ_truth+1e-3) (round-trip clamp kills gradient below out=−3); field is ρ/⟨ρ⟩ notation; `_var_ratio_probe` docstring fix (claims separate probe call; implementation correctly uses same-voxel-set — docstring is what's wrong).
+    Gate-construction panel budget for A1 (one cycle per §F policy): **consumed**. Execution authorized: core-implementer lands `--head` + AM-1/AM-2 instrumentation, runs 9 linear-log cells + 6 Softplus control cells.
+
 ---
 
 ## 4. The Data (Lineage & Governance)
