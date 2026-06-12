@@ -1,0 +1,130 @@
+{
+  "gate": "[D-73] \u00a7E A1 linear log-rho head probe",
+  "rule_verbatim": "ESCAPE iff in >=1 lr cell there exists a recorded step <= 1000 where median-across-3-seeds ratio > 0.1 AND median pearson_r >= 0.2 at the same step; ratio-pass/corr-fail at every such step -> ESCAPE-UNSTABLE, routed as COLLAPSE per [D-37] rule (a); otherwise COLLAPSE. (median-of-3 == 2-of-3.)",
+  "ratio_threshold": 0.1,
+  "pearson_threshold": 0.2,
+  "verdict": "COLLAPSE",
+  "routed_as": "COLLAPSE",
+  "escape_hits": [],
+  "escape_unstable_hits": [],
+  "median_trajectories_by_lr_cell": {
+    "lr=1e-04": [
+      {
+        "step": 0,
+        "median_ratio": 5.4224905528966045e-06,
+        "median_pearson_r": -0.0345065811242282,
+        "n_seeds": 3
+      },
+      {
+        "step": 100,
+        "median_ratio": 6.028626873713541e-05,
+        "median_pearson_r": 0.012864478645669608,
+        "n_seeds": 3
+      },
+      {
+        "step": 250,
+        "median_ratio": 1.690787334053615e-05,
+        "median_pearson_r": -0.010762079317089017,
+        "n_seeds": 3
+      },
+      {
+        "step": 500,
+        "median_ratio": 9.093282701543057e-06,
+        "median_pearson_r": 0.04575801673322912,
+        "n_seeds": 3
+      },
+      {
+        "step": 750,
+        "median_ratio": 5.675030255733315e-06,
+        "median_pearson_r": 0.007479497337860951,
+        "n_seeds": 3
+      },
+      {
+        "step": 1000,
+        "median_ratio": 4.379973039308139e-06,
+        "median_pearson_r": 0.017751855661349052,
+        "n_seeds": 3
+      }
+    ],
+    "lr=5e-04": [
+      {
+        "step": 0,
+        "median_ratio": 5.4224905528966045e-06,
+        "median_pearson_r": -0.0345065811242282,
+        "n_seeds": 3
+      },
+      {
+        "step": 100,
+        "median_ratio": 2.0633542289264177e-05,
+        "median_pearson_r": 0.03995750130961554,
+        "n_seeds": 3
+      },
+      {
+        "step": 250,
+        "median_ratio": 3.0095046143758027e-05,
+        "median_pearson_r": -0.04633073232820763,
+        "n_seeds": 3
+      },
+      {
+        "step": 500,
+        "median_ratio": 1.2395785768262527e-05,
+        "median_pearson_r": 0.03873443317214453,
+        "n_seeds": 3
+      },
+      {
+        "step": 750,
+        "median_ratio": 8.24786767323189e-06,
+        "median_pearson_r": 0.021301756398424312,
+        "n_seeds": 3
+      },
+      {
+        "step": 1000,
+        "median_ratio": 4.973420752690487e-06,
+        "median_pearson_r": 0.02449519231059544,
+        "n_seeds": 3
+      }
+    ],
+    "lr=1e-03": [
+      {
+        "step": 0,
+        "median_ratio": 5.4224905528966045e-06,
+        "median_pearson_r": -0.0345065811242282,
+        "n_seeds": 3
+      },
+      {
+        "step": 100,
+        "median_ratio": 2.484421195063403e-05,
+        "median_pearson_r": 0.0232939303248981,
+        "n_seeds": 3
+      },
+      {
+        "step": 250,
+        "median_ratio": 4.5947370009610556e-05,
+        "median_pearson_r": -0.050494045350638055,
+        "n_seeds": 3
+      },
+      {
+        "step": 500,
+        "median_ratio": 1.0508431866989817e-05,
+        "median_pearson_r": 0.033046087801127395,
+        "n_seeds": 3
+      },
+      {
+        "step": 750,
+        "median_ratio": 5.1845563629713835e-06,
+        "median_pearson_r": 0.00911972924548773,
+        "n_seeds": 3
+      },
+      {
+        "step": 1000,
+        "median_ratio": 2.6959827088756623e-06,
+        "median_pearson_r": 0.007935375827223324,
+        "n_seeds": 3
+      }
+    ]
+  },
+  "n_linear_log_cells": 9,
+  "n_softplus_control_cells_in_dir": 6,
+  "softplus_seed0_controls": "experiments/nerf/artifacts/d69_lr_probe (read-only, cite-only per AM-3)",
+  "scope": "(n_grid=64, (gamma) direct rho-MSE, P1 z=0.3) per R8/R9"
+}

@@ -21,6 +21,12 @@ class PositionalEncoding(nn.Module):
             res.append(torch.cos(freq * x))
         return torch.cat(res, dim=-1)
 
+# [D-73] §E: numerical stabilizer for the linear-log density head. Matches
+# experiments/nerf/pipeline.PRETRAIN_LOG_EPS (kept as a separate constant so
+# src/models has no import dependency on the experiment pipeline).
+DENSITY_LOG_EPS = 1.0e-3
+
+
 class IGMNeRF(nn.Module):
     """
     Continuous MLP mapping 3D position -> density, temp, h1_frac, vpec.
@@ -32,19 +38,39 @@ class IGMNeRF(nn.Module):
           re-injected at every layer). ReLU activations unchanged; head
           unchanged. Tests the Lu+2019 dying-ReLU body pathology under the
           same activation regime as 'current' (operative-cause swap test).
+
+    density_head: 'softplus' (default) | 'linear-log' [D-73 §E A1 probe]
+        - 'softplus'   — channel 0 of the output is Softplus(out[..., 0]),
+          i.e. linear-space rho/<rho> >= 0. Structurally invariant default
+          (mirrors the [D-70] body_arch precedent: identical module
+          construction, no behavioural change).
+        - 'linear-log' — channel 0 passes through RAW: out[..., 0] IS
+          log10(rho/<rho> + 1e-3). The Softplus is bypassed for the density
+          channel ONLY; temp / X_HI / v_pec heads are unchanged. Training
+          loss under this head is computed DIRECTLY on the raw log-space
+          output (AM-5: never round-trip through clamp(10**out) — the clamp
+          kills gradient below out = -3). Use density_log_to_linear() to
+          obtain linear-space rho_theta for variance/correlation probes only.
     """
     def __init__(self, hidden_dim=256, num_layers=8, L=10,
                  use_velocity_gradient_conditioning: bool = False,
                  use_physics_embedding: bool = False,
                  n_physics: int = 4,
                  physics_embedding_dim: int = 16,
-                 body_arch: str = "current"):
+                 body_arch: str = "current",
+                 density_head: str = "softplus"):
         super().__init__()
         if body_arch not in ("current", "skip-rich-mlp"):
             raise ValueError(
                 f"body_arch must be 'current' or 'skip-rich-mlp'; got {body_arch!r}"
             )
+        if density_head not in ("softplus", "linear-log"):
+            raise ValueError(
+                f"density_head must be 'softplus' or 'linear-log'; "
+                f"got {density_head!r}"
+            )
         self.body_arch = body_arch
+        self.density_head = density_head
         # use_velocity_gradient_conditioning toggles the [D-42] sidecar feature
         # (Sherwood-truth dv_pec/dchi, z-scored, detached) concatenated onto the
         # encoded coordinate before layer 1 — see LEDGER §3 [D-42] Math contract.
@@ -177,12 +203,32 @@ class IGMNeRF(nn.Module):
 
         out = self.out_layer(h)
         # Bounding fields to physical ranges
-        density = self.softplus(out[..., 0])  # rho/rho_bar >= 0
+        if self.density_head == "softplus":
+            density = self.softplus(out[..., 0])  # rho/rho_bar >= 0
+        else:
+            # [D-73] §E linear-log head: channel 0 IS log10(rho/<rho> + 1e-3),
+            # passed through raw (may be negative). Conversion to linear space
+            # is the caller's job via density_log_to_linear() — probe-side
+            # only, never in the loss (AM-5).
+            density = out[..., 0]
         temp = self.softplus(out[..., 1]) * 10**4 + 10**3 # T ~ 10^3 to 10^6 K
         h1_frac = self.sigmoid(out[..., 2])   # 0 to 1
         vpec = torch.tanh(out[..., 3]) * 500  # Peculiar velocity +/- 500 km/s
 
         return torch.stack([density, temp, h1_frac, vpec], dim=-1)
+
+    @staticmethod
+    def density_log_to_linear(log_density: torch.Tensor) -> torch.Tensor:
+        """[D-73] §E: convert the linear-log head's raw log-space density
+        output to linear-space rho_theta = clamp(10**out - 1e-3, min=0).
+
+        PROBE-SIDE ONLY (variance / correlation diagnostics). Do NOT use in
+        the training loss — the clamp kills gradient below out = -3 (AM-5);
+        the linear-log loss is computed directly on the raw output.
+        """
+        return torch.clamp(
+            torch.pow(10.0, log_density) - DENSITY_LOG_EPS, min=0.0
+        )
 
 def tepper_garcia_voigt(a: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     """

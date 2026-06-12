@@ -1,0 +1,81 @@
+{
+  "lr_max": 0.0005,
+  "seed": 0,
+  "head": "linear-log",
+  "n_steps_run": 1000,
+  "r_b_pre1_fire_step": 200,
+  "r_pre_at_M1": 0.5027291378265819,
+  "L_pre_step0": 0.4175008237361908,
+  "L_pre_at_M1": 0.20988982915878296,
+  "var_ratio_trajectory": [
+    {
+      "step": 0,
+      "var_rho_theta": 4.514148531598039e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 4.515864737288241e-06,
+      "pearson_r": -0.0345065811242282
+    },
+    {
+      "step": 100,
+      "var_rho_theta": 0.00017890427261590958,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 1.7897228910418322e-05,
+      "pearson_r": 0.042299789355694846
+    },
+    {
+      "step": 250,
+      "var_rho_theta": 0.00023714090639259666,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 2.3723106349976358e-05,
+      "pearson_r": -0.04633073232820763
+    },
+    {
+      "step": 500,
+      "var_rho_theta": 0.00011336141324136406,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 1.1340451140286503e-05,
+      "pearson_r": 0.03873443317214453
+    },
+    {
+      "step": 750,
+      "var_rho_theta": 6.661452061962336e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 6.663984637453312e-06,
+      "pearson_r": 0.021301756398424312
+    },
+    {
+      "step": 1000,
+      "var_rho_theta": 3.400137211428955e-05,
+      "var_rho_truth": 9.996199607849121,
+      "ratio": 3.4014298881738333e-06,
+      "pearson_r": 0.025150788601950094
+    }
+  ],
+  "var_ratio_spread_over_mean": 1.612160987266478,
+  "var_ratio_monotone_increasing": false,
+  "l_pre_trajectory": [
+    {
+      "step": 100,
+      "l_pre": 0.19686460494995117
+    },
+    {
+      "step": 250,
+      "l_pre": 0.21992921829223633
+    },
+    {
+      "step": 500,
+      "l_pre": 0.2027512788772583
+    },
+    {
+      "step": 750,
+      "l_pre": 0.19939571619033813
+    },
+    {
+      "step": 1000,
+      "l_pre": 0.21360808610916138
+    }
+  ],
+  "verdict": "UNKNOWN_NON_MONOTONIC",
+  "elapsed_sec": 5.344547748565674,
+  "cell_log_path": "experiments/nerf/artifacts/d73_a1_head_probe/cell_lr5e-04_seed0_linlog.log"
+}

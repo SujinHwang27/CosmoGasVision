@@ -22,6 +22,31 @@ fixed step grid {100, 250, 500, 750, 1000} without touching pipeline.py.
 Honest-reporting (CLAUDE.md / [D-37] rule (a)): the driver records what the
 probe observes and emits the pre-committed verdict mechanically. It does not
 recommend routing beyond the matrix; PI routes from the summary.
+
+---------------------------------------------------------------------------
+[D-73] §E A1 head-probe extension (2026-06-10, amendments AM-1..AM-5 binding):
+
+* ``--head {softplus,linear-log}`` plumbed to IGMNeRF(density_head=...).
+  Under linear-log, out[..., 0] IS log10(rho/<rho> + 1e-3); the training
+  loss is computed DIRECTLY on the raw output vs log10(rho_truth + 1e-3)
+  (AM-5: no round-trip through clamp(10**out) — the clamp kills gradient
+  below out = -3). The 10**-conversion is probe-side only.
+* AM-1: default artifact dir is experiments/nerf/artifacts/d73_a1_head_probe;
+  every cell JSON carries a "head" field; the [D-69] artifact dir
+  experiments/nerf/artifacts/d69_lr_probe is READ-ONLY (hard-guarded).
+  The [D-69] verdict matrix above is VOID / non-binding for the [D-73]
+  gate — it is still computed per cell for continuity but the summary is
+  tagged "d69_matrix": "VOID-for-D73"; the D73 verdict is computed solely
+  from the AM-2 rule below.
+* AM-2: every recorded probe step (PLUS a step-0 point) records, on the
+  same fixed probe sample, ratio = Var(rho_theta)/Var(rho_truth_fixed)
+  (linear rho/<rho> space) AND pearson_r = corr(rho_theta, rho_truth) over
+  the same voxels. [D-73] verdict rule (pre-registered): ESCAPE iff in >=1
+  lr cell there exists a recorded step <= 1000 where median-across-3-seeds
+  ratio > 0.1 AND median pearson_r >= 0.2; ratio-pass/corr-fail at every
+  such step -> ESCAPE-UNSTABLE, routed as COLLAPSE; otherwise COLLAPSE.
+* AM-3: Softplus control cells (seeds {1,2} x 3 lr) run into the same d73
+  artifact dir; seed-0 Softplus = existing [D-69] artifacts, cite-only.
 """
 
 from __future__ import annotations
@@ -66,7 +91,44 @@ from src.models.nerf import IGMNeRF  # noqa: E402
 # Pre-committed grid + budgets (per dispatch spec).
 PROBE_STEPS = [100, 250, 500, 750, 1000]
 DEFAULT_CELLS = [1e-4, 5e-4, 1e-3]
-ARTIFACT_DIR = Path("experiments/nerf/artifacts/d69_lr_probe")
+# AM-1: [D-69] dir is READ-ONLY; the [D-73] dir is the write default.
+D69_ARTIFACT_DIR = Path("experiments/nerf/artifacts/d69_lr_probe")
+ARTIFACT_DIR = Path("experiments/nerf/artifacts/d73_a1_head_probe")
+
+# [D-73] §E + amendment-1 AM-2 verdict rule (pre-registered; verbatim in
+# d73_summary.json). Thresholds are [D-70] M0 / R-b-pre1-frame (linear-space).
+D73_RATIO_THRESHOLD = 0.1
+D73_PEARSON_THRESHOLD = 0.2
+D73_RULE_TEXT = (
+    "ESCAPE iff in >=1 lr cell there exists a recorded step <= 1000 where "
+    "median-across-3-seeds ratio > 0.1 AND median pearson_r >= 0.2 at the "
+    "same step; ratio-pass/corr-fail at every such step -> ESCAPE-UNSTABLE, "
+    "routed as COLLAPSE per [D-37] rule (a); otherwise COLLAPSE. "
+    "(median-of-3 == 2-of-3.)"
+)
+
+
+def _head_loss(rho_theta_head, rho_truth, head: str):
+    """Head-aware L_pre.
+
+    softplus  : rho_theta_head is linear-space rho/<rho>; the canonical
+                _pretrain_loss applies log10(. + eps) to both sides.
+    linear-log: rho_theta_head IS log10(rho/<rho> + eps) raw (AM-5) — the
+                loss is computed DIRECTLY on it vs log10(truth + eps); no
+                round-trip through clamp(10**out) (clamp kills gradient
+                below out = -3).
+    """
+    if head == "softplus":
+        return _pretrain_loss(rho_theta_head, rho_truth)
+    diff = rho_theta_head - torch.log10(rho_truth + PRETRAIN_LOG_EPS)
+    return (diff * diff).mean()
+
+
+def _theta_linear(rho_theta_head, head: str):
+    """Linear-space rho_theta for the variance/correlation probes ONLY."""
+    if head == "softplus":
+        return rho_theta_head
+    return IGMNeRF.density_log_to_linear(rho_theta_head)
 
 
 def _format_lr_tag(lr: float) -> str:
@@ -75,9 +137,10 @@ def _format_lr_tag(lr: float) -> str:
 
 
 def _var_ratio_probe(model, rho_field_torch, coords_fixed, var_truth_fixed,
-                     device) -> dict[str, float]:
+                     device, truth_fixed=None,
+                     head: str = "softplus") -> dict[str, float]:
     """Forward the model on a FIXED probe coordinate set and return
-    (var_rho_theta, var_rho_truth_fixed, ratio).
+    (var_rho_theta, var_rho_truth_fixed, ratio[, pearson_r]).
 
     DEVIATION FROM SPEC (recorded per [D-37] rule (a)): the dispatch brief
     said record ``{step, var_rho_theta, var_rho_truth, ratio}`` at each
@@ -90,21 +153,39 @@ def _var_ratio_probe(model, rho_field_torch, coords_fixed, var_truth_fixed,
     ratio = var_theta / var_truth_fixed isolates model-side behavior.
 
     Mirrors the R-b-pre1 backstop comparison in train_pretrain (pipeline.py
-    lines ~893-919) on the rho_theta side; the var_truth denominator is
-    drawn from a SEPARATE freshly-sampled M1-style probe call.
+    lines ~893-919) on the rho_theta side. The var_truth denominator comes
+    from the SAME single fixed coord+truth draw — one call, same voxel set
+    for theta and truth (AM-5 docstring fix: an earlier version of this
+    docstring wrongly claimed a separate freshly-sampled probe call; the
+    implementation has always used the one fixed sample, which is correct).
+
+    AM-2: when ``truth_fixed`` is provided, also returns ``pearson_r`` =
+    Pearson correlation(rho_theta_linear, rho_truth) over the same voxels.
+    Both variance and correlation are computed in linear rho/<rho> space;
+    under the linear-log head the raw log output is converted via
+    IGMNeRF.density_log_to_linear (probe-side only, never in the loss).
     """
     with torch.no_grad():
         theta_eval = _pretrain_density_head(model, coords_fixed)
-        var_theta = float(theta_eval.var(unbiased=True).item())
-    return {
+        theta_lin = _theta_linear(theta_eval, head)
+        var_theta = float(theta_lin.var(unbiased=True).item())
+    out = {
         "var_rho_theta": var_theta,
         "var_rho_truth": var_truth_fixed,
         "ratio": var_theta / max(var_truth_fixed, 1e-30),
     }
+    if truth_fixed is not None:
+        t = theta_lin.detach().cpu().numpy().astype(np.float64)
+        u = truth_fixed.detach().cpu().numpy().astype(np.float64)
+        if np.std(t) < 1e-30 or np.std(u) < 1e-30:
+            out["pearson_r"] = 0.0  # degenerate (constant) prediction
+        else:
+            out["pearson_r"] = float(np.corrcoef(t, u)[0, 1])
+    return out
 
 
 def _l_pre_probe(model, rho_field_torch, microbatch, n_crops, crop_size,
-                 device, rng_seed: int) -> float:
+                 device, rng_seed: int, head: str = "softplus") -> float:
     """Compute L_pre on a fresh microbatch with no_grad — diagnostic only."""
     rng = torch.Generator(device=device).manual_seed(rng_seed)
     with torch.no_grad():
@@ -116,7 +197,7 @@ def _l_pre_probe(model, rho_field_torch, microbatch, n_crops, crop_size,
             generator=rng, device=device,
         )
         theta = _pretrain_density_head(model, coords)
-        return float(_pretrain_loss(theta, truth).item())
+        return float(_head_loss(theta, truth, head).item())
 
 
 def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
@@ -132,7 +213,9 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
     print(f"[probe] === lr_max={lr_max:.0e} seed={args.seed} ===", flush=True)
 
     # Per-cell stdout log file (open before MLflow-free training loop runs).
-    cell_log_path = log_dir / f"cell_lr{_format_lr_tag(lr_max)}_seed{args.seed}.log"
+    head_tag = "" if args.head == "softplus" else "_linlog"
+    cell_log_path = (log_dir /
+                     f"cell_lr{_format_lr_tag(lr_max)}_seed{args.seed}{head_tag}.log")
     log_fh = open(cell_log_path, "w", encoding="utf-8")
     t_cell_start = time.time()
 
@@ -143,7 +226,9 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
 
     try:
         # --- Model + optimizer + schedule (production-matched). ---
-        model = IGMNeRF(hidden_dim=256, num_layers=8, L=10).to(device)
+        model = IGMNeRF(hidden_dim=256, num_layers=8, L=10,
+                        density_head=args.head).to(device)
+        _emit(f"[probe] density_head={args.head}")
         optimizer = optim.AdamW(
             model.parameters(), lr=lr_max,
             betas=(0.9, 0.999), weight_decay=1e-6,
@@ -198,10 +283,28 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
                 generator=pre_rng, device=device,
             )
             rho_theta0 = _pretrain_density_head(model, coords0)
-            L_pre_step0 = float(_pretrain_loss(rho_theta0, rho_truth0).item())
+            L_pre_step0 = float(
+                _head_loss(rho_theta0, rho_truth0, args.head).item()
+            )
         _emit(f"[probe] L_pre @ step 0 = {L_pre_step0:.6e}")
 
         var_ratio_traj: list[dict[str, Any]] = []
+
+        # AM-2: step-0 probe point (before any optimizer step) so a
+        # decaying-init-variance trajectory is visible in the record.
+        vr0 = _var_ratio_probe(
+            model, rho_field_torch,
+            coords_fixed=probe_coords_fixed,
+            var_truth_fixed=probe_var_truth_fixed,
+            device=device,
+            truth_fixed=probe_truth_fixed,
+            head=args.head,
+        )
+        var_ratio_traj.append({"step": 0, **vr0})
+        _emit(
+            f"[probe] step 0: ratio={vr0['ratio']:.4e} "
+            f"pearson_r={vr0.get('pearson_r', float('nan')):.4f}"
+        )
         l_pre_traj: list[dict[str, Any]] = []
         r_b_pre1_fire_step: int | None = None
         r_pre_at_M1: float | None = None
@@ -224,7 +327,7 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
             # is short enough (1k steps x 3 cells) that nan/inf is observable
             # via the per-step prints. We DO want to detect R-b-pre1 inline
             # at the M1 step.
-            loss = _pretrain_loss(rho_theta_mb, rho_truth_mb)
+            loss = _head_loss(rho_theta_mb, rho_truth_mb, args.head)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
@@ -241,6 +344,8 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
                     coords_fixed=probe_coords_fixed,
                     var_truth_fixed=probe_var_truth_fixed,
                     device=device,
+                    truth_fixed=probe_truth_fixed,
+                    head=args.head,
                 )
                 lp = _l_pre_probe(
                     model, rho_field_torch,
@@ -249,6 +354,7 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
                     crop_size=args.pretrain_crop_size,
                     device=device,
                     rng_seed=args.seed + 8000 + step,
+                    head=args.head,
                 )
                 var_ratio_traj.append({"step": step, **vr})
                 l_pre_traj.append({"step": step, "l_pre": lp})
@@ -256,7 +362,9 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
                     f"[probe] step {step}: L_pre={float(loss.item()):.4e} "
                     f"var_theta={vr['var_rho_theta']:.4e} "
                     f"var_truth={vr['var_rho_truth']:.4e} "
-                    f"ratio={vr['ratio']:.4e} L_pre_probe={lp:.4e}"
+                    f"ratio={vr['ratio']:.4e} "
+                    f"pearson_r={vr.get('pearson_r', float('nan')):.4f} "
+                    f"L_pre_probe={lp:.4e}"
                 )
 
             # M1 hook — log R_pre and check R-b-pre1 (constant-density basin)
@@ -284,7 +392,9 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
                         crop_size=args.pretrain_crop_size,
                         generator=m1_rng, device=device,
                     )
-                    theta_m1 = _pretrain_density_head(model, coords_m1)
+                    theta_m1 = _theta_linear(
+                        _pretrain_density_head(model, coords_m1), args.head
+                    )
                     vr_m1 = {
                         "var_rho_theta": float(theta_m1.var(unbiased=True).item()),
                         "var_rho_truth": float(truth_m1.var(unbiased=True).item()),
@@ -315,7 +425,9 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
         # underlying question is "does the model move OUT of the basin
         # given more steps?" — and the 250/500/750/1000 points answer that
         # question directly. This widens FAIL_MOVING's reach.
-        ratios = [r["ratio"] for r in var_ratio_traj]
+        # d69-matrix continuity: exclude the AM-2 step-0 point so the legacy
+        # flat/monotone checks keep their original {100..1000} semantics.
+        ratios = [r["ratio"] for r in var_ratio_traj if r["step"] > 0]
         if len(ratios) >= 2:
             mean_r = sum(ratios) / len(ratios)
             if mean_r > 0:
@@ -360,6 +472,7 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
         cell_summary: dict[str, Any] = {
             "lr_max": lr_max,
             "seed": args.seed,
+            "head": args.head,
             "n_steps_run": last_step_reached,
             "r_b_pre1_fire_step": r_b_pre1_fire_step,
             "r_pre_at_M1": r_pre_at_M1,
@@ -380,6 +493,7 @@ def run_cell(lr_max: float, args, log_dir: Path) -> dict[str, Any]:
         return {
             "lr_max": lr_max,
             "seed": args.seed,
+            "head": args.head,
             "error": str(e),
             "traceback": traceback.format_exc(),
             "verdict": "ERROR",
@@ -435,9 +549,12 @@ def emit_summary(cell_results: list[dict[str, Any]],
         route = "fallback_mixed_outcome"
 
     summary = {
+        "d69_matrix": "VOID-for-D73",  # AM-1: [D-73] verdict comes solely
+        # from the AM-2 rule over var_ratio_trajectory (see d73_summary.json)
         "cells": [
             {
                 "lr_max": c.get("lr_max"),
+                "head": c.get("head"),
                 "verdict": c.get("verdict"),
                 "r_pre_at_M1": c.get("r_pre_at_M1"),
                 "r_b_pre1_fire_step": c.get("r_b_pre1_fire_step"),
@@ -466,6 +583,86 @@ def emit_summary(cell_results: list[dict[str, Any]],
     return summary
 
 
+def emit_d73_verdict(artifact_dir: Path) -> dict[str, Any]:
+    """[D-73] §E + AM-2 verdict aggregator (pre-registered rule, applied
+    mechanically). Reads every linear-log cell JSON in artifact_dir, groups
+    by lr cell, computes per-recorded-step median-across-seeds of ratio and
+    pearson_r, and applies D73_RULE_TEXT. Writes d73_summary.json.
+    """
+    cell_files = sorted(
+        f for f in artifact_dir.glob("cell_*.json")
+        if not f.name.startswith("._")  # ExFAT AppleDouble junk
+    )
+    cells = [json.loads(f.read_text()) for f in cell_files]
+    ll_cells = [c for c in cells if c.get("head") == "linear-log"
+                and "error" not in c]
+    by_lr: dict[float, list[dict]] = {}
+    for c in ll_cells:
+        by_lr.setdefault(c["lr_max"], []).append(c)
+
+    escape_hits = []          # steps where ratio AND pearson both pass
+    unstable_hits = []        # ratio passes, pearson fails
+    per_cell_medians: dict[str, list[dict[str, float]]] = {}
+    for lr_max, group in sorted(by_lr.items()):
+        steps = sorted({pt["step"] for c in group
+                        for pt in c["var_ratio_trajectory"]})
+        med_traj = []
+        for s in steps:
+            ratios = [pt["ratio"] for c in group
+                      for pt in c["var_ratio_trajectory"] if pt["step"] == s]
+            rs = [pt.get("pearson_r") for c in group
+                  for pt in c["var_ratio_trajectory"]
+                  if pt["step"] == s and pt.get("pearson_r") is not None]
+            med_ratio = float(np.median(ratios)) if ratios else float("nan")
+            med_r = float(np.median(rs)) if rs else float("nan")
+            med_traj.append({"step": s, "median_ratio": med_ratio,
+                             "median_pearson_r": med_r,
+                             "n_seeds": len(ratios)})
+            if med_ratio > D73_RATIO_THRESHOLD:
+                hit = {"lr_max": lr_max, "step": s,
+                       "median_ratio": med_ratio, "median_pearson_r": med_r}
+                if med_r >= D73_PEARSON_THRESHOLD:
+                    escape_hits.append(hit)
+                else:
+                    unstable_hits.append(hit)
+        per_cell_medians[f"lr={lr_max:.0e}"] = med_traj
+
+    if escape_hits:
+        verdict = "ESCAPE"
+        routed = "ESCAPE"
+    elif unstable_hits:
+        verdict = "ESCAPE-UNSTABLE"
+        routed = "COLLAPSE"  # per AM-2 / [D-37] rule (a)
+    else:
+        verdict = "COLLAPSE"
+        routed = "COLLAPSE"
+
+    softplus_cells = [c for c in cells if c.get("head") == "softplus"
+                      and "error" not in c]
+    d73 = {
+        "gate": "[D-73] §E A1 linear log-rho head probe",
+        "rule_verbatim": D73_RULE_TEXT,
+        "ratio_threshold": D73_RATIO_THRESHOLD,
+        "pearson_threshold": D73_PEARSON_THRESHOLD,
+        "verdict": verdict,
+        "routed_as": routed,
+        "escape_hits": escape_hits,
+        "escape_unstable_hits": unstable_hits,
+        "median_trajectories_by_lr_cell": per_cell_medians,
+        "n_linear_log_cells": len(ll_cells),
+        "n_softplus_control_cells_in_dir": len(softplus_cells),
+        "softplus_seed0_controls": "experiments/nerf/artifacts/d69_lr_probe "
+                                   "(read-only, cite-only per AM-3)",
+        "scope": "(n_grid=64, (gamma) direct rho-MSE, P1 z=0.3) per R8/R9",
+    }
+    out_path = artifact_dir / "d73_summary.json"
+    out_path.write_text(json.dumps(d73, indent=2))
+    print(f"[d73] verdict={verdict} (routed_as={routed})", flush=True)
+    print(json.dumps(d73, indent=2), flush=True)
+    print(f"[d73] wrote {out_path}", flush=True)
+    return d73
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--seed", type=int, default=0)
@@ -482,14 +679,33 @@ def main(argv=None) -> int:
     p.add_argument("--cells", type=str, default=None,
                    help="Comma-separated lr_max values; default 1e-4,5e-4,1e-3")
     p.add_argument("--artifact_dir", type=str, default=str(ARTIFACT_DIR))
+    p.add_argument("--head", type=str, default="softplus",
+                   choices=["softplus", "linear-log"],
+                   help="[D-73] §E density head selector")
+    p.add_argument("--emit_d73_verdict", action="store_true",
+                   help="Skip training; aggregate cell JSONs in artifact_dir "
+                        "and emit d73_summary.json per the AM-2 rule")
     args = p.parse_args(argv)
+
+    log_dir = Path(args.artifact_dir)
+
+    # AM-1 hard guard: the [D-69] artifact dir is READ-ONLY.
+    if log_dir.resolve() == D69_ARTIFACT_DIR.resolve():
+        print("[probe] REFUSED: experiments/nerf/artifacts/d69_lr_probe is "
+              "READ-ONLY per [D-73] amendment-1 AM-1. Use the default "
+              "d73_a1_head_probe dir or pass another --artifact_dir.",
+              flush=True)
+        return 2
+
+    if args.emit_d73_verdict:
+        emit_d73_verdict(log_dir)
+        return 0
 
     if args.cells:
         cells = [float(x.strip()) for x in args.cells.split(",") if x.strip()]
     else:
         cells = list(DEFAULT_CELLS)
 
-    log_dir = Path(args.artifact_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[probe] cells={cells} artifact_dir={log_dir}", flush=True)
@@ -498,7 +714,9 @@ def main(argv=None) -> int:
     cell_results: list[dict[str, Any]] = []
     for lr_max in cells:
         cell_summary = run_cell(lr_max, args, log_dir)
-        cell_path = log_dir / f"cell_lr{_format_lr_tag(lr_max)}_seed{args.seed}.json"
+        head_tag = "" if args.head == "softplus" else "_linlog"
+        cell_path = (log_dir /
+                     f"cell_lr{_format_lr_tag(lr_max)}_seed{args.seed}{head_tag}.json")
         cell_path.write_text(json.dumps(cell_summary, indent=2))
         print(f"[probe] wrote {cell_path}", flush=True)
         cell_results.append(cell_summary)
