@@ -1,0 +1,28 @@
+{
+  "deliverable": "[D-73] A4 Wiener baseline -- correlation-length sensitivity sweep",
+  "note": "All cells: P1 z=0.3, 1024 rays first-N slice, 64^3 grid, noise_rel=0.05, pixel_stride=192 (Npix=11264), direct dense solve. xi/r_rho estimators per the per-L JSONs. None approach the [D-13] 0.6 bar; best case L=4 Mpc/h gives xi_3d(r=2)=+0.092.",
+  "d13_bar": 0.6,
+  "sweep": [
+    {
+      "L_corr_mpc_h": 2.0,
+      "xi_3d_pearson_r2_interp": 0.05103367924795565,
+      "r_rho_log_median": 0.11271106402851047,
+      "density_power_ratio_shape": 0.009105030258733634,
+      "global_linear_gain": 3.1133417942610504
+    },
+    {
+      "L_corr_mpc_h": 3.0,
+      "xi_3d_pearson_r2_interp": 0.06592663565485034,
+      "r_rho_log_median": 0.14761649568127827,
+      "density_power_ratio_shape": 0.020452522525162376,
+      "global_linear_gain": 4.671277220479149
+    },
+    {
+      "L_corr_mpc_h": 4.0,
+      "xi_3d_pearson_r2_interp": 0.09164353648824224,
+      "r_rho_log_median": 0.17343930708822158,
+      "density_power_ratio_shape": 0.05194692340385902,
+      "global_linear_gain": 8.73769087815918
+    }
+  ]
+}

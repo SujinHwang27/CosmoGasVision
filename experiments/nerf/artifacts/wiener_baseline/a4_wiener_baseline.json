@@ -1,0 +1,174 @@
+{
+  "deliverable": "[D-73] A4 Stark+2015/CLAMATO Wiener density baseline",
+  "provenance": {
+    "generated_utc": "2026-06-12T03:23:40.584089+00:00",
+    "script": "scripts/d73_a4_wiener_baseline.py",
+    "wiener_module": "src/analysis/wiener_baseline.py",
+    "inputs": {
+      "sightlines": "Sherwood/Physics1_nofeedback/los2048_n16384_z0.300.dat (via SherwoodLoader.load_sightlines(1, 0.3))",
+      "tau": "Sherwood/Physics1_nofeedback/tauH1_2048_n16384_z0.300.dat",
+      "rho_truth_cube": "Sherwood/.rho_field_cache/rho_field_p1_z0.300_n64.npy"
+    },
+    "geometry": {
+      "physics_id": 1,
+      "redshift": 0.3,
+      "n_rays": 1024,
+      "ray_selection": "first-N (production slice)",
+      "n_grid": 64,
+      "box_mpc_h": 60.0,
+      "pixels_per_ray_used": 11,
+      "pixel_stride": 192,
+      "Npix_total": 11264
+    },
+    "wiener_config": {
+      "L_corr_mpc_h": 2.0,
+      "noise_rel_sigma2": 0.05,
+      "kernel": "isotropic 3D Gaussian exp(-r^2/2L^2), periodic min-image"
+    },
+    "metric_code_paths": {
+      "xi_3d_gate": "src/analysis/cross_corr.py:compute_xi_pearson (line 18)",
+      "xi_1d_surrogate": "scripts/proxy_xi_1d_sample.py:_pearson_per_row (median over rays); [D-58] production metric",
+      "density_power": "src/analysis/density_power.py:compute_Pdelta_iso (line 120)"
+    },
+    "command": "PYTHONPATH=. ~/.venvs/cosmogasvision/bin/python -u scripts/d73_a4_wiener_baseline.py --L-mpc-h 2.0 --noise-rel 0.05 --pixel-stride 192"
+  },
+  "idealizations": [
+    "Noiseless mock: noise term is a 1e-3*signal regularizer, not a survey continuum-fit+photon noise model -> best-case classical recon.",
+    "Gaussian-correlation prior (prescribed L), not a measured nonlinear P(k).",
+    "No redshift-space-distortion deconvolution (maps redshift-space flux directly, CLAMATO convention).",
+    "Single global linear gain fit to truth for the power-ratio amplitude (Pearson xi metrics are gain-invariant and need no such fit).",
+    "rho-truth cube is the 64^3 CIC field; reconstruction is on the same grid."
+  ],
+  "results": {
+    "mean_F": 0.9790409713147822,
+    "global_linear_gain_b": 3.1133417942610504,
+    "xi_3d_pearson_gate": {
+      "estimator": "src/analysis/cross_corr.compute_xi_pearson (3D FFT shell)",
+      "xi_at_r2_interp": 0.05103367924795565,
+      "xi_nearest_shell": {
+        "r_mpc_h": 2.0,
+        "xi": 0.05103367924795565
+      },
+      "r_centers": [
+        0.5,
+        1.25,
+        2.0,
+        3.0,
+        4.25,
+        6.5,
+        11.5,
+        22.5
+      ],
+      "xi_profile": [
+        0.06085836475147371,
+        0.05792380109707052,
+        0.05103367924795565,
+        0.04136215010709584,
+        0.029273730431499292,
+        0.014035556474747057,
+        0.002273275992853733,
+        -0.0009823449603251723
+      ],
+      "d13_gate_bar": 0.6,
+      "passes_d13_bar": false
+    },
+    "xi_1d_surrogate_r_rho": {
+      "estimator": "r_rho^log per [D-58] (median over rays)",
+      "r_rho_log_median": 0.11271106402851047,
+      "r_rho_log_q16": -0.04762719776864257,
+      "r_rho_log_q84": 0.28794383902309045,
+      "r_rho_lin_median": 0.07443727107624501,
+      "n_valid": 1024
+    },
+    "density_power_ratio": {
+      "band_h_per_mpc": [
+        0.1,
+        1.0
+      ],
+      "P_rec_over_P_truth_mean": 0.009105030258733634,
+      "k_centers": [
+        0.05503470856261047,
+        0.0666760716081662,
+        0.0807799049219937,
+        0.09786708907438299,
+        0.11856868528308273,
+        0.1436492416676832,
+        0.1740350294214205,
+        0.21084825171429106,
+        0.25544848872534637,
+        0.30948290944563017,
+        0.3749471046662278,
+        0.45425878782584334,
+        0.5503470856261047,
+        0.6667607160816618,
+        0.8077990492199367,
+        0.9786708907438298,
+        1.185686852830827,
+        1.436492416676832,
+        1.740350294214205,
+        2.1084825171429102,
+        2.554484887253463,
+        3.094829094456302,
+        3.7494710466622774,
+        4.542587878258433
+      ],
+      "P_rec": [
+        NaN,
+        NaN,
+        NaN,
+        4.45838092411335,
+        NaN,
+        3.1091383069198684,
+        3.455776998571762,
+        14.00274348678345,
+        5.294462060160522,
+        3.5202415383056516,
+        2.416125095770654,
+        2.526890871425043,
+        2.466688259475432,
+        2.0519522344760923,
+        1.759436254977349,
+        1.4200481174397752,
+        0.6771736924268783,
+        0.1828870969299071,
+        0.012497623979099533,
+        0.00011162377591439334,
+        1.0064914085545395e-07,
+        3.5374373472287378e-12,
+        1.394875801721543e-18,
+        5.5435400867468325e-28
+      ],
+      "P_truth": [
+        NaN,
+        NaN,
+        NaN,
+        1069.6599394163752,
+        NaN,
+        1559.7870774616085,
+        441.80003751165,
+        1446.6391854795784,
+        1024.4902272636234,
+        383.39927810105024,
+        452.93841954446265,
+        287.8214231963698,
+        228.35290137925526,
+        158.9124882483264,
+        131.03280043069554,
+        94.32265842218155,
+        67.423587263901,
+        48.29660841004121,
+        32.827513428876365,
+        20.525457604073104,
+        11.232130062103506,
+        5.575672164746857,
+        2.5289940208491277,
+        0.910501641474489
+      ],
+      "note": "Computed AFTER the global linear-gain fit; absolute amplitude is gain-calibrated, so this ratio measures SHAPE fidelity of the recovered power, not blind amplitude."
+    },
+    "delta_pf_over_pf": {
+      "computed": false,
+      "reason": "The Wiener method outputs a 3D DENSITY estimate, not a flux field. Forward-modelling it to P_F needs the full FGPA+RSD+Voigt integrator on 3D x_HI/T/v_pec fields that the linear Wiener filter does not produce. Out of scope for a classical density baseline; documented per [D-37]."
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "deliverable": "[D-73] A7(b) production xi(r=2 Mpc/h) surrogate",
+  "provenance": {
+    "generated_utc": "2026-06-12T02:40:10.484127+00:00",
+    "script": "scripts/d73_a7_control_recompute.py",
+    "run_id": "31acdf9d900e447081e6d051f7d42c0e",
+    "run_dir": "cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe",
+    "data_root": "Sherwood",
+    "geometry": {
+      "physics_id": 1,
+      "redshift": 0.3,
+      "tau_max": 10.0,
+      "hidden_dim": 256,
+      "num_layers": 8,
+      "L_fourier": 10
+    },
+    "metric_def_var_pf": {
+      "code": "experiments/nerf/pipeline.py:3047-3060 + src/training/p_flux_loss.py:torch_p_flux",
+      "K_MIN_INERTIAL": 0.0031622776601683794,
+      "K_MAX_INERTIAL": 0.03162277660168379,
+      "definition": "Var_k(mean_rays(P_F_pred)[band]) / max(Var_k(mean_rays(P_F_truth)[band]), 1e-30)"
+    },
+    "metric_def_xi": {
+      "code": "scripts/proxy_xi_1d_sample.py:_pearson_per_row (median over rays)",
+      "name": "r_rho^log (1D-along-ray Pearson on log10(rho/<rho>), [D-58])"
+    },
+    "ckpt": "cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe/checkpoints/step_050000.pt",
+    "ckpt_mlflow_run_id": "31acdf9d900e447081e6d051f7d42c0e",
+    "xi_n_rays": 1024,
+    "rho_pred_floor": 1e-06,
+    "ray_selection": "first-N (coords_raw[:n]); deterministic, matches pub-t1 default-OFF slice order. The [D-58] throwaway used a seeded random subsample; estimator identical, ray set differs.",
+    "command": "PYTHONPATH=. ~/.venvs/cosmogasvision/bin/python -u scripts/d73_a7_control_recompute.py"
+  },
+  "estimator_name": "r_rho^log (1D-along-ray Pearson on log10(rho/<rho>))",
+  "estimator_note": "This is the production metric per [D-58]: a 1D-along-ray zero-lag Pearson surrogate, NOT the [D-13] 3D xi_{rho_hat,rho}(r=2 h^-1 Mpc) FFT-shell estimator (src/analysis/cross_corr.py:compute_xi_pearson). The 3D measure requires a reconstructed 3D rho cube; the production model is supervised on 1D flux sightlines only, so no 3D cube exists to feed the [D-13] gate evaluator. The 3D measurement was deferred per A2/[D-23] (pending the ~40 GB SherwoodIGM_gal extraction).",
+  "r_rho_log": {
+    "n_valid": 1024,
+    "median": 0.029244892432526162,
+    "q16": -0.08877562530538688,
+    "q25": -0.051912130711501275,
+    "q75": 0.11367714605709049,
+    "q84": 0.15424013088391478
+  },
+  "r_rho_lin": {
+    "n_valid": 1024,
+    "median": -0.002469569334534725,
+    "q16": -0.052383367588258144,
+    "q25": -0.03793413096364434,
+    "q75": 0.05592807399319095,
+    "q84": 0.09371127853544751
+  },
+  "comparison_to_published": "LEDGER cites production r_rho^log=+0.077 from the T3 N1024 checkpoint (cloud_runs/prong3-p1-t3/.../step_010000.pt, run f74dbb669c9641568ab883023a84d1fa). THIS number is from the A7-named pub-t1 P1-N64 run 31acdf9d step_050000 on n_rays=1024 -- a DIFFERENT checkpoint; values are not expected to be identical."
+}
