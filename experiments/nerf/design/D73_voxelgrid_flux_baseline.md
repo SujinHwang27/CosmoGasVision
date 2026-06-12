@@ -16,31 +16,38 @@ supervision (R13), NOT a supervision-change and NOT Mode-B remediation.
 
 ---
 
-## 1. The closure fork — RESOLVED: option (b)
+## 1. The closure fork — RE-RESOLVED: option (a) (was option (b); corrected per (1d′)-construction panel KILLER-1, 2026-06-11)
 
-**Decision**: (b) explicit log10-ρ voxel grid for the **density field only**;
-T and X_HI tied to ρ via the fluctuating Gunn-Peterson approximation (FGPA);
-v_pec NOT a free grid.
+**Decision**: (a) explicit log10 voxel grids for **all four fields** — ρ, T, X_HI,
+v_pec — one independent grid per field, matching the production MLP's four free
+output heads one-for-one.
 
-**Free fields**: ρ (grid). **Closed fields**: T = T0·(ρ/⟨ρ⟩)^(γ−1); X_HI from the
-FGPA τ∝ρ^β scaling already embedded in the production forward model; v_pec recovered
-from ρ via the same FGPA/RSD relation the production integrator consumes (linear-theory
-peculiar velocity from the density field), defaulting to v_pec = 0 if that path is not
-already wired in the production MLP route. v_pec is in either case a **fixed function
-of ρ**, introducing zero free DOF.
+**Free fields**: ρ (grid), T (grid), X_HI (grid), v_pec (grid). **Closed fields**: none.
 
-**Rationale (stated, hedged)**:
-- (b) is the stronger TARDIS-analog: T and X_HI tied to ρ by FGPA mirrors the
-  classical Horowitz+2019 reconstruction assumption set; the test doubles as the
-  missing TARDIS-analog baseline datum ([D-73] §B, A4-adjacent).
-- (b) isolates exactly one degree of freedom (R10 one-lever): a PASS/FAIL is
-  attributable to the ρ representation, not to a re-opened multi-field degeneracy.
-  Option (a) (four free grids, 12 free DOF/voxel) reintroduces the
-  constant-T / structured-ρ / structured-X_HI degeneracy the [D-42]/[D-47] arc
-  mapped; a PASS under (a) could not be attributed to the ρ axis alone.
-- The FGPA closure constants (T0, γ, β) are taken **unchanged from the production
-  MLP forward model** — they are not re-fit here. This is load-bearing for one-lever
-  cleanliness (see §3, §6).
+**Rationale (stated, hedged) — corrected one-lever argument**:
+- The production forward path is **four free fields**, not one. Verified this session at
+  `nerf.py:204-218`: the MLP emits density, temp = softplus·1e4+1e3, h1_frac = sigmoid,
+  vpec = tanh·500 as four independent output heads, consumed directly by
+  `volume_render_physics` (`nerf.py:303-307`). There is **no FGPA closure in the
+  production forward path**. The only FGPA-tail in the project ([D-41]) is a retired,
+  smoke-FAILed, default-OFF soft regularizer whose z~3 Hui-Gnedin β=1.6/γ=−0.7 the
+  project flags as mis-specified at z=0.3 (LEDGER S3 §587).
+- Therefore the **one-lever match to production is option (a)**: four free grids vs four
+  free MLP heads. Option (b) (ρ free, T/X_HI/v_pec FGPA-closed) would change **two** axes
+  at once — the representation AND the field-DOF count (4-free → 1-free+closure) — so a
+  (b) PASS/FAIL could not be attributed to the representation axis alone. Option (b)
+  additionally imports the z~3 FGPA closure the project suspects is wrong at z=0.3,
+  confounding every (b) gate verdict with a closure defect.
+- **Anti-(a) argument STRUCK (was inverted)**: the prior text claimed option (a)
+  "reintroduces the constant-T / structured-ρ / structured-X_HI degeneracy." That
+  degeneracy is exactly what the production 4-free-head MLP **already carries**; matching
+  it is *required* for one-lever attribution, not a defect introduced by (a). The [D-42]/
+  [D-47] arc mapped that degeneracy as a property of the production representation — the
+  (1d′) test must inherit it, not eliminate it, to isolate the representation axis.
+- The **TARDIS-analog / FGPA-closed datum is a SEPARATE deliverable**, reported as an
+  explicit two-axis result (representation swap + closure imposition), NEVER as the (1d′)
+  one-lever test. It is out of scope for this bounded close-out (no new engineering budget;
+  [D-73] §F item 7).
 
 **Pre-committed degeneracy audit (R3 / [D-37]-ext rule 3)**: under flux supervision
 with the [D-24] saturated-absorber mask, `loss_data` is weakly informative on the
@@ -57,9 +64,18 @@ it is a pre-committed valid end-state, not a failure of the experiment.
 
 ## 2. Grid parameterization
 
-- **Field**: a single dense tensor `log_rho_grid` of shape (G, G, G), G = 128 default.
-  ≈ 2.10M free parameters (128³ = 2,097,152). Comparable in parameter count to the
-  production MLP body; trivially fits A30 memory.
+- **Field**: four independent dense tensors — `log_rho_grid`, `temp_grid`, `xhi_grid`,
+  `vpec_grid`, each shape (G, G, G), G = 128 default. ≈ 4 × 2.10M = 8.39M free
+  parameters total (4 × 128³). Comparable in parameter count to the production MLP body;
+  trivially fits A30 memory. Each grid's output transform mirrors the corresponding
+  production MLP head: log10(ρ/⟨ρ⟩ + 1e-3) for density (per §2 output-transform below);
+  softplus·1e4+1e3 for T; sigmoid for X_HI; tanh·500 for v_pec — applied to the
+  trilinearly-interpolated raw grid value, byte-for-byte the `nerf.py:214-216` head maps.
+- **SERIOUS-2 RSD-parity (resolved by option (a))**: the free `vpec_grid` matches the
+  production MLP's free vpec head feeding the RSD line-shift at `nerf.py:328`
+  (v_source = vel_axis + vpec). The prior option-(b) v_pec=0 (or FGPA-derived v_pec)
+  would have broken RSD-parity with the production path; the free v_pec grid restores it
+  with zero closure assumption.
 - **Resolution justification**: 128³ is coarse vs the production 768³ ρ-field. This is
   deliberate and pre-committed as a scope-lock: the test asks whether an explicit field
   can represent the flux-relevant structure *at all*, not whether it matches 768³.
@@ -70,6 +86,14 @@ it is a pre-committed valid end-state, not a failure of the experiment.
   128³ over the 60 Mpc/h box). A trainability PASS at 128³ that fails P_F is NOT
   attributable to under-resolution at this band; a re-bake at higher G is the single
   permitted re-bake (§5) only if the panel flags a resolution confound at gate-construction.
+- **MANDATORY pre-dispatch voxels-per-shortest-mode calc (SERIOUS-4)**: before dispatch,
+  compute the z=0.3 box-velocity-length → shortest-resolved-mode → voxels-per-mode at G=128
+  over the 60 Mpc/h box for the [D-13] inertial-band upper edge k_∥ = 10^−1.5 s/km. If
+  **voxels-per-shortest-mode ≲ 4**, START at G ≥ 192³ (not 128³) to preserve the single
+  permitted re-bake (§5) for a genuine construction defect rather than spending it on an
+  under-resolution confound the calc could have caught at design time. Record the calc
+  (Hubble flow at z=0.3, box H(z), Nyquist) in the dispatch brief. A G≥192³ start triggered
+  by this calc is NOT a re-bake — it is the correct initial resolution.
 - **Interpolation**: trilinear (`grid_sample`-equivalent or manual trilinear),
   autograd-compatible, no detached numpy in the ray-sampling path (CLAUDE.md contract).
   Ray sample points (the production integrator's quadrature nodes along each sightline)
@@ -129,13 +153,17 @@ regardless of the other's outcome.
   band-masked, float64 variance ratio). Definition-match to production is a panel-check
   item (§6).
 - **Threshold**: `var_pf_band_ratio > 1e-3` at step 5000.
-- **Margin rationale**: the [D-65]/[D-63] collapsed-basin ceiling is 2.93e-6 (job 202109,
-  L2 reduction sum→mean). 1e-3 is ≥ 300× over that ceiling — a grid that clears it has
-  produced flux-power structure the collapsed MLP basins never reached. **Healthy-run
-  anchor (A7, 2026-06-10)**: the production pub-t1 run sits at var_pf_band_ratio ≈ 1.0
-  at steps 5000–50000 (`d73_a7_control/a7a_var_pf_control.json`) — so the 1e-3 bar sits
-  ~3 orders below the healthy/trained signature and ~300× above the collapsed basin, a
-  defensible mid-band threshold. CAVEAT (strengthened per [D-73] amendment-3 §G — PARTIAL
+- **Margin rationale (re-anchored per (1d′)-construction panel SERIOUS-3)**: the bar is
+  anchored PRIMARILY to the **A7 healthy production run** (`d73_a7_control/a7a_var_pf_control.json`),
+  which sits at var_pf_band_ratio ≈ 1.0 at steps 5000–50000 — the frame-comparable,
+  same-instrumentation, same-architecture-class trained signature. The 1e-3 bar sits ~3
+  orders below the healthy/trained signature: a grid clearing it has produced flux-power
+  structure within 3 decades of a healthy trained run. The collapsed-basin ceiling
+  (2.93e-6, job 202109) is retained as a **SECONDARY sanity floor only** — the bar sits
+  ≥300× above it — with the explicit caveat that 2.93e-6 is from a **different
+  architecture + reduction** (L2 reduction sum→mean) and is therefore a cross-arch sanity
+  reference, not the primary anchor. Anchoring primarily to A7 (frame-comparable) rather
+  than to the cross-arch collapsed ceiling closes the SERIOUS-3 mismatch. CAVEAT (strengthened per [D-73] amendment-3 §G — PARTIAL
   SERIOUS-2 discharge): the healthy-run control is available only from step 5000 onward (no
   step-200/1000 checkpoint), so a matched step-200 control does not exist. This means the
   SERIOUS-2 attack ("collapsed-basin retirements read at step 200 may be not-yet-trained, not
@@ -157,11 +185,21 @@ regardless of the other's outcome.
 - (b) ξ_ρ̂,ρ(r = 2 h⁻¹ Mpc) > 0.6, **3D FFT-shell estimator** (`src/analysis/cross_corr.py:compute_xi_pearson`)
   — the explicit grid IS a 3D ρ cube, so unlike the production MLP (1D-surface-supervised,
   no 3D cube; A7 could only report the 1D r_ρ^log surrogate) the (1d′) run CAN be scored on
-  the true [D-13] 3D ξ. **[D-36] provenance disclosure** mandatory on every citation: the
-  0.6 bar is a project-side adoption, NOT a Stark+2015-quoted value. **A4 anchor (2026-06-10)**:
-  the idealized noiseless Wiener baseline reaches ξ_3D(2 Mpc/h) ≈ 0.05 on this geometry
-  (`wiener_baseline/a4_wiener_baseline.json`) — the classical external bar; the (1d′) ξ is
-  reported against both the 0.6 gate and the 0.05 Wiener anchor.
+  the true [D-13] 3D ξ. **[D-36] / PROBE-6 provenance disclosure** mandatory on every ξ
+  citation: the ξ estimator is from Stark+2015; the 0.6 threshold is a **project-side
+  adoption per [D-36]**, NOT a Stark+2015-quoted value. Both halves (estimator-source AND
+  threshold-provenance) carry on every citation. **A4 anchor — WITHDRAWN pending re-run
+  (A4′), per A4-scrutiny panel 2026-06-11**: the prior ξ_3D(2 Mpc/h) ≈ 0.05 "best-case
+  Wiener" anchor is **DEMOTED — not citable as an information floor**. As-run it was
+  over-regularized (data tracer not unit-variance standardized → ~2.5× over-regularization)
+  AND ran at noise_rel=0.05 (50× the claimed 1e-3 idealization; provenance contradiction),
+  AND used 11 px/ray (LOS spacing coarser than the L=2 Mpc/h correlation length), AND its
+  L-sweep was monotone to the boundary (optimum outside the window). A4′ re-run
+  (support-researcher, CPU) is authorized to earn a real classical number with the panel
+  fixes; until it lands, the (1d′) ξ is reported against the 0.6 [D-36]-provenance gate
+  ONLY, with NO classical anchor. When A4′ lands, its self-anchored "validated best-case
+  Wiener at z=0.3" value (R14 — never an external CLAMATO/TARDIS bar) is the anchor, with
+  the z=0.3 / density-FFT-shell scope caveat attached.
 - (c) KS-distance on flux PDF < 0.05 over F ∈ [0.05, 0.95].
 
 ### Pre-committed outcome semantics (all three valid, publishable — decision-quality, rule 7)
@@ -213,10 +251,14 @@ ONE cycle only (R-bank FREEZE / §F item 7 cap — one gate-construction panel c
 sub-30-A30-hr experiment). The cycle's object is the **gate construction**, not a readout.
 Required checks:
 
-1. **FGPA-closure choice (the load-bearing item)**: T, X_HI, v_pec are derived from ρ by
-   the **identical** FGPA/RSD relations the production MLP path consumes — same T0, γ, β,
-   same RSD treatment, same mask. No grid-specific second closure. This is what makes the
-   one-lever attribution valid; if it fails, the whole comparison is confounded.
+1. **Four-free-field parity (the load-bearing item, re-resolved option (a))**: the four
+   grids (ρ, T, X_HI, v_pec) feed the integrator through the **identical** output-head
+   maps and the identical RSD/mask/integrator path the production 4-head MLP uses — same
+   softplus/sigmoid/tanh transforms (`nerf.py:214-216`), same v_source RSD shift
+   (`nerf.py:328`), same mask. There is NO FGPA closure on either side (the production
+   path has none; verified `nerf.py:204-218`). This four-free-field parity is what makes
+   the one-lever (grid-vs-MLP) attribution valid; if a grid-specific closure or transform
+   crept in, the comparison would be confounded.
 2. **One-lever cleanliness (R10)**: grid-vs-MLP is the ONLY changed axis; loss form, mask,
    cap, anchor, integrator, optimizer schedule all inherited unchanged; the Rung-3
    reweighted loss is confirmed ABSENT ([D-73] §D).
@@ -231,14 +273,19 @@ Required checks:
    K6 unit-chain obligation is discharged by this same-frame construction, not by an external
    observational anchor, so no FGPA forward-model unit-transfer is crossed.)
 5. **[D-36] ξ-provenance disclosure**: the 0.6 bar citation carries the project-side-adoption
-   disclosure (not Stark-quoted); the A4 Wiener ξ ≈ 0.05 anchor carries its idealization
-   caveats (noiseless, Gaussian prior, global-gain-fit).
+   disclosure (not Stark-quoted, estimator from Stark+2015); the A4 Wiener ξ anchor is
+   WITHDRAWN pending the A4′ re-run (was over-regularized; see §4(ii)(b)) — until A4′ lands
+   the (1d′) ξ carries NO classical anchor, only the 0.6 [D-36] gate.
 6. **Re-bake scope**: the 1 re-bake is for a panel-flagged construction defect only, not tuning.
 
 K6 narrow-discharge linkage: per [D-73] §B, this design-doc panel cycle IS the [D-71]
-§D/§F K6 narrow-discharge gate. The K6 obligation discharges with an APPROVE on items 1-6;
-a NEEDS-WORK returns the construction defect to the PI (no second cycle — the defect is
-fixed and the re-bake budget absorbs at most one construction fix).
+§D/§F K6 narrow-discharge gate. **K6 DISCHARGED 2026-06-11**: the single permitted cycle
+returned NEEDS-WORK (KILLER-1, option-(b) two-lever), the PI applied the panel-authorized
+mechanical fix (option (a), four free grids — edits (i)–(viii), [D-73] amendment-4) inside
+the re-bake budget WITHOUT consuming a second cycle, and items 1-6 now hold under option (a).
+The construction defect is fixed; no second cycle. The §6 item-1 FGPA-closure check is now
+N/A (no closure — four free grids); item 2 one-lever cleanliness holds (grid-vs-MLP, four
+free fields each side); items 3-6 unchanged.
 
 ---
 
