@@ -135,10 +135,15 @@ regardless of the other's outcome.
   anchor (A7, 2026-06-10)**: the production pub-t1 run sits at var_pf_band_ratio ≈ 1.0
   at steps 5000–50000 (`d73_a7_control/a7a_var_pf_control.json`) — so the 1e-3 bar sits
   ~3 orders below the healthy/trained signature and ~300× above the collapsed basin, a
-  defensible mid-band threshold. CAVEAT: the healthy-run control is available only from
-  step 5000 onward (no step-200/1000 checkpoint), so a matched step-200 control does not
-  exist; the trainability gate at step 5000 is nonetheless inside the confirmed-healthy
-  window.
+  defensible mid-band threshold. CAVEAT (strengthened per [D-73] amendment-3 §G — PARTIAL
+  SERIOUS-2 discharge): the healthy-run control is available only from step 5000 onward (no
+  step-200/1000 checkpoint), so a matched step-200 control does not exist. This means the
+  SERIOUS-2 attack ("collapsed-basin retirements read at step 200 may be not-yet-trained, not
+  genuine collapse") is only PARTIALLY discharged: the healthy run is confirmed at ≈1.0 by
+  step 5000 (5+ orders above the ~1e-6 retirements), but a step-200 read of ~1e-6 is not
+  directly excluded as a transient. The (1d′) trainability gate is read at step 5000 —
+  INSIDE the confirmed-healthy window — so this caveat does NOT weaken the (1d′) gate itself;
+  it bounds only what the prior 7-lever step-200 retirements can claim.
 - **PASS / FAIL / MARGINAL**:
   - PASS: > 1e-3 at step 5000.
   - MARGINAL: ∈ [~8.8e-5, 1e-3) — above the collapsed ceiling by a clear margin but
