@@ -349,10 +349,27 @@ def parse_args(argv=None):
     # operative-cause swap-back test (pre-flight D, M0-PASS-conditional).
     p.add_argument("--arch", dest="arch",
                    type=str, default="current",
-                   choices=["current", "skip-rich-mlp"],
+                   choices=["current", "skip-rich-mlp", "voxel-grid"],
                    help="[D-70 (1b)] Body architecture. 'current' preserves "
                         "the pre-Rev-5.1 model; 'skip-rich-mlp' enables the "
-                        "DeepSDF every-layer skip-input variant.")
+                        "DeepSDF every-layer skip-input variant. "
+                        "[D-73 (1d')] 'voxel-grid' swaps the coordinate-MLP "
+                        "field producer for four independent dense (G,G,G) "
+                        "voxel grids (option (a): one free grid per MLP head), "
+                        "feeding the IDENTICAL [D-24] flux regime / RSD-Voigt "
+                        "integrator. One-lever parameterization-axis test.")
+    p.add_argument("--voxel-grid-size", dest="voxel_grid_size",
+                   type=int, default=192,
+                   help="[D-73 (1d')] G for the --arch voxel-grid grids "
+                        "((G,G,G) per field). Default 192 per the "
+                        "voxels-per-shortest-mode calc (design §2 SERIOUS-4: "
+                        "G=128 gives ~4.7 voxels/mode at the inertial upper "
+                        "edge, borderline; G=192 gives ~7.1, comfortably "
+                        "clear). Ignored unless --arch voxel-grid.")
+    p.add_argument("--voxel-init-noise-std", dest="voxel_init_noise_std",
+                   type=float, default=0.01,
+                   help="[D-73 (1d')] sigma of the symmetry-breaking Gaussian "
+                        "noise on the constant-mean grid init (design §2).")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
@@ -1980,12 +1997,44 @@ def train(args):
     # Default-OFF preserves byte-equivalent baseline: the embedding is not
     # instantiated and does not consume from the RNG stream, so layer init
     # is unchanged from the pre-[D-46] code.
-    model = IGMNeRF(
-        hidden_dim=256, num_layers=8, L=10,
-        use_velocity_gradient_conditioning=args.use_velocity_gradient_conditioning,
-        use_physics_embedding=args.use_physics_embedding,
-        body_arch=getattr(args, "arch", "current"),
-    ).to(device)
+    _arch = getattr(args, "arch", "current")
+    if _arch == "voxel-grid":
+        # [D-73 (1d')] Explicit four-field voxel-grid producer (option (a)).
+        # Drops into volume_render_physics unchanged (same 4-field output
+        # contract). The (1d') one-lever test runs without [D-42]
+        # velocity-gradient conditioning and without [D-46] physics embedding —
+        # guard against those flags so a misconfigured invocation fails loudly.
+        if args.use_velocity_gradient_conditioning:
+            raise ValueError(
+                "--arch voxel-grid is incompatible with "
+                "--use_velocity_gradient_conditioning ([D-42]); the (1d') "
+                "test is a one-lever (grid-vs-MLP) parameterization swap."
+            )
+        if args.use_physics_embedding:
+            raise ValueError(
+                "--arch voxel-grid is incompatible with --use_physics_embedding "
+                "([D-46]); the (1d') test runs single-physics (P1)."
+            )
+        from src.models.voxel_grid_field import VoxelGridField
+        model = VoxelGridField(
+            grid_size=getattr(args, "voxel_grid_size", 192),
+            init_noise_std=getattr(args, "voxel_init_noise_std", 0.01),
+            density_head="softplus",
+        ).to(device)
+        print(
+            f"[D-73 (1d')] VoxelGridField: G={model.grid_size} "
+            f"(4 x {model.grid_size}^3 = "
+            f"{4 * model.grid_size**3:,} free params), "
+            f"init_noise_std={model.init_noise_std}",
+            flush=True,
+        )
+    else:
+        model = IGMNeRF(
+            hidden_dim=256, num_layers=8, L=10,
+            use_velocity_gradient_conditioning=args.use_velocity_gradient_conditioning,
+            use_physics_embedding=args.use_physics_embedding,
+            body_arch=_arch,
+        ).to(device)
     log_tau_amp = torch.nn.Parameter(torch.tensor(0.0, device=device))
     sigma_log = 0.5
     tau_amp_prior_weight = 1e-3
@@ -2971,8 +3020,15 @@ def train(args):
                 + args.pf_loss_weight * loss_pf_band_val
                 + args.fgpa_tail_weight * loss_fgpa_val
             )
-            grad_norm = model.out_layer.weight.grad.norm().item() \
-                if model.out_layer.weight.grad is not None else 0.0
+            # Representative-layer grad-norm probe. MLP path: out_layer weight.
+            # [D-73 (1d')] voxel-grid path: there is no out_layer, so use the
+            # density grid (log_rho_grid) as the representative tensor.
+            if hasattr(model, "out_layer"):
+                _gn_tensor = model.out_layer.weight
+            else:
+                _gn_tensor = model.log_rho_grid
+            grad_norm = _gn_tensor.grad.norm().item() \
+                if _gn_tensor.grad is not None else 0.0
             cur_lr = scheduler.get_last_lr()[0]
 
             if step <= 10 or step % 50 == 0 or step == args.max_steps:
@@ -3064,6 +3120,18 @@ def train(args):
                     float(torch.stack(l1_loss_chunks).mean().item())
                     if l1_loss_chunks else 0.0
                 )
+                # Stdout surfacing of the gate observable (var_pf_band_ratio) so
+                # the trainability signal is visible in driver logs even when
+                # the MLflow tracker is unreachable. Throttled to the main-print
+                # cadence; does not alter the MLflow logging contract below.
+                if step <= 10 or step % 50 == 0 or step == args.max_steps:
+                    print(
+                        f"[sprint-L1] step {step}: loss_pf={loss_pf_step_val:.4e} "
+                        f"var_pf_band_ratio={var_pf_ratio:.4e} "
+                        f"var_F_ratio={var_F_ratio:.4e} "
+                        f"irr={irr:.4e} coh_median={coh_median:.4e}",
+                        flush=True,
+                    )
                 # Log per-step metrics.
                 if mlflow_active:
                     mlflow.log_metric("loss_tau", loss_data, step=step)
