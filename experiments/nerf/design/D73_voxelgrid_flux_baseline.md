@@ -81,19 +81,28 @@ it is a pre-committed valid end-state, not a failure of the experiment.
   can represent the flux-relevant structure *at all*, not whether it matches 768³.
   The [D-24] sightline geometry samples 16384 rays × n_bins along one axis; the
   flux-relevant longitudinal structure is band-limited to the [D-13] inertial range
-  k_∥ ∈ [10^−2.5, 10^−1.5] s/km, which 128 voxels along the line of sight resolves
-  with margin (the inertial band upper edge corresponds to ≳ a few voxels per mode at
-  128³ over the 60 Mpc/h box). A trainability PASS at 128³ that fails P_F is NOT
+  k_∥ ∈ [10^−2.5, 10^−1.5] s/km. Per the SERIOUS-4 calc below (angular convention,
+  λ=198.7 km/s at the upper edge), 128 voxels gives only 4.71 vox/shortest-mode
+  (borderline at the ≲4 trigger), so the production resolution is set to **G=192**
+  (7.07 vox/shortest-mode). A trainability PASS at 192³ that fails P_F is NOT
   attributable to under-resolution at this band; a re-bake at higher G is the single
   permitted re-bake (§5) only if the panel flags a resolution confound at gate-construction.
-- **MANDATORY pre-dispatch voxels-per-shortest-mode calc (SERIOUS-4)**: before dispatch,
-  compute the z=0.3 box-velocity-length → shortest-resolved-mode → voxels-per-mode at G=128
-  over the 60 Mpc/h box for the [D-13] inertial-band upper edge k_∥ = 10^−1.5 s/km. If
-  **voxels-per-shortest-mode ≲ 4**, START at G ≥ 192³ (not 128³) to preserve the single
-  permitted re-bake (§5) for a genuine construction defect rather than spending it on an
-  under-resolution confound the calc could have caught at design time. Record the calc
-  (Hubble flow at z=0.3, box H(z), Nyquist) in the dispatch brief. A G≥192³ start triggered
-  by this calc is NOT a re-bake — it is the correct initial resolution.
+- **MANDATORY pre-dispatch voxels-per-shortest-mode calc (SERIOUS-4) — DISCHARGED, G=192 set
+  ([D-73] amendment-5, 2026-06-13).** CONVENTION (load-bearing): the inertial-band edge
+  k_∥ = 10^−1.5 s/km is an **angular wavenumber** (k = 2πf), the convention the [D-13] P_F
+  estimator and the `var_pf_band_ratio` gate observable use first-hand
+  (`src/analysis/p_flux.py:107`, `src/training/p_flux_loss.py:187`; LEDGER §5 gate def).
+  The resolution calc MUST use the same convention as the gate observable it sizes the grid
+  to resolve. The physical structure wavelength at the inertial upper edge is therefore
+  **λ = 2π/k = 2π/10^−1.5 = 198.7 km/s**, NOT the cyclic-frequency reading 1/k = 31.6 km/s
+  (the 31.6 km/s reading is wrong for this gate by exactly log10(2π) = 0.798 dex and is
+  barred). Calc (z=0.3, Ωm=0.308, h=0.678 → H(z)=79.32 km/s/Mpc; box velocity length
+  v_box = H(z)·(60/0.678 Mpc)/(1+z) = 5399.6 km/s; dv/voxel = v_box/G): G=128 → 42.18 km/s
+  → 198.7/42.18 = 4.71 vox/shortest-mode (borderline at the ≲4 trigger); G=192 → 28.12 km/s
+  → 7.07 vox/shortest-mode (clears with margin). **G=192 SET as the correct initial
+  resolution** (not a re-bake — the SERIOUS-4 contingency fired at design time exactly as
+  intended). The single permitted re-bake (§5) is preserved for a genuine construction
+  defect. Recorded in the GPU dispatch brief per the SERIOUS-4 mandate.
 - **Interpolation**: trilinear (`grid_sample`-equivalent or manual trilinear),
   autograd-compatible, no detached numpy in the ray-sampling path (CLAUDE.md contract).
   Ray sample points (the production integrator's quadrature nodes along each sightline)
