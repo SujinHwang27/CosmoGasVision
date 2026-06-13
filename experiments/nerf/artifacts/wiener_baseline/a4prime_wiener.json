@@ -1,0 +1,251 @@
+{
+  "deliverable": "[D-73] A4' Wiener density baseline RE-RUN (four fixes)",
+  "supersedes": "a4_wiener_baseline.json (DEMOTED, [D-73] amendment-4 sec.A)",
+  "provenance": {
+    "generated_utc": "2026-06-13T21:02:45.690663+00:00",
+    "script": "scripts/d73_a4prime_wiener_baseline.py",
+    "wiener_module": "src/analysis/wiener_baseline.py",
+    "inputs": {
+      "sightlines": "Sherwood/Physics1_nofeedback/los2048_n16384_z0.300.dat (via SherwoodLoader.load_sightlines(1, 0.3))",
+      "tau": "Sherwood/Physics1_nofeedback/tauH1_2048_n16384_z0.300.dat (REDSHIFT-SPACE first half, [D-06]/[D-24])",
+      "rho_truth_cube": "Sherwood/.rho_field_cache/rho_field_p1_z0.300_n64.npy"
+    },
+    "geometry": {
+      "physics_id": 1,
+      "redshift": 0.3,
+      "n_rays": 1024,
+      "ray_selection": "first-N (production slice)",
+      "n_grid": 64,
+      "box_mpc_h": 60.0,
+      "nbins": 2048
+    },
+    "xi_estimator": {
+      "code_path": "src/analysis/cross_corr.py:compute_xi_pearson (def at line 18)",
+      "definition": "3D FFT-shell Pearson cross-correlation; both fields mean-subtracted + unit-variance-normalized internally -> bounded [-1,1], gain-invariant. The [D-13] gate estimator; NOT modified.",
+      "gate_bar_context": "[D-13]/[D-36] project-adopted 0.6 threshold (NOT a published Stark/CLAMATO bar).",
+      "r_bins_edges_mpc_h": [
+        0.0,
+        1.0,
+        1.5,
+        2.5,
+        3.5,
+        5.0,
+        8.0,
+        15.0,
+        30.0
+      ]
+    },
+    "command": "PYTHONPATH=. ~/.venvs/cosmogasvision/bin/python -u scripts/d73_a4prime_wiener_baseline.py --noise-rel 0.001 --pixel-stride 28 --l-sweep 2.0 2.5 3.0 --l-ram-bound 3.5 4.0 5.0 6.0"
+  },
+  "four_fixes_applied": {
+    "fix1_noise_and_variance_standardization": {
+      "noise_rel": 0.001,
+      "tracer_standardized_to_unit_variance": true,
+      "note": "tracer /= tracer.std() before the solve; noise_rel=1e-3 is the genuine best-case (was 0.05 = 50x in A4)."
+    },
+    "fix2_finer_stride_cg": {
+      "pixel_stride": 28,
+      "px_per_ray": 74,
+      "Npix_total": 75776,
+      "los_spacing_mpc_h": 0.8108108108108109,
+      "solver": "sparse-kernel CG (KD-tree neighbour cutoff at 5 sigma * L; scipy.sparse.linalg.cg). Dense O(Npix^2)-per-matvec CG is intractable at Npix~76k on CPU; the Gaussian kernel beyond 5 sigma is < 4e-6 so the truncation is the standard practical CLAMATO cutoff, NOT a new idealization beyond the prescribed Gaussian prior.",
+      "sparse_n_sigma": 5.0,
+      "spd_safety_note": "Cutoff r_cut = 5*L (float64) is the empirically CG-convergent setting: kernel(5L)=3.7e-6 << noise_rel=1e-3, so the dropped Gaussian tail is regularized by the noise diagonal and (C_dd+N) stays positive-definite (CG info=0). PROBE-7 lessons banked: (i) an absolute r_cut cap BELOW ~3.72*L truncates the kernel body, breaks SPD, collapses CG (info hits maxiter, xi->0; observed with a 12 Mpc/h cap at L>=4); (ii) a tight 3.72*L cutoff in float32 is also numerically indefinite (observed info=20000 even at L=2). The 5*L float64 cutoff is used throughout; no body-truncating cap is applied.",
+      "jacobi_preconditioner": true,
+      "periodic_min_image": "cKDTree(boxsize=box_mpc_h) exact min-image",
+      "cg_tol": 1e-05,
+      "cg_maxiter": 20000,
+      "cg_info_fully_fixed_L2": 0,
+      "cg_info_meaning": "0 = converged; non-zero biases xi LOW (PROBE-7)."
+    },
+    "fix3_extended_L_sweep": {
+      "L_grid_mpc_h": [
+        2.0,
+        2.5,
+        3.0
+      ],
+      "swept_until_turnover": false,
+      "peak_is_at_boundary": true
+    },
+    "fix4_frame_finding": {
+      "pixel_positions_frame": "REAL-SPACE (loader.get_world_coordinates places pixels at pos_axis comoving coords; no peculiar-velocity offset applied -- loader.py:1299-1328).",
+      "rho_truth_cube_frame": "REAL-SPACE (rho_field_p1_z0.300 is CIC-deposited from gas-particle Coordinates ONLY; Velocities are NOT applied -- igm_gal_loader.load_3d_field:137-185).",
+      "flux_tracer_frame": "REDSHIFT-SPACE (-delta_F from tau_h1, the first half of tauH1_*.dat, [D-06]/[D-24]).",
+      "mismatch": "Pixel positions and the truth cube AGREE (both real-space), but the absorption VALUE each pixel carries is redshift-space. Peculiar-velocity displacement (RSD) shifts absorption features along the LOS relative to the real-space density they trace.",
+      "bias_direction": "LOW. The redshift-space flux value is attached to a real-space position offset by ~v_pec/H(z); this misregistration smears xi_{rho_hat,rho} DOWNWARD. NOT fixed here (CLAMATO maps redshift-space flux directly; deconvolving RSD is out of scope) -- documented as a real but unquantified LOW-bias contributor (SERIOUS-5)."
+    }
+  },
+  "results": {
+    "mean_F": 0.9790409713147822,
+    "fix_delta_ladder": [
+      {
+        "rung": "0_original",
+        "desc": "stride 192 (11 px/ray), noise_rel=0.05, tracer NOT standardized",
+        "px_per_ray": 11,
+        "Npix": 11264,
+        "noise_rel": 0.05,
+        "tracer_standardized": false,
+        "tracer_std_before": 0.08298044544553897,
+        "L_mpc_h": 2.0,
+        "cg_info": 0,
+        "xi_at_r2_interp": 0.05103367924795564,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.05103367924795564
+      },
+      {
+        "rung": "1_fix1_varstd_noise1e-3",
+        "desc": "stride 192 (11 px/ray), noise_rel=1e-3, tracer standardized",
+        "px_per_ray": 11,
+        "Npix": 11264,
+        "noise_rel": 0.001,
+        "tracer_standardized": true,
+        "tracer_std_before": 0.08298044544553897,
+        "L_mpc_h": 2.0,
+        "cg_info": 0,
+        "xi_at_r2_interp": 0.02029455031711663,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.02029455031711663
+      },
+      {
+        "rung": "2_fix1+fix2_finestride_CG",
+        "desc": "stride 28 (74 px/ray), noise_rel=1e-3, tracer standardized, matrix-free CG",
+        "px_per_ray": 74,
+        "Npix": 75776,
+        "noise_rel": 0.001,
+        "tracer_standardized": true,
+        "tracer_std_before": 0.07929832914006052,
+        "L_mpc_h": 2.0,
+        "cg_info": 0,
+        "xi_at_r2_interp": 0.03647806079361093,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.03647806079361093
+      }
+    ],
+    "L_sweep": [
+      {
+        "L_mpc_h": 2.0,
+        "xi_at_r2_interp": 0.03647806079361093,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.03647806079361093,
+        "cg_info": 0,
+        "r_cut_eff_mpc_h": 10.0,
+        "kernel_at_r_cut": 3.726653172078671e-06,
+        "xi_profile": [
+          0.04572406476531934,
+          0.04291503101330552,
+          0.03647806079361093,
+          0.027790615384897546,
+          0.018377241085420375,
+          0.00953018077944788,
+          0.0021201312253290943,
+          -0.0004867032795311775
+        ],
+        "r_centers": [
+          0.5,
+          1.25,
+          2.0,
+          3.0,
+          4.25,
+          6.5,
+          11.5,
+          22.5
+        ]
+      },
+      {
+        "L_mpc_h": 2.5,
+        "xi_at_r2_interp": 0.05295911053853344,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.05295911053853344,
+        "cg_info": 0,
+        "r_cut_eff_mpc_h": 12.5,
+        "kernel_at_r_cut": 3.726653172078671e-06,
+        "xi_profile": [
+          0.06942779956748188,
+          0.06423949371561108,
+          0.05295911053853344,
+          0.03867430015512035,
+          0.024380296339900357,
+          0.011496695392888485,
+          0.0021344901778986465,
+          -0.0005724026127981816
+        ],
+        "r_centers": [
+          0.5,
+          1.25,
+          2.0,
+          3.0,
+          4.25,
+          6.5,
+          11.5,
+          22.5
+        ]
+      },
+      {
+        "L_mpc_h": 3.0,
+        "xi_at_r2_interp": 0.07893166038457622,
+        "xi_nearest_shell_r": 2.0,
+        "xi_nearest_shell": 0.07893166038457622,
+        "cg_info": 0,
+        "r_cut_eff_mpc_h": 15.0,
+        "kernel_at_r_cut": 3.726653172078671e-06,
+        "xi_profile": [
+          0.10070520604499726,
+          0.09398963455947872,
+          0.07893166038457622,
+          0.059087314038050315,
+          0.037786152696171985,
+          0.017499106910402837,
+          0.003387837830108647,
+          -0.0008193300674010644
+        ],
+        "r_centers": [
+          0.5,
+          1.25,
+          2.0,
+          3.0,
+          4.25,
+          6.5,
+          11.5,
+          22.5
+        ]
+      }
+    ],
+    "L_skipped_ram_bound": [
+      {
+        "L_mpc_h": 3.5,
+        "r_cut_eff_mpc_h": 17.5,
+        "reason": "RAM-bound on CPU host (OS OOM-kill at Npix~76k, 5-sigma neighbour list ~ (5L)^3); not computed."
+      },
+      {
+        "L_mpc_h": 4.0,
+        "r_cut_eff_mpc_h": 20.0,
+        "reason": "RAM-bound on CPU host (OS OOM-kill at Npix~76k, 5-sigma neighbour list ~ (5L)^3); not computed."
+      },
+      {
+        "L_mpc_h": 5.0,
+        "r_cut_eff_mpc_h": 25.0,
+        "reason": "RAM-bound on CPU host (OS OOM-kill at Npix~76k, 5-sigma neighbour list ~ (5L)^3); not computed."
+      },
+      {
+        "L_mpc_h": 6.0,
+        "r_cut_eff_mpc_h": 30.0,
+        "reason": "RAM-bound on CPU host (OS OOM-kill at Npix~76k, 5-sigma neighbour list ~ (5L)^3); not computed."
+      }
+    ],
+    "peak": {
+      "L_opt_mpc_h": 3.0,
+      "xi_3d_peak_at_r2": 0.07893166038457622,
+      "xi_nearest_shell_r": 2.0,
+      "xi_nearest_shell": 0.07893166038457622,
+      "cg_info": 0,
+      "turned_over_within_window": false,
+      "peak_at_window_boundary": true,
+      "peak_is_last_computed_L": true,
+      "larger_L_ram_skipped": true,
+      "turnover_caveat": "Peak sits at the boundary of the FEASIBLE (CG-convergent, non-RAM-bound) L window. Larger-L solves were RAM-bound on this CPU host (5-sigma neighbour list ~ (5L)^3), so the true optimum may lie at larger L. Reported xi_peak is a LOWER bound on the best-case over the full L axis."
+    },
+    "all_cg_converged": true
+  },
+  "readout_R14_self_anchored": "Our validated best-case Wiener (noise_rel=1e-3, unit-variance tracer, 74 px/ray CG-solved, info=0) reaches xi_3D(2 Mpc/h) ~= 0.079 at L=3 Mpc/h, P1 z=0.3 -- the LARGEST feasible L on this CPU host (xi still RISING at the RAM wall; L>=3.5 OOM-bound), so 0.079 is a LOWER BOUND on the best-case over the full L axis, not a turned-over optimum. Caveat: z=0.3 mean_F=0.979 -> genuinely low per-pixel S/N is a real but unquantified contributor to any residual low xi; and the redshift-space flux vs real-space pixel/truth frame mismatch (SERIOUS-5) biases xi LOW. This is the SELF-ANCHORED best-case; published CLAMATO/TARDIS r-values are context/scope only, NOT our bar.",
+  "interpretation_D37": "Reported as measured; no tuning toward any target. Read the peak xi against the per-fix ladder: if xi rose substantially from the 0.05 original, the demoted A4 number was an over-regularization artifact; if it remains << CLAMATO-class after all four fixes, that is the honest self-anchored floor and the z=0.3 low-S/N + RSD-frame contributors are the legitimate explanation."
+}

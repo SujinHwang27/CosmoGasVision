@@ -1,0 +1,40 @@
+{
+  "deliverable": "[D-73] A4' Wiener L-sweep summary",
+  "generated_utc": "2026-06-13T21:02:45.690663+00:00",
+  "config": {
+    "noise_rel": 0.001,
+    "pixel_stride": 28,
+    "px_per_ray": 74,
+    "Npix": 75776,
+    "tracer_standardized": true
+  },
+  "L_sweep": [
+    {
+      "L_mpc_h": 2.0,
+      "xi_at_r2_interp": 0.03647806079361093,
+      "cg_info": 0
+    },
+    {
+      "L_mpc_h": 2.5,
+      "xi_at_r2_interp": 0.05295911053853344,
+      "cg_info": 0
+    },
+    {
+      "L_mpc_h": 3.0,
+      "xi_at_r2_interp": 0.07893166038457622,
+      "cg_info": 0
+    }
+  ],
+  "peak": {
+    "L_opt_mpc_h": 3.0,
+    "xi_3d_peak_at_r2": 0.07893166038457622,
+    "xi_nearest_shell_r": 2.0,
+    "xi_nearest_shell": 0.07893166038457622,
+    "cg_info": 0,
+    "turned_over_within_window": false,
+    "peak_at_window_boundary": true,
+    "peak_is_last_computed_L": true,
+    "larger_L_ram_skipped": true,
+    "turnover_caveat": "Peak sits at the boundary of the FEASIBLE (CG-convergent, non-RAM-bound) L window. Larger-L solves were RAM-bound on this CPU host (5-sigma neighbour list ~ (5L)^3), so the true optimum may lie at larger L. Reported xi_peak is a LOWER bound on the best-case over the full L axis."
+  }
+}

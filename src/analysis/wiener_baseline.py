@@ -68,11 +68,78 @@ class WienerConfig:
     noise_rel: float = 0.05        # sigma_noise^2 / sigma_signal^2 (Wiener noise floor)
     pixel_stride: int = 64         # subsample pixels along each ray (cost control)
     cg_tol: float = 1e-5           # CG relative tolerance for the (C_dd+N) solve
-    cg_maxiter: int = 4000
+    cg_maxiter: int = 20000
+    # [D-73] A4': sparse-kernel cutoff. The Gaussian kernel decays as
+    # exp(-r^2/2L^2); beyond r_cut = sparse_n_sigma * L the entries are
+    # < exp(-sparse_n_sigma^2/2) and dropped. This turns the O(Npix^2)-per-
+    # matvec dense CG into an O(Npix * neighbours) sparse CG, the only tractable
+    # path at >=70 px/ray (Npix ~ 76k) on CPU.
+    #
+    # SPD-SAFETY (PROBE-7): a Gaussian truncated mid-body is NOT positive-
+    # definite -> CG (which requires SPD) fails to converge and xi collapses.
+    # The truncation is SPD-safe only when the kernel value AT the cutoff is
+    # <= the noise-floor diagonal (which regularizes the dropped tail). With
+    # noise_rel n, the safe radius is r_cut >= L*sqrt(2*ln(1/n)); for n=1e-3
+    # that is 3.72*L, so n_sigma=4 (kernel(4L)=3.4e-4 < 1e-3) is SPD-safe.
+    # An ABSOLUTE r_cut cap below this radius is FORBIDDEN -- it truncates the
+    # kernel body, breaks SPD, and destroys convergence (observed L>=4 with a
+    # 12 Mpc/h cap -> info=4000, xi -> ~0). So no absolute cap is applied; cost
+    # is bounded instead by the L-sweep range (large L is genuinely expensive).
+    sparse_kernel: bool = False
+    sparse_n_sigma: float = 5.0
+    # Jacobi (diagonal) preconditioner for the sparse CG. The (C_dd+N) diagonal
+    # is 1+noise_rel (constant), so the Jacobi preconditioner is a near-identity
+    # scaling; included for robustness against the wider-kernel (larger-L)
+    # conditioning growth.
+    use_jacobi_precond: bool = True
 
 
 def _gaussian_kernel(dperp2, dpara2, L_perp, L_para):
     return np.exp(-0.5 * dperp2 / (L_perp ** 2)) * np.exp(-0.5 * dpara2 / (L_para ** 2))
+
+
+def _build_sparse_Cdd(px, box_mpc_h, L, noise_rel, n_sigma):
+    """Sparse (C_dd + N) as a float32 CSR matrix using a KD-tree neighbour cutoff.
+
+    Periodic minimum-image is handled by cKDTree(boxsize=...). Returns the
+    (Npix, Npix) symmetric CSR Gaussian-kernel signal covariance truncated at
+    r_cut = n_sigma * L, plus the noise_rel diagonal. SPD-safe cutoff (see
+    WienerConfig). scipy's C-level sparse_distance_matrix builds the neighbour
+    list; the COO data is recast to the kernel and dropped to a float32 CSR to
+    halve RAM (the COO row/col int arrays are the transient peak).
+    """
+    from scipy.spatial import cKDTree
+    from scipy.sparse import csr_matrix, identity
+
+    Npix = px.shape[0]
+    inv2L2 = 0.5 / (L ** 2)
+    r_cut = n_sigma * L
+    pxw = np.mod(px, box_mpc_h)
+    tree = cKDTree(pxw, boxsize=box_mpc_h)
+    coo = tree.sparse_distance_matrix(tree, r_cut, output_type="coo_matrix")
+    data = np.exp(-(coo.data ** 2) * inv2L2)
+    A = csr_matrix((data, (coo.row, coo.col)), shape=(Npix, Npix))
+    del coo, data
+    A = A + (noise_rel * identity(Npix, format="csr", dtype=np.float64))
+    return A
+
+
+def _build_sparse_Cmd(vox, px, box_mpc_h, L, n_sigma):
+    """Sparse voxel-pixel cross covariance C_md as float32 CSR, KD-tree cutoff."""
+    from scipy.spatial import cKDTree
+    from scipy.sparse import csr_matrix
+
+    Nvox = vox.shape[0]
+    Npix = px.shape[0]
+    inv2L2 = 0.5 / (L ** 2)
+    r_cut = n_sigma * L
+    voxw = np.mod(vox, box_mpc_h)
+    pxw = np.mod(px, box_mpc_h)
+    tree_px = cKDTree(pxw, boxsize=box_mpc_h)
+    tree_vox = cKDTree(voxw, boxsize=box_mpc_h)
+    coo = tree_vox.sparse_distance_matrix(tree_px, r_cut, output_type="coo_matrix")
+    data = np.exp(-(coo.data ** 2) * inv2L2)
+    return csr_matrix((data, (coo.row, coo.col)), shape=(Nvox, Npix))
 
 
 def wiener_reconstruct(
@@ -81,7 +148,8 @@ def wiener_reconstruct(
     voxel_xyz_mpc_h: np.ndarray,   # (Nvox, 3) map voxel centers, Mpc/h
     box_mpc_h: float,
     cfg: WienerConfig,
-) -> np.ndarray:
+    return_info: bool = False,
+):
     """Return the Wiener density-tracer estimate at each voxel (Nvox,).
 
     Periodic minimum-image convention is used for all separations (the
@@ -93,6 +161,10 @@ def wiener_reconstruct(
     Npix = pixel_xyz_mpc_h.shape[0]
     half = box_mpc_h / 2.0
     px = pixel_xyz_mpc_h
+    # CG convergence flag (PROBE-7): 0 = converged for the direct path (no CG
+    # invoked); set by scipy.sparse.linalg.cg on the matrix-free path. A
+    # non-zero info means a non-converged solve, which biases xi LOW.
+    cg_info = 0
     # Isotropic kernel (L_perp == L_para is the common CLAMATO choice); when
     # they differ we cannot cleanly split perp/para for a mixed-axis sightline
     # set, so we use the isotropic 3D Gaussian with the mean L and treat all
@@ -105,6 +177,32 @@ def wiener_reconstruct(
     # so a direct dense factorization is robust and fast for Npix up to ~12k.
     # Above that we fall back to matrix-free CG to bound RAM.
     DIRECT_MAX = 12000
+    if cfg.sparse_kernel:
+        # [D-73] A4' sparse-CG path: KD-tree-truncated Gaussian kernel solved
+        # with scipy CG. Tractable at >=70 px/ray (Npix ~ 76k) on CPU; matvec
+        # cost is O(Npix * neighbours), not O(Npix^2).
+        A = _build_sparse_Cdd(px, box_mpc_h, L, cfg.noise_rel, cfg.sparse_n_sigma)
+        M = None
+        if cfg.use_jacobi_precond:
+            from scipy.sparse import diags
+            diag = A.diagonal()
+            diag = np.where(diag != 0, diag, 1.0)
+            M = diags(1.0 / diag, format="csr")
+        w, info = cg(A, pixel_data, rtol=cfg.cg_tol, maxiter=cfg.cg_maxiter, M=M)
+        cg_info = int(info)
+        if info != 0:
+            print(f"[wiener] WARNING: sparse-CG did not converge (info={info}).")
+        C_md = _build_sparse_Cmd(
+            voxel_xyz_mpc_h, px, box_mpc_h, L, cfg.sparse_n_sigma,
+        )
+        rec = np.asarray(C_md @ w).ravel()
+        if not np.all(np.isfinite(rec)):
+            raise FloatingPointError(
+                "wiener_reconstruct (sparse) produced non-finite voxels."
+            )
+        if return_info:
+            return rec, cg_info
+        return rec
     if Npix <= DIRECT_MAX:
         dx = px[:, None, 0] - px[None, :, 0]
         dy = px[:, None, 1] - px[None, :, 1]
@@ -133,6 +231,7 @@ def wiener_reconstruct(
             return out
         op = LinearOperator((Npix, Npix), matvec=_apply_Cdd, dtype=np.float64)
         w, info = cg(op, pixel_data, rtol=cfg.cg_tol, maxiter=cfg.cg_maxiter)
+        cg_info = int(info)
         if info != 0:
             print(f"[wiener] WARNING: CG did not converge cleanly (info={info}).")
 
@@ -159,4 +258,6 @@ def wiener_reconstruct(
         raise FloatingPointError(
             "wiener_reconstruct produced non-finite voxels; check conditioning."
         )
+    if return_info:
+        return rec, cg_info
     return rec
