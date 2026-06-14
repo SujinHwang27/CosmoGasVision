@@ -209,6 +209,16 @@ def parse_args(argv=None):
                    help="[sprint-L1] Enable the direct P_F MSE loss test "
                         "(log-MSE over [D-13] inertial range, GradNorm-balanced "
                         "with [D-24] tau-MSE). Default OFF.")
+    p.add_argument("--pf-diagnostic-only", dest="pf_diagnostic_only",
+                   action="store_true",
+                   help="[D-73 (1d') amendment-6 §Q] Compute var_pf_band_ratio "
+                        "as a DETACHED diagnostic readout (torch.no_grad) WITHOUT "
+                        "adding any P_F loss term to the backward objective. The "
+                        "per-microbatch loss stays EXACTLY the plain-[D-24] "
+                        "objective (loss_data + meanF anchor). Mutually exclusive "
+                        "with --enable-l1-pf-loss (the (1d') one-lever contract: "
+                        "grid-vs-MLP is the SOLE lever; folding L1 in is a second "
+                        "lever). Default OFF.")
     p.add_argument("--l1-gradnorm-alpha", dest="l1_gradnorm_alpha",
                    type=float, default=0.12,
                    help="[sprint-L1] GradNorm alpha (Chen+ 2018 default 0.12).")
@@ -370,11 +380,40 @@ def parse_args(argv=None):
                    type=float, default=0.01,
                    help="[D-73 (1d')] sigma of the symmetry-breaking Gaussian "
                         "noise on the constant-mean grid init (design §2).")
+    p.add_argument("--voxel-init-xhi", dest="voxel_init_xhi",
+                   type=float, default=1.0e-5,
+                   help="[D-73 (1d') amendment-6 §R] init_xhi for the "
+                        "VoxelGridField X_HI grid (raw pre-activation set so "
+                        "sigmoid(s)=init_xhi). Default 1e-5 for back-compat. "
+                        "Set tau-rich per §N (pin <F>_init in [0.90, 0.95] at "
+                        "z=0.3 P1) for the GPU dispatch. PRE-COMMITTED knob, NOT "
+                        "tuned; does not change the lever count.")
 
     # Data root --------------------------------------------------------------
     p.add_argument("--data_root", type=str, default="Sherwood")
 
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+
+    # [D-73 (1d') amendment-6 §Q] One-lever mutual-exclusion contract:
+    # --pf-diagnostic-only (plain-[D-24] objective + detached var_pf readout)
+    # and --enable-l1-pf-loss (GradNorm 3-term combo that injects the falsified
+    # [D-60] P_F loss into backward) are mutually exclusive. Enabling both would
+    # put a second lever into the (1d') grid-vs-MLP test and resurrect the
+    # killed [D-60] basin — the exact confound this flag exists to prevent.
+    if getattr(args, "pf_diagnostic_only", False) and getattr(
+        args, "enable_l1_pf_loss", False
+    ):
+        raise ValueError(
+            "--pf-diagnostic-only and --enable-l1-pf-loss are mutually "
+            "exclusive ([D-73] amendment-6 §Q one-lever contract). "
+            "--pf-diagnostic-only keeps the backward objective byte-for-byte "
+            "plain-[D-24] (loss_data + meanF anchor) and computes "
+            "var_pf_band_ratio as a DETACHED diagnostic; --enable-l1-pf-loss "
+            "adds the GradNorm-weighted P_F loss (the falsified [D-60] track) "
+            "to backward. Pick exactly one."
+        )
+
+    return args
 
 
 # ---------------------------------------------------------------------------
@@ -1789,6 +1828,43 @@ def _assemble_step_losses_and_gradnorm(
 
 
 # ---------------------------------------------------------------------------
+# [D-73] amendment-6 §Q — var_pf_band_ratio single-source-of-truth helper
+# ---------------------------------------------------------------------------
+
+def _compute_var_pf_band_ratio(F_pred_pool, F_truth_pool, vel_axis):
+    """[D-73] amendment-6 §Q — the (1d') trainability gate observable.
+
+    SINGLE SOURCE OF TRUTH for ``var_pf_band_ratio`` =
+    ``Var_k(P_F_pred_band) / Var_k(P_F_truth_band)`` over the [D-13] inertial
+    band (angular-k, ``K_MIN_INERTIAL..K_MAX_INERTIAL``), r-averaged then
+    float64 variance ratio. This is the EXACT math that previously lived inline
+    inside the ``if args.enable_l1_pf_loss:`` block (former pipeline.py:3104-3116);
+    factored here per the R20 helper-refactor seam so BOTH the L1 GradNorm path
+    AND the ``--pf-diagnostic-only`` plain-[D-24] diagnostic path compute the
+    DEFINITIONALLY IDENTICAL quantity. The diagnostic path never contributes to
+    the backward objective; only the observable is shared.
+
+    Inputs are the detached, full-step F pools (no live graph). Returns a Python
+    float ratio (or NaN if the inertial band is empty for this velocity axis).
+    """
+    from src.training.p_flux_loss import (
+        torch_p_flux as _pf,
+        K_MIN_INERTIAL as _K_MIN, K_MAX_INERTIAL as _K_MAX,
+    )
+    with torch.no_grad():
+        centers, P_pred = _pf(F_pred_pool, vel_axis)
+        _, P_truth = _pf(F_truth_pool, vel_axis)
+        band = (centers >= _K_MIN) & (centers <= _K_MAX)
+        if bool(band.any()):
+            Pp_ravg = P_pred.to(torch.float64).mean(dim=0)[band]
+            Pt_ravg = P_truth.to(torch.float64).mean(dim=0)[band]
+            var_pf_pred_band = float(Pp_ravg.var().item())
+            var_pf_truth_band = float(Pt_ravg.var().item())
+            return var_pf_pred_band / max(var_pf_truth_band, 1e-30)
+        return float("nan")
+
+
+# ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
 
@@ -1878,13 +1954,17 @@ def train(args):
     # log-binned P_F the network's predicted flux must match. We cache the
     # tensor (NOT its P_F — the per-step loss recomputes the full estimator
     # so a graph-attached comparison on the matched bin grid is available).
+    # [D-73 amendment-6 §Q] The --pf-diagnostic-only path consumes the SAME
+    # truth-flux cache to build the matching F_truth pool for var_pf, so the
+    # diagnostic observable is definitionally identical to the L1-path one.
     F_truth_l1 = None
-    if args.enable_l1_pf_loss:
+    if args.enable_l1_pf_loss or getattr(args, "pf_diagnostic_only", False):
         with torch.no_grad():
             tau_truth_capped = tau_gt_profile.clamp_max(args.tau_max)
             F_truth_l1 = torch.exp(-tau_truth_capped)
+        _src_tag = "sprint-L1" if args.enable_l1_pf_loss else "D-73 diag"
         print(
-            f"[sprint-L1] truth flux cache: shape={tuple(F_truth_l1.shape)} "
+            f"[{_src_tag}] truth flux cache: shape={tuple(F_truth_l1.shape)} "
             f"mean={float(F_truth_l1.mean()):.4f} "
             f"Var={float(F_truth_l1.var()):.4e}",
             flush=True,
@@ -2020,12 +2100,14 @@ def train(args):
             grid_size=getattr(args, "voxel_grid_size", 192),
             init_noise_std=getattr(args, "voxel_init_noise_std", 0.01),
             density_head="softplus",
+            init_xhi=getattr(args, "voxel_init_xhi", 1e-5),
         ).to(device)
         print(
             f"[D-73 (1d')] VoxelGridField: G={model.grid_size} "
             f"(4 x {model.grid_size}^3 = "
             f"{4 * model.grid_size**3:,} free params), "
-            f"init_noise_std={model.init_noise_std}",
+            f"init_noise_std={model.init_noise_std}, "
+            f"init_xhi={getattr(args, 'voxel_init_xhi', 1e-5):.3e}",
             flush=True,
         )
     else:
@@ -2483,6 +2565,12 @@ def train(args):
             l1_F_pred_chunks = []         # for inertial_rel_residual / coherence diagnostics
             l1_F_truth_chunks = []
             l1_loss_pf_step = None        # accumulated graph-attached loss for GradNorm
+            # [D-73 amendment-6 §Q] --pf-diagnostic-only detached F pools. Kept
+            # SEPARATE from the L1 accumulators so the diagnostic path never
+            # touches the L1 lists / GradNorm wrapper. Filled only when
+            # args.pf_diagnostic_only is set.
+            diag_F_pred_chunks = []
+            diag_F_truth_chunks = []
             # [D2 2026-05-22] Live-graph accumulators for GradNorm ONLY (bug #2 fix).
             # The 4 diagnostic accumulators (sat_band, rank_order, pf_band, fgpa)
             # plus data_loss_chunks / l1_loss_chunks above stay .detach()'d per
@@ -2646,6 +2734,25 @@ def train(args):
                         l1_loss_pf_step = loss_pf_mb
                     else:
                         l1_loss_pf_step = l1_loss_pf_step + loss_pf_mb
+
+                # ---- [D-73 amendment-6 §Q] --pf-diagnostic-only F pooling ----
+                # DIAGNOSTIC ONLY. This branch MUST NOT touch loss_mb, MUST NOT
+                # append to l1_loss_chunks_live, MUST NOT instantiate/call the
+                # GradNorm wrapper. It only accumulates DETACHED F_pred /
+                # F_truth pools (the SAME tensors the L1 path uses at the
+                # F_pred_l1_mb / F_truth_l1_mb lines above, but detached, no
+                # live-graph copy) so the end-of-step helper can compute the
+                # var_pf_band_ratio observable. The backward objective stays
+                # byte-for-byte the plain-[D-24] loss_mb assembled at the top of
+                # this loop body. The two flags are mutually exclusive at parse,
+                # so this branch never coexists with the L1 branch above.
+                if getattr(args, "pf_diagnostic_only", False):
+                    with torch.no_grad():
+                        tau_pred_capped_diag = tau_pred_mb.clamp_max(args.tau_max)
+                        diag_F_pred_chunks.append(
+                            torch.exp(-tau_pred_capped_diag).detach()
+                        )
+                        diag_F_truth_chunks.append(F_truth_l1[idx_mb].detach())
 
                 # ---- [D-39] rank-order penalty in the saturation band ----
                 # Pairwise-margin Spearman surrogate; see _sat_band_rank_loss.
@@ -3101,21 +3208,16 @@ def train(args):
                     var_F_truth = float(F_truth_pool.var().item())
                     var_F_ratio = var_F_pred / max(var_F_truth, 1e-30)
                     # P_F-pred Var_k over inertial range (R-b backstop).
-                    from src.training.p_flux_loss import (
-                        torch_p_flux as _l1_pf,
-                        K_MIN_INERTIAL as _K_MIN, K_MAX_INERTIAL as _K_MAX,
+                    # [D-73] amendment-6 §Q (R20 helper-refactor seam): the
+                    # var_pf_band_ratio math is now the SINGLE-SOURCE-OF-TRUTH
+                    # helper _compute_var_pf_band_ratio, also called by the
+                    # --pf-diagnostic-only plain-[D-24] path. Behaviour here is
+                    # bit-for-bit the prior inline block (same torch_p_flux,
+                    # same angular-k band constants, same float64 r-averaged
+                    # variance ratio).
+                    var_pf_ratio = _compute_var_pf_band_ratio(
+                        F_pred_pool, F_truth_pool, vel_axis
                     )
-                    centers_l1, P_pred_l1 = _l1_pf(F_pred_pool, vel_axis)
-                    _, P_truth_l1 = _l1_pf(F_truth_pool, vel_axis)
-                    band_l1 = (centers_l1 >= _K_MIN) & (centers_l1 <= _K_MAX)
-                    if bool(band_l1.any()):
-                        Pp_ravg = P_pred_l1.to(torch.float64).mean(dim=0)[band_l1]
-                        Pt_ravg = P_truth_l1.to(torch.float64).mean(dim=0)[band_l1]
-                        var_pf_pred_band = float(Pp_ravg.var().item())
-                        var_pf_truth_band = float(Pt_ravg.var().item())
-                        var_pf_ratio = var_pf_pred_band / max(var_pf_truth_band, 1e-30)
-                    else:
-                        var_pf_ratio = float("nan")
                 loss_pf_step_val = (
                     float(torch.stack(l1_loss_chunks).mean().item())
                     if l1_loss_chunks else 0.0
@@ -3235,6 +3337,34 @@ def train(args):
                         flush=True,
                     )
                     sys.exit(0)
+
+            # ---- [D-73 amendment-6 §Q] --pf-diagnostic-only var_pf readout ---
+            # Plain-[D-24] path: the backward objective was loss_mb =
+            # loss_data + meanF anchor (NO loss_pf). Here we compute the SAME
+            # var_pf_band_ratio observable as the L1 path, via the shared helper
+            # _compute_var_pf_band_ratio, from the DETACHED diagnostic F pools.
+            # This never enters backward (the step already backwarded above).
+            # Mutually exclusive with enable_l1_pf_loss at parse, so this and the
+            # L1 block never both fire.
+            if getattr(args, "pf_diagnostic_only", False):
+                with torch.no_grad():
+                    diag_F_pred_pool = torch.cat(diag_F_pred_chunks, dim=0)
+                    diag_F_truth_pool = torch.cat(diag_F_truth_chunks, dim=0)
+                diag_var_pf_ratio = _compute_var_pf_band_ratio(
+                    diag_F_pred_pool, diag_F_truth_pool, vel_axis
+                )
+                # Same surfacing cadence as the L1 path's gate readout.
+                if step <= 10 or step % 50 == 0 or step == args.max_steps:
+                    print(
+                        f"[D-73 diag] step {step}: "
+                        f"var_pf_band_ratio={diag_var_pf_ratio:.4e} "
+                        f"(plain-[D-24] objective; var_pf NOT in backward)",
+                        flush=True,
+                    )
+                if mlflow_active:
+                    mlflow.log_metric(
+                        "l1_var_pf_band_ratio", diag_var_pf_ratio, step=step
+                    )
 
             # Checkpoint ---------------------------------------------------
             if (args.checkpoint_interval > 0
