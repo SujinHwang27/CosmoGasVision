@@ -141,6 +141,15 @@ is byte-for-byte the production MLP path:
 - **Loss form**: log1p MSE, L_data = ⟨(log(1+τ_pred^eff) − log(1+τ_GT^eff))²⟩_non-saturated
   ([D-24] item (3)), plus the [D-11] mean-flux anchor (λ_F = 1.0) at the [D-34]-corrected
   ⟨F⟩_obs(z=0.3) = 0.979 ± 0.005 — same anchor the production publication route uses.
+- **Objective of record (PRE-COMMITTED, [D-73] amendment-6 §P/§Q)**: the per-microbatch loss
+  is BYTE-FOR-BYTE the plain [D-24] objective `loss_mb = loss_data_mb + mean_F_grad_coef·mean_F_mb`
+  (`pipeline.py:2584`) — exactly what the production MLP (pub-t1, the A7 ≈1.0 anchor) minimized.
+  The dispatch runs under `--pf-diagnostic-only` (NOT `--enable-l1-pf-loss`): the GradNorm-weighted
+  P_F-residual loss term (the falsified [D-60] track) is NEVER added to the backward pass. The
+  trainability gate observable `var_pf_band_ratio` is computed as a DETACHED diagnostic readout
+  (`torch.no_grad()`, the exact same Var_k(P_F_pred)/Var_k(P_F_truth) variance ratio over the
+  [D-13] inertial band, angular-k per §K) that does not enter the objective. This is the load-bearing
+  one-lever fix: measuring the gate must not inject a second lever.
 - **The single lever (R10/R13)**: grid-vs-MLP. Nothing else moves. The FGPA closure
   constants (T0, γ, β), the integrator, the mask, the cap, the anchor, the loss form,
   the optimizer schedule are all inherited unchanged.
@@ -158,7 +167,7 @@ regardless of the other's outcome.
 ### (i) Trainability gate (primary, pre-science)
 - **Observable**: `var_pf_band_ratio` = Var_k(P_F^pred) / Var_k(P_F^truth) over the
   [D-13] inertial band, computed by the EXACT production instrumentation at
-  `pipeline.py:3047-3060` (r-averaged P_F over k ∈ [K_MIN_INERTIAL, K_MAX_INERTIAL],
+  the `--pf-diagnostic-only` detached readout (`pipeline.py` var_pf helper, ~3104-3116; r-averaged P_F over k ∈ [K_MIN_INERTIAL, K_MAX_INERTIAL],
   band-masked, float64 variance ratio). Definition-match to production is a panel-check
   item (§6).
 - **Threshold**: `var_pf_band_ratio > 1e-3` at step 5000.
@@ -274,7 +283,7 @@ Required checks:
 3. **Gate-ladder construction**: the 1e-3 / 300×-margin trainability threshold and the
    MARGINAL band; the three pre-committed outcome semantics; symmetric disclosure ([D-37]).
 4. **var_pf_band_ratio definition-match**: the grid run's trainability observable is the
-   EXACT `pipeline.py:3047-3060` instrumentation (r-averaged band P_F variance ratio,
+   EXACT `--pf-diagnostic-only` detached var_pf helper (~pipeline.py:3104-3116; r-averaged band P_F variance ratio,
    float64, [K_MIN_INERTIAL, K_MAX_INERTIAL] band) — no grid-specific re-definition.
    (R29-substance unit-chain check: the gate observable is a dimensionless variance ratio,
    truth-side denominator, same frame as the collapsed-basin ceiling AND the A7 healthy-run
