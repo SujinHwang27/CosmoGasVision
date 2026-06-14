@@ -1,5 +1,14 @@
 #!/bin/bash
-# [D-73] (1d') Explicit voxel-grid + flux-supervision baseline — Juno A30 dispatch.
+# [D-73] (1d') Explicit voxel-grid + flux-supervision baseline — Juno H100 dispatch.
+#
+# PARTITION CHANGE (2026-06-13 scheduling decision, infrastructure-manager): switched
+# a30 -> h100. Rationale: the a30 partition is saturated overnight (job 214396 sat
+# PENDING(Resources) and was cancelled); h100 schedules sooner AND its 80 GB removes the
+# A30 (24 GB) VRAM-fit risk that was the original reason to hold (job 214197 OOM'd at
+# G=192 in the Voigt intermediate). The science is partition-invariant — same one-lever
+# config, same microbatch=256/accum=4, same seed; this is a deliberate logged scheduling
+# choice, NOT a methodology change. The h100 pre-flight (job 214404, d73_preflight_h100.sh)
+# GPU-validates the corrected --pf-diagnostic-only path before this full run.
 #
 # Parameters of record (LEDGER §3 [D-73] amendment-6 §P/§Q/§R/§S + amendment-7 §U/§V/§W;
 # design D73_voxelgrid_flux_baseline.md §3/§4/§5):
@@ -15,11 +24,13 @@
 #   P1, z=0.3, plain [D-24] supervision (integrator/mask/cap/log1p/mean-F anchor inherited),
 #   [D-14] optimizer schedule, n_rays=1024 ([D-13] fiducial eval point).
 #
-# Microbatch sizing: --microbatch 256 --accum_steps 4 (VRAM-safe). The earlier pre-flight
-# (job 214197) ran microbatch>=1024 full-grid and OOM'd at G=192 on the A30 (24 GB) in the
-# Voigt intermediate. 256/4 matches the production T3 mapping (peak ~11.3 GB measured on the
-# MLP; the grid forward is cheaper per design §5). PYTORCH_CUDA_ALLOC_CONF set to reduce
-# fragmentation headroom.
+# Microbatch sizing: --microbatch 256 --accum_steps 4 (kept IDENTICAL to the h100 pre-flight
+# 214404 so the GPU-validated path == the full-run path — do NOT inflate microbatch even
+# though the h100 (80 GB) has headroom; the validated-by-pre-flight invariant is worth more
+# than throughput here). History: pre-flight 214197 ran microbatch>=1024 full-grid and OOM'd
+# at G=192 on the A30 (24 GB) in the Voigt intermediate — moot on h100, but the locked config
+# does not change with the partition. 256/4 matches the production T3 mapping (peak ~11.3 GB
+# on the MLP; the grid forward is cheaper per design §5). PYTORCH_CUDA_ALLOC_CONF retained.
 #
 # Gate ladder (pre-committed, design §4):
 #   (i)  trainability: var_pf_band_ratio > 1e-3 at step 5000 (emitted to stdout + MLflow
@@ -40,7 +51,7 @@
 #   sbatch scripts/submit_juno_d73_voxelgrid.sh
 #
 #SBATCH --job-name=d73-1dp-voxelgrid-p1
-#SBATCH --partition=a30
+#SBATCH --partition=h100
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
