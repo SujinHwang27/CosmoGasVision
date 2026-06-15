@@ -125,7 +125,7 @@ python -u experiments/nerf/pipeline.py \
     --seed 0 \
     --checkpoint_interval 5000 \
     --data_root Sherwood \
-    --stage_tag 2b-1dprime
+    --run_name "${RUN_TAG}"
 TRAIN_SECONDS=${SECONDS}
 echo "=== train wall-clock: ${TRAIN_SECONDS}s ==="
 
