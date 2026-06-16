@@ -72,6 +72,28 @@ Source of truth for cluster state: <https://hpc.utdallas.edu/systems-resources/j
   - Available on **Juno only** (not Ganymede 2). SSH-key setup: <https://utdallas-hpc-juno-ug.readthedocs-hosted.com/en/latest/getting-started/ssh-keys/>.
 - **Support**: `circ-assist@utdallas.edu` (general HPC) or `hpc@utdallas.edu` (Juno-specific).
 
+## Keeping the control machine awake (macOS `caffeinate`)
+
+The Juno **job** is server-side — an `sbatch` job keeps running on the compute node whether or not your laptop sleeps. What dies when the Mac goes idle is anything **local and long-lived**: a polling watcher on the step-gate, an open `rsync` pull, an interactive `ssh`/`salloc` session, or the UTD VPN tunnel itself (macOS suspends the network stack on system sleep, and most VPN clients do not auto-reconnect on wake). On this machine the idle sleep timer is aggressive (`pmset -g` showed `sleep 1` — full system sleep after ~1 min idle), so an unguarded monitoring loop will be cut off within a minute of you stepping away.
+
+Wrap any long-lived local Juno interaction in `caffeinate` so the control machine holds the network up for its duration:
+
+```bash
+# Wrap a specific transfer/loop — caffeinate exits when the command exits:
+caffeinate -is rsync -avzP "juno:${JUNO_WORK%/CosmoGasVision}/stage2b_results/<RUN_TAG>/" cloud_runs/<RUN_TAG>/
+
+# Hold the machine awake while a local watcher/poll loop runs in this shell:
+caffeinate -is squeue --me     # or any monitor command; Ctrl-C releases it
+
+# Pin caffeinate to a background PID (e.g. a detached watcher) and let it self-release:
+<your-watcher> &              # capture its PID
+caffeinate -is -w $!          # stays awake until that watcher exits
+```
+
+Flags: `-i` prevents idle **system** sleep (the one that drops the tunnel), `-s` prevents sleep on AC power, `-w <pid>` ties the awake-window to a process so it self-releases. Scope `caffeinate` to the command rather than disabling sleep system-wide (`sudo pmset -c sleep 0`) — the wrapper reverts automatically and won't leave the laptop awake on battery after the dispatch is done.
+
+Rule of thumb: **if a Juno-related command will outlive you sitting at the keyboard, prefix it with `caffeinate -is`.** Fire-and-forget `sbatch` submissions that return immediately do not need it.
+
 ## Storage layout — pick the right filesystem
 
 | Path | Real location | Filesystem | Quota | Backed up | Purge | Use for |
@@ -325,7 +347,7 @@ Batch 3 (T3 × {P1,P2,P3,P4}):  dispatch all 4 only after Batch 2 fully complete
 Batch 4 (T4 × {P1,P2,P3,P4}):  post-quota only — sanity-check VRAM with one cell first
 ```
 
-Use `squeue --me` to monitor; `scancel <jobid>` to abort. `sshare` to check Fairshare value before dispatching the next batch — if your share dropped below 0.5, expect long wait times and consider deferring.
+Use `squeue --me` to monitor; `scancel <jobid>` to abort. `sshare` to check Fairshare value before dispatching the next batch — if your share dropped below 0.5, expect long wait times and consider deferring. If you monitor from a macOS laptop that sleeps, run the poll loop under `caffeinate -is` (see "Keeping the control machine awake") so an idle-sleep doesn't sever the VPN mid-watch.
 
 ## Anti-patterns
 
