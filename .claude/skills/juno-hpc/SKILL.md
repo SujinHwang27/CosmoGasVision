@@ -58,6 +58,18 @@ Source of truth for cluster state: <https://hpc.utdallas.edu/systems-resources/j
   ```
 
 - **Open OnDemand** (web UI for file browse / VS Code / Jupyter): <https://juno-ood.hpcre.utdallas.edu/>. Useful for ≤10 GB ad-hoc transfers; not suitable for the full Sherwood mirror.
+- **VS Code Remote-SSH — use the dedicated node, NOT the login node** (HPC team notice 2026-06-16, Juno-only, experimental). VS Code's Remote-SSH spawns many background/zombie processes that destabilized the regular login nodes, so its access there was restricted. The sanctioned path is a separate host:
+  ```bash
+  # Remote-SSH target (VS Code ONLY — do not use as a general login/compute node):
+  #   Server:   juno-vscode.utdallas.edu
+  #   Username: <netid>   (UTD password, or SSH keys per the UG SSH-keys guide)
+  ssh <netid>@juno-vscode.utdallas.edu
+  ```
+  Hard limits / caveats:
+  - **VS Code Remote-SSH only.** Do NOT use `juno-vscode` as a regular node, and do NOT run programs/training on it — all compute still goes through `sbatch` to the a30/h100 **compute nodes**. (Our dispatch workflow is unchanged: `ssh juno` → `sbatch`; `juno-vscode` is only for editing in VS Code.)
+  - Memory + max-process limits are enforced (`ulimit -a` to inspect); exceeding them kills the session.
+  - Testing phase — expect hangs/disconnects; Remote-SSH zombie processes are reaped by routine cleanup scripts, so the session may drop and restart its remote processes.
+  - Available on **Juno only** (not Ganymede 2). SSH-key setup: <https://utdallas-hpc-juno-ug.readthedocs-hosted.com/en/latest/getting-started/ssh-keys/>.
 - **Support**: `circ-assist@utdallas.edu` (general HPC) or `hpc@utdallas.edu` (Juno-specific).
 
 ## Storage layout — pick the right filesystem
