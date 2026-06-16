@@ -51,7 +51,7 @@
 #   sbatch scripts/submit_juno_d73_voxelgrid.sh
 #
 #SBATCH --job-name=d73-1dp-voxelgrid-p1
-#SBATCH --partition=h100
+#SBATCH --partition=a30
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
