@@ -81,7 +81,7 @@ echo "=== [D-73] (1d') dispatch | RUN_TAG=${RUN_TAG} | commit=${COMMIT} ==="
 # --- 1. Copy in ---
 mkdir -p "${RUN_DIR}"
 cd "${RUN_DIR}"
-cp -r "${JUNO_WORK}"/{src,experiments,scripts,pyproject.toml,uv.lock} .
+cp -r "${JUNO_WORK}"/{src,experiments,scripts,tests,pyproject.toml,uv.lock} .
 ln -s "${JUNO_SCRATCH}/sherwood" Sherwood   # P1 sightlines + tauH1 + .rho_field_cache/
 
 # Provenance guard: confirm the copied repo carries the one-lever flag + tol-0 test.
