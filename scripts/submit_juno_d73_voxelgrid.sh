@@ -72,7 +72,10 @@ fi
 : "${JUNO_WORK:=$HOME/work/CosmoGasVision}"
 : "${JUNO_SCRATCH:=$HOME/scratch}"
 
-COMMIT="37c02bc"
+# Derive the provenance label from the checkout that will actually be copied in,
+# so the RUN_TAG / log never drifts from the code that runs (was hardcoded 37c02bc;
+# the tests/-copy-in fix made the hardcode stale — see git log for this file).
+COMMIT="$(git -C "${JUNO_WORK}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 RUN_TAG="d73-1dprime-voxel192-P1-z0.3-${COMMIT}-$(date +%Y%m%d-%H%M%S)-$(uuidgen | cut -c1-6)"
 RUN_DIR="${JUNO_SCRATCH}/d73_1dprime/${RUN_TAG}"
 
