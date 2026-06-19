@@ -161,9 +161,10 @@ the Juno grid cube and remains S7-confounded).
 ## 6. The two pre-written (1d′) branch dispositions
 
 The (1d′) explicit voxel-grid (four free grids matching the MLP's four free heads, G = 192, plain
-[D-24] flux supervision, one-lever proven tol-0 at am-7) is the most expressive parameterization the
-problem can be given. Its result determines which disposition lands. Both are valid [D-37]-rule-7 end
-states; neither is spun.
+[D-24] flux supervision, one-lever proven tol-0 at am-7) is the maximal-capacity-within-this-study
+parameterization (most degrees of freedom / least regularization; conditioning — e.g. hash-grid /
+multigrid — is a separate untested axis). Its result determines which disposition lands. Both are valid
+[D-37]-rule-7 end states; neither is spun.
 
 **Branch A — SELECTED (job 221335, 2026-06-18, [D-73] am-9).** The trigger is a disjunction
 (trainability var_pf_band_ratio ≤ ~8.8×10⁻⁵ at step 5000, OR PASS-trainability-but-P_F-fails). The run

@@ -54,7 +54,8 @@ def compute_xi_pearson(
     r_centers : (n_bins,) ndarray
         Geometric centers of the r bins (h^-1 Mpc).
     xi : (n_bins,) ndarray
-        Mean Pearson cross-correlation in each shell. Empty bins -> NaN.
+        Mean cross-correlation-FUNCTION value in each shell (decays with r;
+        per-lag Pearson only at r=0). Empty bins -> NaN.
     """
     if rho_pred.shape != rho_truth.shape:
         raise ValueError(
@@ -65,8 +66,10 @@ def compute_xi_pearson(
     N = rho_pred.shape[0]
     L = box_kpc_h / 1000.0  # Mpc/h
 
-    # NORMALIZE both fields to zero-mean, unit-variance so xi is bounded
-    # in [-1, 1] and the [D-13] threshold of 0.6 is well-defined.
+    # NORMALIZE both fields to zero-mean, GLOBAL unit-variance. NOTE: this makes
+    # xi(r) the cross-correlation FUNCTION (decays with r), bounded [-1,1] only at
+    # r=0 — NOT a per-lag coefficient; the [D-13] 0.6 gate is unreachable under it
+    # and is DEMOTED ([D-73] am-9 / [D-36] correction note).
     delta_pred = rho_pred - rho_pred.mean()
     delta_truth = rho_truth - rho_truth.mean()
     sp = delta_pred.std()
@@ -125,9 +128,10 @@ def compute_xi_covariance(
     """Density-density cross-COVARIANCE xi(r) on overdensity cubes.
 
     Diagnostic only — NOT a [D-13] gate. The [D-13] gating function is
-    :func:`compute_xi_pearson`, which divides through by the per-field
-    standard deviations so the result is bounded in [-1, 1] and the
-    threshold 0.6 has meaning. This routine returns the unnormalized
+    :func:`compute_xi_pearson`, which divides through by each field's GLOBAL
+    standard deviation — yielding a cross-correlation FUNCTION (bounded [-1,1]
+    only at r=0; the 0.6 gate is unreachable under it and DEMOTED per [D-73]
+    am-9 / [D-36]). This routine returns the unnormalized
     covariance estimator ``<delta_pred(x) delta_truth(x + r)>`` so that
     ``xi(r=0) ≈ Var(rho)`` when ``rho_pred == rho_truth`` — useful for
     sanity-checking the FFT-based pipeline against direct variance.
