@@ -102,7 +102,12 @@ optimum. The per-fix ladder (0.051 → 0.020 → 0.037 → 0.079) confirms the o
 over-regularization artifact (am-4 demote vindicated). It is reported self-anchored (R14): published
 CLAMATO/TARDIS r-values are context only, never our bar. Two real low-bias contributors are disclosed:
 z = 0.3 mean_F = 0.979 (genuinely low per-pixel S/N) and a real-space-pixel / redshift-space-flux
-frame mismatch.
+frame mismatch. **The frame mismatch is now quantified ([D-73] am-9 S7) and applies to BOTH the Wiener
+and the neural (1d′) ξ numbers:** ξ scores a real-space density cube against real-space truth while
+supervision/observation is redshift-space flux, with no RSD remap on either cube; at z = 0.3, P1 the
+displacement is Δχ_rms = 1.30 h⁻¹Mpc, Δχ_p95 = 2.53 h⁻¹Mpc — comparable to / exceeding the r = 2 h⁻¹Mpc
+gate point, so it depresses ξ(r = 2) independent of reconstruction quality. This is a named confound on
+every ξ(r ≈ 2) number in §5, not a property of any one method.
 
 ---
 
@@ -130,12 +135,26 @@ The explicit-grid result is the only neural 3D-ξ number the project can produce
 | Method | ξ_3D(2 h⁻¹Mpc) | Note |
 |---|---|---|
 | Classical Wiener (idealized) | ≥ 0.079 (lower bound, optimum un-pinned) | self-anchored; z=0.3 low-S/N + RSD-frame low-bias |
-| Neural explicit voxel-grid (1d′) | **TBD** | the only neural 3D-ξ; G=192, plain-[D-24], one-lever |
+| Neural explicit voxel-grid (1d′) | **0.0075** (≈ 25% of the 0.0298 achievable ceiling) | job 221335, G=192, plain-[D-24], one-lever; weak structure |
 | Production MLP | N/A (3D) — 1D surrogate ≈ +0.03/+0.08 | 1D-flux-supervised, no 3D cube |
 
-The 0.6 bar provenance: estimator from Stark+ 2015; the 0.6 acceptance threshold is a project-side
-adoption ([D-36] — the Stark attribution was retracted), not a Stark-quoted value. Both halves carry
-on every citation.
+**The 0.6 acceptance bar is DEMOTED ([D-73] am-9 / [D-36] correction note, 2026-06-18).** Two
+independent defects, both confirmed first-hand: **(S5) the threshold is unreachable under the
+implemented estimator.** `compute_xi_pearson` normalizes by each field's *global* std and returns the
+cross-*correlation function* ξ(r), which decays with r — NOT the per-lag Pearson coefficient the 0.6
+bar assumes (≡1 for truth-vs-truth at every r). Measured: ξ(truth, truth) at r≈2 = **0.0298**, not ≈1.0,
+so no field — not even a perfect reconstruction — can pass 0.6. The honest read is therefore
+**ceiling-relative**: the grid recovers 0.0075/0.0298 ≈ 25% of the field's own achievable r≈2
+autocorrelation, and sits *below* truth+100%-noise (0.0211) — genuinely weak structure recovery, but
+the "0.0075 vs 0.6 → catastrophic fail" framing is INVALID. **(S7) frame mismatch** confounds *both* the
+neural and Wiener numbers: ξ compares a real-space cube to real-space truth while supervision is
+redshift-space flux, no RSD remap; at z=0.3 the displacement Δχ_rms = 1.30, Δχ_p95 = 2.53 h⁻¹Mpc is
+≳ the r=2 gate scale, depressing ξ(r=2) independent of reconstruction quality. Provenance (unchanged):
+the estimator is a *Stark-style FFT cross-power* (not "from Stark+2015"); the 0.6 threshold is a
+project-side adoption ([D-36], Stark attribution retracted). **The ξ number is SUPPORTING, not
+load-bearing — the decisive close-out evidence is K2 (degeneracy, §6), which is estimator-independent.**
+A corrected per-lag coefficient ξ_cross/√(ξ_pp·ξ_tt) is banked as journal-length / future work (needs
+the Juno grid cube and remains S7-confounded).
 
 ---
 
@@ -146,18 +165,45 @@ The (1d′) explicit voxel-grid (four free grids matching the MLP's four free he
 problem can be given. Its result determines which disposition lands. Both are valid [D-37]-rule-7 end
 states; neither is spun.
 
-**Branch A — (1d′) collapses** (trainability var_pf_band_ratio ≤ ~8.8×10⁻⁵ at step 5000, OR
-PASS-trainability-but-P_F-fails). **Disposition: the characterization is complete.** Headline
-(scope-locked, R8/R9): *at z = 0.3, P1, the P_F reconstruction deficit is invariant across the tested
-representation classes — continuous coordinate-MLP, skip-rich MLP, and explicit free-per-voxel grid —
-under flux supervision; the obstacle is the supervision regime and the information content of the
-low-z forest, not the neural representation.* This is a successful result: a method class's failure
-mode, named, localized (saturation-band + void-floor pinch), and bounded in scope. It is the honest
-close. The paper's contribution is the characterization itself plus the falsification-disciplined
-methodology; no over-reach to "impossible," only "characterized at this regime."
+**Branch A — SELECTED (job 221335, 2026-06-18, [D-73] am-9).** The trigger is a disjunction
+(trainability var_pf_band_ratio ≤ ~8.8×10⁻⁵ at step 5000, OR PASS-trainability-but-P_F-fails). The run
+fired the **PASS-trainability disjunct**: var_pf_band_ratio = 1.0959, flat step 5000→50000 — the grid
+trained (escaped the Mode-B collapse, ~1000× over the bar) and then failed 3D-structure recovery.
+*Honest disclosure:* the grid's `|ΔP_F/P_F|` was not separately tabulated; var_pf IS the
+predicted-P_F-band-variance statistic (the §2 A7 observable), so the trainability clause is satisfied
+directly and the "P_F-fails" arm is discharged by the absence of P_F-relevant structure recovery, not a
+direct P_F measurement.
 
-**Branch B — (1d′) escapes collapse and closes P_F** (var_pf > 1e-3 at step 5000 AND |ΔP_F/P_F| < 10%
-at convergence). **Disposition: the project reopens.** The re-issue becomes a methods-paper-plus-
+**Disposition: the characterization is complete.** The decisive, estimator-independent evidence is
+**K2**: the TRUE sightline fields, forward-modeled through the SAME integrator under the exact [D-24]
+loss (RSD applied identically, free tau_amp), score loss_data = 0.0101; the grid scored 0.0026 — it fits
+the observed flux ~4× *better than the true field does*. (Non-trivial content: the 4× margin +
+tau_amp-flatness, which rules out the [D-10]/[D-11]/[D-34] amplitude-calibration escape; the margin
+includes integrator-induced slack — the 0.0101 floor is our FGPA-vs-RT error, not nature's.) Regime
+note: var_pf = 1.0959 ≈ Mode-A's ≈1.0, so the grid sits in the **Mode-A basin** (saturation-band
+partial-underfit), reproducing it at the most-expressive parameterization — *this* is the
+representation-invariance content, scoped to P_F (the cross-representation claim belongs to the §1
+intervention table, not to this single (1d′) run).
+
+Headline (scope-locked, R8/R9; supersedes the prior draft): *At z = 0.3 (P1), a
+maximal-capacity-within-this-study free-per-voxel field (192³), trained under the production flux
+supervision, fits the observed flux better than the true field does through the same forward model
+(0.0026 vs 0.0101, ~4×) while recovering only weak 3D structure (≈25% of the achievable ξ ceiling,
+with real-vs-redshift-space frame mismatch a named additional confound). The z = 0.3 flux inverse
+problem, under this FGPA forward model, is under-constrained: escaping the optimization collapse is
+necessary but not sufficient, because the flux through this integrator does not determine the 3D field.
+We do not separate problem-intrinsic from forward-model-induced under-determination at ⟨F⟩ = 0.979, and
+make no claim beyond z = 0.3 — where the low-z forest is information-sparse (≈2% absorption), in contrast
+to z ≈ 2–3 where CLAMATO/TARDIS succeed.* This is a successful result: a method class's failure mode,
+named, localized, measured (K2 degeneracy), and bounded in scope. It is the honest close — the
+contribution is the characterization plus the falsification-disciplined methodology; no over-reach to
+"impossible," only "characterized at this regime."
+
+**Branch B — NOT SELECTED (foreclosed by job 221335).** (var_pf > 1e-3 at step 5000 AND |ΔP_F/P_F| < 10%
+at convergence.) Branch B required the explicit field to *recover the flux-relevant structure the MLP
+could not*; the K2 degeneracy + weak ξ (§9c) show it did not (the grid fits flux *better* than truth yet
+carries the wrong structure). The [D-74] JAX-at-v2 adoption and the Rung-4 angled-sightline reopen below
+are therefore NOT triggered. **(Original Branch-B disposition, retained for the record:) the project reopens.** The re-issue becomes a methods-paper-plus-
 positive-result: an explicit field, forward-modeled through the differentiable Voigt integrator,
 recovers the flux-relevant structure the implicit MLP could not — scope-locked to (192³, P1, z = 0.3),
 NOT "the method class is solved." This triggers: the [D-74] JAX-at-v2-boundary evaluation (a scaling

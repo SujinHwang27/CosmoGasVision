@@ -1,11 +1,19 @@
 """Real-space density cross-correlation xi(r).
 
-The Stark+ 2015 sparse-tomography reference metric: compute the cross-power
-between predicted and ground-truth overdensity fields in Fourier space,
-inverse-transform to real space, and bin into spherical shells of |r|.
+A Stark-STYLE FFT cross-power metric (NOT the Stark+ 2015 estimator — that paper
+uses void-catalogue match-error + volume-overlap, see [D-36]): compute the
+cross-power between predicted and ground-truth overdensity fields in Fourier
+space, inverse-transform to real space, and bin into spherical shells of |r|.
 
-The headline number for [D-13] is xi(r=2 h^-1 Mpc) computed by
-:func:`compute_xi_pearson` (Pearson correlation, bounded in [-1, 1]).
+WARNING ([D-73] am-9 / [D-36] correction note, 2026-06-18): the returned xi(r)
+is the cross-CORRELATION FUNCTION (decays with r), NOT a per-lag Pearson
+coefficient. It equals a bounded [-1, 1] Pearson coefficient ONLY at r = 0;
+for r > 0 it is the cross-correlation of globally-unit-variance fields and is
+NOT bounded by 1. Measured consequence: xi(truth, truth) at r=2 h^-1 Mpc ≈ 0.03,
+not 1.0 — so the [D-13] 0.6 gate is UNREACHABLE under this estimator and is
+DEMOTED. A per-lag coefficient xi_cross/sqrt(xi_pp * xi_tt) is the bounded
+statistic the 0.6 bar assumed; not implemented here.
+
 :func:`compute_xi_covariance` returns the unnormalized covariance form;
 diagnostic only — not a [D-13] gate.
 """
@@ -21,13 +29,16 @@ def compute_xi_pearson(
     box_kpc_h: float,
     r_bins: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Pearson density-density cross-correlation function — [D-13] gate.
+    """Density-density cross-correlation FUNCTION xi(r) — [D-13] gate (DEMOTED).
 
-    Both fields are mean-subtracted and rescaled to unit variance before
-    the FFT cross-power is taken, so the returned xi(r) is the Pearson
-    correlation coefficient in real space, bounded in [-1, 1]. The
-    [D-13] gating threshold xi(r = 2 h^-1 Mpc) > 0.6 is defined on this
-    normalized form.
+    Both fields are mean-subtracted and rescaled to GLOBAL unit variance
+    before the FFT cross-power is taken. The returned xi(r) is therefore the
+    cross-correlation FUNCTION of unit-variance fields: it equals the Pearson
+    coefficient (bounded [-1, 1]) ONLY at r = 0; for r > 0 it decays with r and
+    is NOT a per-lag correlation coefficient. The [D-13] threshold
+    xi(r = 2 h^-1 Mpc) > 0.6 implicitly assumed the per-lag coefficient and is
+    UNREACHABLE under this estimator (xi(truth, truth) at r=2 ≈ 0.03) — see the
+    module docstring + [D-36] correction note; the gate is demoted.
 
     Parameters
     ----------
