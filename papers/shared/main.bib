@@ -803,27 +803,8 @@
 
 % ----- Category C: medical / scientific implicit-NeRF cross-pollination
 
-@inproceedings{zha2022naf,
-  title        = {{NAF}: Neural Attenuation Fields for Sparse-View {CBCT} Reconstruction},
-  author       = {Zha, Ruyi and Zhang, Yanhao and Li, Hongdong},
-  booktitle    = {Medical Image Computing and Computer Assisted Intervention -- MICCAI 2022},
-  year         = {2022},
-  doi          = {10.1007/978-3-031-16446-0_42},
-  eprint       = {2209.14540},
-  archivePrefix= {arXiv}
-}
-% RELEVANCE: HIGH (methodological precedent — coordinate-MLP representing a
-% continuous 3D attenuation field, optimized self-supervised against projection
-% data via differentiable forward synthesis). Most architecturally analogous
-% prior work to our IGM-NeRF; CT analogue of Voigt-integrated tau supervision.
-% Cite as primary cross-pollination reference.
-% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/2209.14540. Verbatim abstract
-% first sentence: "This paper proposes a novel and fast self-supervised
-% solution for sparse-view CBCT reconstruction (Cone Beam Computed Tomography)
-% that requires no external training data." Architecture confirmation: "the
-% desired attenuation coefficients are represented as a continuous function of
-% 3D spatial coordinates, parameterized by a fully-connected deep neural
-% network."
+% (duplicate zha2022naf stub removed 2026-06-18 per [D-73] am-9 PI review;
+%  canonical entry retained above.)"
 
 @inproceedings{coronafigueroa2022mednerf,
   title        = {{MedNeRF}: Medical Neural Radiance Fields for Reconstructing {3D}-aware {CT}-Projections from a Single {X}-ray},
@@ -858,28 +839,5 @@
 % synthesizing three-dimensional representations from the projected
 % two-dimensional image data."
 
-% ----- Category D: classical baseline anchor (already-cited Horowitz TARDIS
-% upgrade — recording the verified arXiv handle for the existing main.bib
-% reference if it needs cross-checking. NOT a new citation if duplicate.)
-
-@article{horowitz2019tardis,
-  title        = {{TARDIS} Paper {I}: A Constrained Reconstruction Approach to Modeling the $z\sim2.5$ Cosmic Web Probed by {L}yman-$\alpha$ Forest Tomography},
-  author       = {Horowitz, Benjamin and Lee, Khee-Gan and White, Martin and Krolewski, Alex and Ata, Metin},
-  journal      = {The Astrophysical Journal},
-  volume       = {887},
-  number       = {1},
-  pages        = {61},
-  year         = {2019},
-  doi          = {10.3847/1538-4357/ab4d4c},
-  eprint       = {1903.09049},
-  archivePrefix= {arXiv}
-}
-% RELEVANCE: DUPLICATE-CANDIDATE — confirm against existing main.bib horowitz
-% entries before final paper compilation; if already present, drop this stub.
-% Included here for sweep completeness because Q2 K2 brief named TARDIS as the
-% classical baseline.
-% VERIFICATION: 2026-06-02 WebFetch arxiv.org/abs/1903.09049. Verbatim abstract
-% first sentence: "Recent Lyman-α forest tomography measurements of the
-% intergalactic medium (IGM) have revealed a wealth of cosmic structures at
-% high redshift (z∼2.5)." Note: solver-internals (differentiable PM vs other)
-% not on abstract page; VERIFICATION-OWED for any solver-detail citation.
+% (duplicate horowitz2019tardis stub removed 2026-06-18 per [D-73] am-9 PI review;
+%  canonical entry retained above at the Category-A baseline block.)
