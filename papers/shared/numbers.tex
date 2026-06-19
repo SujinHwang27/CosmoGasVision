@@ -420,6 +420,46 @@
 \newcommand{\SubstrateProbeCpResnetParams}{8.3M}      % same as sprint-4 (channels-halved 3D ResNet-18)
 
 % ====================================================================
+% [D-73] (1d') explicit voxel-grid close-out — K2 degeneracy, trainability,
+%   ceiling-relative xi, real/redshift-space frame mismatch.
+%   Config: VoxelGridField G=192, plain-[D-24] flux supervision, one-lever,
+%   P1, z=0.3, n_rays=1024.  Juno job 221335 (commit c6f3aed), 50k steps.
+%   Source: experiments/nerf/artifacts/d73_1dprime/verification_{summary.md,battery.json}
+%   LEDGER reference: [D-73] amendment-9 §9a-§9d; spine §5/§6; [D-36] correction note.
+% ====================================================================
+
+% Voxel-grid resolution and supervision regime (R8: "maximal-capacity-within-this-study")
+\newcommand{\GridG}{192}                              % per-axis voxel count of the free grid
+
+% Trainability: predicted-P_F-band-variance ratio (A7-control observable, spine §2)
+% PASS-trainability disjunct: model escaped the Mode-B collapse, flat 5k->50k.
+\newcommand{\VarPfBandRatio}{1.0959}                  % flat step 5000->50000; ~Mode-A's ~1.0
+
+% K2 degeneracy: truth vs grid flux loss through the SAME integrator, free tau_amp
+\newcommand{\KTwoTruthLoss}{0.0101}                   % TRUE field forward-modeled, min over tau_amp
+\newcommand{\KTwoGridLoss}{0.0026}                    % grid argmin loss_data
+\newcommand{\KTwoMarginFactor}{4}                     % ~4x: grid fits flux better than truth
+
+% xi(r=2 h^-1 Mpc) — ceiling-relative reading (0.6 bar DEMOTED, S5+S7)
+\newcommand{\XiGrid}{0.0075}                          % neural explicit voxel-grid xi
+\newcommand{\XiCeiling}{0.0298}                       % truth-vs-truth ceiling (NOT ~1.0 under estimator)
+\newcommand{\XiCeilingFraction}{25\%}                 % 0.0075/0.0298 ~ 25% of achievable ceiling
+\newcommand{\XiTruthNoiseHundred}{0.0211}             % truth + 100%-noise reference; grid sits below
+\newcommand{\XiDemotedBar}{0.6}                        % the demoted [D-13] acceptance bar (unreachable as implemented)
+\newcommand{\WienerXiLowerBound}{0.079}              % idealized Wiener lower bound (optimum un-pinned)
+
+% S7 real-space-cube vs redshift-space-flux frame mismatch (named confound, both methods)
+\newcommand{\FrameDeltaChiRms}{1.30}                  % h^-1 Mpc rms displacement at z=0.3, P1
+\newcommand{\FrameDeltaChiPNF}{2.53}                  % h^-1 Mpc p95 displacement; >= r=2 gate scale
+
+% z=0.3 mean transmitted flux (information-sparse regime; ~2% absorption)
+\newcommand{\MeanFluxZpThree}{0.979}                  % <F> at z=0.3 (= Kirkman anchor central value)
+
+% Intervention enumeration (spine §1): 12 interventions + 2 diagnostics
+\newcommand{\NumInterventions}{12}
+\newcommand{\NumDiagnostics}{2}
+
+% ====================================================================
 % Compute footprint
 % ====================================================================
 

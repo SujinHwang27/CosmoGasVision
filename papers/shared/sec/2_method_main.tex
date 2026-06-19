@@ -25,7 +25,7 @@ where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\te
 \begin{equation}
 H(a, x) \approx e^{-x^2} - \frac{a}{\sqrt{\pi} x^2} \big[ e^{-2x^2} (4x^4 + 7x^2 + 4 + 1.5x^{-2}) - 1.5x^{-2} - 1 \big]
 \end{equation}
-allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$.
+allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix ([D-57]); the explicit-grid probe of \S\ref{sec:method:gridprobe} is supervised through the same forward model.
 
 \subsection{Lyman-alpha Forest Loss: Saturated-Absorber Mask, Cap, and Log-Space Supervision}
 \label{sec:method:loss}
@@ -45,3 +45,7 @@ at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ f
 
 \subsection{Training Configuration}
 We optimize with AdamW ($\beta=(0.9,0.999)$, weight decay $10^{-6}$, gradient L2 clip $1.0$) on a single \texttt{ml.g5.xlarge} (NVIDIA A10G, 24 GB) per tier under a tier-aware schedule (T1 $n_{\text{rays}}{=}64$ $/\,50$k steps, T2 $256/25$k, T3 $1024/12.5$k, T4 $16{,}384/12.5$k deferred), with per-tier linear-warmup-then-cosine LR $0\!\to\!5\!\times\!10^{-4}\!\to\!5\!\times\!10^{-6}$. Peak-VRAM follows the linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB, validated cross-tier (see suppl.).
+
+\subsection{Explicit-Voxel-Grid Probe}
+\label{sec:method:gridprobe}
+The MLP couples its four fields through a shared body, so a failure to recover structure could be a capacity limit of the implicit representation rather than a property of the inverse problem. We separate the two with an explicit-voxel-grid probe: we replace $F_\theta$ with four independent free-per-voxel grids at resolution $\GridG^3$ (one grid per field, no shared body, no encoding bandwidth limit) and train them under the same forward model and the same flux supervision as the MLP. This is the maximal-capacity parameterization within this study --- the most degrees of freedom and the least regularization we give the problem; the single lever is the per-voxel field values, so the optimizer can place any value at any voxel. Hash-grid or multiresolution conditioning is a separate, untested axis. The probe asks one question: given a representation with enough capacity to fit any field, does the flux supervision identify the true 3D field?

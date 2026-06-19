@@ -37,7 +37,7 @@ where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\te
 \begin{equation}
 H(a, x) \approx e^{-x^2} - \frac{a}{\sqrt{\pi} x^2} \big[ e^{-2x^2} (4x^4 + 7x^2 + 4 + 1.5x^{-2}) - 1.5x^{-2} - 1 \big]
 \end{equation}
-This allows the loss gradients to propagate back through the damping wings to the MLP parameters $\theta$.
+This allows the loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix ([D-57]), so the forward model is the same one the explicit-grid probe of Sec.~\ref{sec:method:gridprobe} is supervised through.
 
 \subsection{Lyman-alpha Forest Loss: Saturated-Absorber Mask, Cap, and Log-Space Supervision}
 \label{sec:method:loss}
@@ -130,3 +130,7 @@ Microbatch values for tiers 3 and 4 are constrained by VRAM rather than converge
     \caption{Stage 2b micro-grid per-tier peak VRAM measurements, validating the $\hat{V}_{\text{peak}} \approx \TonePeakVRAM \cdot \min(n_{\text{rays}}, \mu\text{batch}) / 64$ GB scaling from [D-23]. All tiers fit $\geq \VRAMHeadroomPercent$ under the 24 GB device VRAM budget; the linear model holds across the full $\text{accum\_steps} \in \{1, 4, 64\}$ range exercised by the production schedule.}
     \label{tab:per-tier-vram}
 \end{table} The learning-rate schedule is per-tier linear warmup $0 \to 5 \times 10^{-4}$ followed by cosine decay $5 \times 10^{-4} \to 5 \times 10^{-6}$ over the remaining steps; checkpoints sync to S3 every 5{,}000 steps. Tier 4 is deferred to post-quota because its 64-chunk gradient accumulation makes its wallclock per cell dominate the survey budget; tiers 1--3 already span the survey-realistic sightline-density regime. Cost-survey runs are calibration evidence only; publication runs (post-quota) re-run the corresponding tier under the locked-in schedule.
+
+\subsection{Explicit-Voxel-Grid Probe}
+\label{sec:method:gridprobe}
+The MLP couples its four fields through a shared body, so a failure to recover structure could be a capacity limit of the implicit representation rather than a property of the inverse problem. We separate the two with an explicit-voxel-grid probe. We replace $F_\theta$ with four independent free-per-voxel grids at resolution $\GridG^3$ --- one grid per field ($\rho/\bar\rho$, $T$, $X_{HI}$, $v_{\text{pec}}$), no shared body, no positional-encoding bandwidth limit --- and train them under the same forward model and the same flux supervision as the MLP. This is the maximal-capacity parameterization within this study: the most degrees of freedom and the least regularization we give the problem. The optimizer exposes a single lever (the per-voxel field values), so it can place any value at any voxel. Hash-grid or multiresolution conditioning is a separate, untested axis and is not part of this probe. The probe answers one question: given a representation with enough capacity to fit any field, does the flux supervision identify the true 3D field?
