@@ -1,0 +1,6 @@
+outs:
+- md5: 9ceb25bc1061379874a21e9d7fad1322
+  size: 339758908
+  isexec: true
+  hash: md5
+  path: step_050000.pt
