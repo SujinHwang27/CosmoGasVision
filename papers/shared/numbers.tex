@@ -440,6 +440,15 @@
 \newcommand{\KTwoGridLoss}{0.0026}                    % grid argmin loss_data
 \newcommand{\KTwoMarginFactor}{4}                     % ~4x: grid fits flux better than truth
 
+% P_F gate ([D-73] am-10): the grid CLOSES the flux-power gate the MLP FAILED.
+% Grid: job 221335 step_050000, n_rays=1024, eval convention = src.analysis.p_flux
+% (scripts/d73_pf_sharpener.py -> experiments/nerf/artifacts/d73_1dprime/pf_sharpener.json).
+% Baseline: MLP n_rays=64 pub-t1 seed=42 anchor (== \PFresidPone). Distinct config:
+% same convention + same 10% gate (PASS/FAIL verdicts comparable), magnitudes NOT a
+% controlled head-to-head -- do not present as one.
+\newcommand{\PFresidGrid}{0.0352}                     % grid |dP_F/P_F| band-mean, PASS < 0.10
+\newcommand{\PFresidGridBaseline}{0.4155}             % MLP baseline, FAIL (n_rays=64; config caveat)
+
 % xi(r=2 h^-1 Mpc) — ceiling-relative reading (0.6 bar DEMOTED, S5+S7)
 \newcommand{\XiGrid}{0.0075}                          % neural explicit voxel-grid xi
 \newcommand{\XiCeiling}{0.0298}                       % truth-vs-truth ceiling (NOT ~1.0 under estimator)

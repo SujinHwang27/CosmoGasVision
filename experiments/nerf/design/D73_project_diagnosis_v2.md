@@ -138,6 +138,15 @@ The explicit-grid result is the only neural 3D-ξ number the project can produce
 | Neural explicit voxel-grid (1d′) | **0.0075** (≈ 25% of the 0.0298 achievable ceiling) | job 221335, G=192, plain-[D-24], one-lever; weak structure |
 | Production MLP | N/A (3D) — 1D surrogate ≈ +0.03/+0.08 | 1D-flux-supervised, no 3D cube |
 
+**P_F gate, for contrast ([D-73] am-10):** the explicit grid also **PASSES** the [D-13] flux-power gate
+the production MLP **failed** — grid |ΔP_F/P_F| (band-mean, k∥∈[10⁻²·⁵,10⁻¹·⁵]) = **0.0352 < 0.10**
+(`scripts/d73_pf_sharpener.py`), vs the MLP's **0.4155** ([D-39]). *Config caveat:* the MLP baseline is
+the n_rays=64 pub-t1 seed=42 anchor and the grid is n_rays=1024 — same `compute_p_flux` convention and
+the same 10% gate, so the PASS/FAIL **verdicts** are directly comparable, but the residual **magnitudes**
+are not a controlled same-config contrast. This is the sharp form of the under-constraint result: the
+grid closes *both* flux gates (var_pf trainability + P_F power spectrum) and beats truth on flux loss,
+yet recovers only weak 3D structure — the flux observables do not determine the 3D field.
+
 **The 0.6 acceptance bar is DEMOTED ([D-73] am-9 / [D-36] correction note, 2026-06-18).** Two
 independent defects, both confirmed first-hand: **(S5) the threshold is unreachable under the
 implemented estimator.** `compute_xi_pearson` normalizes by each field's *global* std and returns the
@@ -166,19 +175,14 @@ parameterization (most degrees of freedom / least regularization; conditioning �
 multigrid — is a separate untested axis). Its result determines which disposition lands. Both are valid
 [D-37]-rule-7 end states; neither is spun.
 
-**Branch A — SELECTED (job 221335, 2026-06-18, [D-73] am-9).** The trigger is a disjunction
-(trainability var_pf_band_ratio ≤ ~8.8×10⁻⁵ at step 5000, OR PASS-trainability-but-P_F-fails). The run
-fired the **PASS-trainability disjunct**: var_pf_band_ratio = 1.0959, flat step 5000→50000 — the grid
-trained (escaped the Mode-B collapse, ~1000× over the bar) and then failed 3D-structure recovery.
-*Honest disclosure:* the grid's `|ΔP_F/P_F|` was not separately tabulated; var_pf IS the
-predicted-P_F-band-variance statistic (the §2 A7 observable), so the trainability clause is satisfied
-directly and the "P_F-fails" arm is discharged by the absence of P_F-relevant structure recovery, not a
-direct P_F measurement.
+**Disposition: characterization complete (Branch A's end-state), reached on independent evidence — the §6 discriminator is VOID in this outcome cell ([D-73] am-10, 2026-06-20).** The run (job 221335) landed in a **"P_F-closes-but-ξ-fails" cell the §6 A/B trigger table did not enumerate**, so no branch is selected by predicate-match: var_pf_band_ratio = 1.0959 (not ≤ 8.8×10⁻⁵), and the grid's |ΔP_F/P_F| was subsequently MEASURED at **0.0352 — PASS** (`scripts/d73_pf_sharpener.py`), so Branch A's "P_F-fails" disjunct is FALSIFIED while Branch B's two conjuncts (var_pf>1e-3 AND |ΔP_F/P_F|<10%) both fire. The triggers embedded a false biconditional (`P_F-closure ⟺ structure-recovery`) that this run refutes; the discriminator is therefore declared void here and the disposition is decided on the **independent scientific evidence**, not by trigger-matching. (Pre-registration limitation, disclosed: the run falsified expectations on *both* sides — Branch A's naive premise "even the maximal field cannot close P_F" was also wrong.)
 
-**Disposition: the characterization is complete.** The decisive, estimator-independent evidence is
+The decisive, estimator-independent evidence for the no-reopen disposition (and the reason Branch B is
+foreclosed — its premise "recovers the flux-relevant structure" is FALSE) is
 **K2**: the TRUE sightline fields, forward-modeled through the SAME integrator under the exact [D-24]
 loss (RSD applied identically, free tau_amp), score loss_data = 0.0101; the grid scored 0.0026 — it fits
-the observed flux ~4× *better than the true field does*. (Non-trivial content: the 4× margin +
+the observed flux ~4× *better than the true field does*. K2 is internal to the run (n_rays-controlled,
+discriminator-independent), which is why it carries the disposition the void §6 triggers cannot. (Non-trivial content: the 4× margin +
 tau_amp-flatness, which rules out the [D-10]/[D-11]/[D-34] amplitude-calibration escape; the margin
 includes integrator-induced slack — the 0.0101 floor is our FGPA-vs-RT error, not nature's.) Regime
 note: var_pf = 1.0959 ≈ Mode-A's ≈1.0, so the grid sits in the **Mode-A basin** (saturation-band
@@ -188,11 +192,13 @@ intervention table, not to this single (1d′) run).
 
 Headline (scope-locked, R8/R9; supersedes the prior draft): *At z = 0.3 (P1), a
 maximal-capacity-within-this-study free-per-voxel field (192³), trained under the production flux
-supervision, fits the observed flux better than the true field does through the same forward model
-(0.0026 vs 0.0101, ~4×) while recovering only weak 3D structure (≈25% of the achievable ξ ceiling,
-with real-vs-redshift-space frame mismatch a named additional confound). The z = 0.3 flux inverse
-problem, under this FGPA forward model, is under-constrained: escaping the optimization collapse is
-necessary but not sufficient, because the flux through this integrator does not determine the 3D field.
+supervision, closes the [D-13] flux-power gate the production MLP failed (|ΔP_F/P_F| = 0.0352 vs 0.4155,
+PASS vs FAIL against the 10% bar) and fits the observed flux better than the true field does through the
+same forward model (0.0026 vs 0.0101, ~4×) while recovering only weak 3D structure (≈25% of the
+achievable ξ ceiling, with real-vs-redshift-space frame mismatch a named additional confound). The
+z = 0.3 flux inverse problem, under this FGPA forward model, is under-constrained: escaping the
+optimization collapse is necessary but not sufficient, because the flux through this integrator — even
+when it passes the community flux-power gate — does not determine the 3D field.
 We do not separate problem-intrinsic from forward-model-induced under-determination at ⟨F⟩ = 0.979, and
 make no claim beyond z = 0.3 — where the low-z forest is information-sparse (≈2% absorption), in contrast
 to z ≈ 2–3 where CLAMATO/TARDIS succeed.* This is a successful result: a method class's failure mode,
