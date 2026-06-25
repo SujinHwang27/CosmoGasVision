@@ -67,26 +67,30 @@ _RHO_CROP_HI = 1.0e6  # relaxed from 1.0e3 per 2026-05-13c; see comment above
 # (physics_id, redshift, n_grid). On a cache hit the disk read is mmap'd and
 # the in-memory `_RHO_FIELD_CACHE` is repopulated; target <= 15 s round-trip.
 #
-# Default location is D:\...\Sherwood\.rho_field_cache\ per the project's
-# C:-drive-constrained storage layout. Override via COSMOGAS_RHO_CACHE_DIR.
+# Default location is the repo-relative ``Sherwood/.rho_field_cache/`` (the
+# location DVC/.gitignore exclude per [D-48]). Override via COSMOGAS_RHO_CACHE_DIR.
+# NOTE: the prior default was a hardcoded Windows path
+# ``D:\Data\sujin\CosmoGasVision\Sherwood\.rho_field_cache`` from the retired
+# C:-drive-constrained machine. On macOS/Linux backslashes are valid filename
+# characters, so that default spawned a junk directory literally named
+# ``D:\Data\...`` at the repo root. Fixed 2026-06-25 to the repo-relative path.
 # ---------------------------------------------------------------------------
 _RHO_CACHE_SCHEMA_VERSION = 1
 
 # Sentinel for the default cache location. Resolved at call time (not import
 # time) so a test can `monkeypatch.setenv("COSMOGAS_RHO_CACHE_DIR", ...)`
 # without having to reload the module.
-_RHO_CACHE_DEFAULT_DIR = Path(
-    r"D:\Data\sujin\CosmoGasVision\Sherwood\.rho_field_cache"
-)
+_RHO_CACHE_DEFAULT_DIR = Path("Sherwood/.rho_field_cache")
 
 
 def _resolve_rho_cache_dir() -> Path:
     """Return the directory where rho-field cache entries are stored.
 
     Honors the ``COSMOGAS_RHO_CACHE_DIR`` env var when set; otherwise falls
-    back to the D:-drive default. Per the storage directive we deliberately
-    do NOT fall back to ``~/.cache`` or ``tempfile.gettempdir()`` on Windows
-    (both can resolve to C:); a manual override is required to relocate.
+    back to the repo-relative ``Sherwood/.rho_field_cache/`` (resolved against
+    the CWD, which is the repo root for the documented ``PYTHONPATH=.`` run
+    convention). The cache is a derived artifact, regenerable from the sim
+    binaries, and is excluded from git and DVC per [D-48].
     """
     override = os.environ.get("COSMOGAS_RHO_CACHE_DIR")
     if override:
@@ -1270,6 +1274,13 @@ class SherwoodLoader:
             bug — overflow, sign-flip, or unit-conversion error. The
             previous 1e3 ceiling rejected real n_grid=768 production
             data in sprint-4 first dispatch; see module-level comment.
+
+        Note: ``_RHO_CROP_LO`` (module-level, 1e-3) is a documentation
+        anchor only — this validator does NOT enforce a per-voxel
+        positive floor. Downstream consumers needing log/division
+        stability must add their own epsilon (e.g., the +1e-3
+        stabilizer in the [D-69] pretrain loss). Surfaced by [D-69]
+        K3 calibration probe.
         """
         if not np.isfinite(crops).all():
             n_bad = int((~np.isfinite(crops)).sum())
