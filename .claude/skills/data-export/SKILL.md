@@ -8,9 +8,10 @@ description: The project's canonical outbound data-export contract — how Cosmo
 > **Transplant note:** ported from the CosmoGasPeruser `data-export` skill via the
 > skill-transplant protocol (2026-06-25), localized to CosmoGasVision conventions
 > (SherwoodLoader, `src/export.py`, `src.utils.provenance`, the [D-37]/[D-73]
-> verb-ceiling). The upstream's `selements-website` consumer and `SignalClustering`
-> science did NOT come across — they are CosmoGasPeruser-specific. **No consumer is
-> registered yet** — see "Registered consumers" below.
+> verb-ceiling). The upstream's `SignalClustering` science did NOT come across — it
+> is CosmoGasPeruser-specific. The **`selements-website`** consumer IS shared (it
+> curates sources across the author's projects, CosmoGasVision among them) and is
+> registered below.
 
 CosmoGasVision data leaves the project through ONE audited boundary:
 `src/export.py`. Every export carries a no-bit-lost integrity guarantee —
@@ -118,11 +119,14 @@ caveat.
    verb-ceiling gate** above before shipping copy.
 
 ## Registered consumers
-- **None yet.** This contract was transplanted ahead of a registered consumer.
-  The first export request registers one: choose a kebab-case consumer name,
-  create `results/exports/<consumer>/MANIFEST.md`, and replace this line with the
-  consumer + its landing/registry paths (mirroring the upstream
-  `selements-website` entry).
+- **selements-website** — curates project sources across the author's projects;
+  CosmoGasVision is one. First (and currently only) registered consumer.
+  Landing: `results/exports/selements-website/`. Registry:
+  `results/exports/selements-website/MANIFEST.md`. Because it is a public-facing
+  curation site, **every claim-bearing export inherits the [D-73] close-out
+  verb-ceiling** (see the verb-ceiling gate above) — lead with the honest
+  characterization, never a reconstruction/“it works” claim. No requests serviced
+  yet; the first export adds the first MANIFEST row.
 
 ## Anti-patterns
 - Logic in `scripts/export/` instead of `src/export.py`.
