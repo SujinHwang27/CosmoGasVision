@@ -1,0 +1,19 @@
+{
+  "commit": "1b80f56",
+  "branch": "service/data-export",
+  "dirty": "True",
+  "timestamp": "2026-06-29T13:19:09",
+  "consumer": "selements-website",
+  "request_slug": "narrative-arc-honesty-review",
+  "producing_process": "project-architect (PI) narrative-arc honesty review (prose; no data/figure owed)",
+  "request_origin": "selements.website repo \u2014 story-editor narrative-arc honesty review questionnaire (Groups A-G)",
+  "artifact": "narrative-arc-honesty-review.md",
+  "deliverable_type": "prose advice (PI scientific + honesty sign-off); NOT a data export",
+  "source_documents": [
+    "experiments/nerf/LEDGER.md \u00a73 [D-73] amendment-9 (\u00a79a-\u00a79e) + amendment-10 (\u00a710a-\u00a710e); \u00a74 (1d') lineage row",
+    "experiments/nerf/design/D73_project_diagnosis_v2.md \u00a73a honest gaps, \u00a74 scope-lock, \u00a75 \u03be table + P_F para, \u00a76 dispositions"
+  ],
+  "verb_ceiling": "[D-37] honest-reporting + [D-73] close-out. Claim-bearing: every number/framing verified first-hand against am-9/am-10 (R26/R30).",
+  "honest_caveat": "PI sign-off = APPROVE-WITH-BINDING-CORRECTIONS on selements' drafted arc. Boundary: critique only, no rewrite; scientific corrections binding, storytelling input. Load-bearing caveats the narrative MUST carry: the K2 4x margin includes integrator-induced slack (0.0101 is OUR FGPA-vs-RT error, not physical); '~25%' is ceiling-relative under a DEMOTED \u03be estimator (vs 0.0298, never vs 0.6); grid-vs-MLP P_F magnitudes (0.0352 vs 0.4155) are NOT a same-config contrast (n_rays 1024 vs 64) though PASS/FAIL verdicts are; under-constraint is scoped to z=0.3 under this forward model (NOT 'information, not model'; NOT a claim about nature; NOT 'tomography impossible'). MLP fails 2 of 3 gates (3D \u03be never evaluated on MLP). Single realization, Sherwood P1, 60 cMpc/h box, fixed cosmology.",
+  "courier_target": "content/cosmo-gas-vision/sources/ (selements-website repo) \u2014 request->source courier"
+}
