@@ -1,0 +1,21 @@
+{
+  "commit": "9e93b85",
+  "branch": "service/data-export",
+  "dirty": "True",
+  "timestamp": "2026-07-07T18:20:13",
+  "consumer": "selements-website",
+  "request_slug": "tomography-framing-check",
+  "producing_process": "project-architect (PI) framing-check ruling (prose; no data/figure owed); literature verified first-hand via WebFetch",
+  "request_origin": "selements.website repo \u2014 story-editor framing-check on primer ep01 seeing-in-1d \u00a7IV ('tomography' + CLAMATO/TARDIS)",
+  "artifact": "tomography-framing-check.md",
+  "deliverable_type": "prose advice (PI scientific + citation ruling); NOT a data export",
+  "source_documents": [
+    "experiments/nerf/design/D73_project_diagnosis_v2.md \u00a71, \u00a73c, \u00a74, \u00a75, \u00a76 (scope-lock, Wiener baseline, CLAMATO/TARDIS context-only, K2)",
+    "CLAMATO Lee et al. 2018 (arXiv:1710.02894) \u2014 verified first-hand",
+    "TARDIS Horowitz et al. 2019 (arXiv:1903.09049) \u2014 verified first-hand",
+    "TARDIS II Horowitz et al. 2020 (arXiv:2007.15994) \u2014 flagged, not opened"
+  ],
+  "verb_ceiling": "[D-37] honest-reporting + [D-73] close-out. Claim-bearing + public-facing; citations verified against primary sources (R26/R30, review-protocol rule 2).",
+  "ruling_summary": "PI verdict: primer's reserve-'tomography'-for-the-working-case instinct is CORRECT and BINDING; no overhaul. Three MANDATORY precision fixes: (1) CLAMATO's real-data map used a WIENER FILTER, not TARDIS; (2) TARDIS Paper I is a SEPARATE, MOCK-VALIDATED method, not how real data was mapped; (3) name SIGHTLINE DENSITY (CLAMATO 2.37 h^-1Mpc, faint-galaxy backlights) alongside faint absorption as a second real difference from z=2-3, while stating CGV's synthetic n_rays=1024 test isolates the absorption axis and does NOT vary density. Corrected \u00a7IV passage supplied (Group D); closing line kept. Exact noun for CGV: 'a neural-field (learned) reconstruction of the 3D IGM density' \u2014 an instance of the IGM-tomography problem class, method not classical tomography; never call CGV's RESULT 'tomography' (it is under-constrained at z=0.3).",
+  "courier_target": "content/cosmo-gas-vision/sources/ (selements-website repo) \u2014 request->source courier"
+}
