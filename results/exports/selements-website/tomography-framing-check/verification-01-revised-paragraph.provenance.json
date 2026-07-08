@@ -1,0 +1,24 @@
+{
+  "commit": "b011bca",
+  "branch": "service/data-export",
+  "dirty": "True",
+  "timestamp": "2026-07-08T13:25:43",
+  "consumer": "selements-website",
+  "request_slug": "tomography-framing-check",
+  "follow_up": "verification-01",
+  "artifact": "verification-01-revised-paragraph.md",
+  "producing_process": "project-architect (PI) verification of selements' revised \u00a7IV paragraph (prose)",
+  "deliverable_type": "prose advice (PI verification); NOT a data export",
+  "verdict": "APPROVE WITH TWO BINDING CORRECTIONS",
+  "binding_corrections": [
+    "Final sentence: make explicit CGV holds sightlines DENSE (~1.9 h^-1Mpc, denser than CLAMATO 2.37) and varies ONLY absorption -- currently misreads as 'reproduced sparse z=0.3 geometry'.",
+    "'improve on that reconstruction' -> 'improve on that approach in simulations' (TARDIS improved Wiener in sims, not the real CLAMATO map)."
+  ],
+  "arithmetic": "CGV synthetic sep = 60 h^-1Mpc / sqrt(1024) = 1.875 ~ 1.9 h^-1Mpc (denser than CLAMATO 2.37).",
+  "cleared": [
+    "'demonstrably works' attaches only to CLAMATO/Wiener",
+    "closing question in-scope",
+    "physics + 'couple of Mpc' rounding fair"
+  ],
+  "courier_target": "content/cosmo-gas-vision/sources/ (selements-website repo)"
+}
