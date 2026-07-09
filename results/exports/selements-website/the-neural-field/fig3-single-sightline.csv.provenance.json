@@ -1,0 +1,23 @@
+{
+  "artifact": "fig3-single-sightline.csv",
+  "producing_function": "src.export.export_single_sightline",
+  "source_data_path": "Sherwood/Physics1_*/{los2048,tauH1}_n16384_z0.300.dat (truth) + cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe/checkpoints/step_050000.pt (MLP)",
+  "git": {
+    "commit": "3cdd811",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-09T13:18:41"
+  },
+  "export_timestamp_utc": "2026-07-09T18:18:41.202915+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "ONE REPRESENTATIVE RAY (global sightline index 67 = first of the sorted seed=42 n_rays=1024 selection), NOT a typical spectrum and NOT hand-picked for agreement. Eval geometry n_rays=1024, eval_seed=42; the production MLP was TRAINED at n_rays=64. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock. Illustrative of the under-constrained z=0.3 flux inverse problem under this FGPA forward model; a single agreeing/ disagreeing ray is not a gate.",
+  "representative_ray_global_index": 67,
+  "representative_ray_selection_rule": "sel[0] of sorted seed=42 selection",
+  "n_bins": 2048,
+  "render_convention": "published eval_partial_d13: tau_amp=1.0, no tau_max clamp",
+  "checkpoint_tau_amp": 1.045479260409416
+}

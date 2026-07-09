@@ -1,0 +1,75 @@
+{
+  "artifact": "fig1-pf-miss.csv",
+  "producing_function": "src.export.export_pf_miss",
+  "source_data_path": "Sherwood/Physics{1..N}_*/{los2048,tauH1}_n16384_z0.300.dat (truth) + cloud_runs/pub-t1-extracted/P*-N64-*/checkpoints/step_050000.pt (MLP)",
+  "git": {
+    "commit": "3cdd811",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-09T13:51:00"
+  },
+  "export_timestamp_utc": "2026-07-09T18:51:00.710940+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "RE-RUN at the [D-13] fiducial eval geometry (n_rays=1024, eval_seed=42; transverse separation 60/sqrt(1024)=1.875 ~1.9 h^-1 Mpc, denser than CLAMATO's 2.37 h^-1 Mpc). The production MLP was TRAINED at n_rays=64 \u2014 this is an EVAL-geometry statement, NEVER 'trained on 1024 dense sightlines'. The band-mean |dP_F/P_F| ~0.42 (P1) is 4.2x the [D-13] 10% small-scale flux-power gate: the MLP MISSES THE SMALL-SCALE FLUX-POWER GATE BY ~4x THE TOLERANCE (a ~42% band-mean fractional error), NOT 'the power spectrum is 4x off'. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock (no claim beyond z=0.3; CLAMATO/TARDIS succeed at z~2-3). This is a characterization of the under-constrained z=0.3 flux inverse problem under this FGPA forward model.",
+  "band_k_parallel_s_per_km": [
+    0.0031622776601683794,
+    0.03162277660168379
+  ],
+  "band_residual_per_cell": {
+    "P1": {
+      "abs_delta_PF_over_PF_in_band": 0.415520917022622,
+      "banked_seed42_P_F_residual": 0.4155
+    },
+    "P2": {
+      "abs_delta_PF_over_PF_in_band": 0.3757475370660148,
+      "banked_seed42_P_F_residual": 0.3757
+    },
+    "P3": {
+      "abs_delta_PF_over_PF_in_band": 0.3591552155148731,
+      "banked_seed42_P_F_residual": 0.3591
+    },
+    "P4": {
+      "abs_delta_PF_over_PF_in_band": 0.3613384960780592,
+      "banked_seed42_P_F_residual": 0.3613
+    }
+  },
+  "abs_delta_PF_over_PF_in_band": 0.415520917022622,
+  "measured_k_range_s_per_km": [
+    0.001122018454301963,
+    0.08912509381337459
+  ],
+  "n_measured_kbins": 17,
+  "n_empty_kbins_dropped": 3,
+  "empty_kbin_note": "compute_p_flux returns NaN for empty log-k bins; the CSV emits only the finite (measured) bins. Dropped bins carried no rays in that log-k interval \u2014 not a numerical failure.",
+  "reproduces_banked_seed42_P_F_residual_P1": {
+    "reproduced": 0.415520917022622,
+    "banked": 0.4155,
+    "abs_diff": 2.091702262202455e-05,
+    "tolerance": 0.05,
+    "within_tolerance": true
+  },
+  "cells_exported": [
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "pf_binning": "src.analysis.p_flux.compute_p_flux defaults (k in [1e-3,1e-1], 20 log bins)",
+  "render_convention": "published eval_partial_d13 convention: tau_amp=1.0 (renderer default), no tau_max clamp \u2014 reproduces banked 0.4155 to 4 dp.",
+  "checkpoint_tau_amp_per_cell": {
+    "P1": 1.045479260409416,
+    "P2": 1.1168591245441828,
+    "P3": 1.092010690853572,
+    "P4": 1.0609803341926922
+  },
+  "checkpoint_tau_amp_note": "tau_amp read from each checkpoint's log_tau_amp (never hardcoded), recorded here; NOT applied to the rendered flux under the published P_F convention. Applying it (+clamp) is the a7-recompute convention and yields 0.4414 for P1 \u2014 a different, self-consistent number."
+}

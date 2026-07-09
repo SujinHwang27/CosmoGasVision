@@ -1,0 +1,46 @@
+{
+  "artifact": "fig2b-flux-pdf.csv",
+  "producing_function": "src.export.export_flux_pdf",
+  "source_data_path": "Sherwood/Physics1_*/{los2048,tauH1}_n16384_z0.300.dat (truth) + cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe/checkpoints/step_050000.pt (MLP)",
+  "git": {
+    "commit": "3cdd811",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-09T13:17:45"
+  },
+  "export_timestamp_utc": "2026-07-09T18:17:45.691430+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "RE-RUN histograms at n_rays=1024, eval_seed=42, F in [0.05,0.95] (Bolton+2008/Lee+2015 window). KS is 3/4 PASS at the [D-13] gate (P2 fails at 0.0742). This is one of the two directly-evaluated [D-13] gates the production MLP is scored on (P_F fails 4/4; flux-PDF KS 3/4 pass); the 3D xi gate was NEVER evaluated on the MLP in its defined form, so 'fails all three gates' is BARRED. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "F_range": [
+    0.05,
+    0.95
+  ],
+  "n_bins_hist": 49,
+  "KS_distance_exported_cell": 0.03254302097265408,
+  "KS_per_physics_banked": {
+    "P1": {
+      "KS_seed42": 0.0325,
+      "KS_bootstrap_mean": 0.03568747866537126
+    },
+    "P2": {
+      "KS_seed42": 0.0742,
+      "KS_bootstrap_mean": 0.06772233800054664
+    },
+    "P3": {
+      "KS_seed42": 0.0408,
+      "KS_bootstrap_mean": 0.03534745384552862
+    },
+    "P4": {
+      "KS_seed42": 0.0389,
+      "KS_bootstrap_mean": 0.04109624041599434
+    }
+  },
+  "banked_source": "experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json + LEDGER \u00a73 gate table",
+  "pdf_normalization": "density over the [0.05,0.95] window (integrates to 1)",
+  "render_convention": "published eval_partial_d13: tau_amp=1.0, no tau_max clamp",
+  "checkpoint_tau_amp": 1.045479260409416
+}

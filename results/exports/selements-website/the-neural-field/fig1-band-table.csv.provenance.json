@@ -1,0 +1,42 @@
+{
+  "artifact": "fig1-band-table.csv",
+  "producing_function": "src.export.export_pf_miss (companion band table)",
+  "source_data_path": "Sherwood/Physics{1..4}_*/{los2048,tauH1}_n16384_z0.300.dat (truth) + cloud_runs/pub-t1-extracted/P*-N64-*/checkpoints/step_050000.pt (MLP)",
+  "git": {
+    "commit": "3cdd811",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-09T13:51:00"
+  },
+  "export_timestamp_utc": "2026-07-09T18:51:00.882282+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "P_F small-scale flux-power band-mean residual |dP_F/P_F| over k_|| in [10^-2.5, 10^-1.5] s/km, per physics cell, at n_rays=1024/eval_seed=42 (EVAL geometry; MLP TRAINED at n_rays=64). All exported cells fail the [D-13] 10% gate at 3.6x-4.2x the tolerance (0/4 PASS) \u2014 'misses the small-scale flux-power gate by ~4x the tolerance', NOT 'the power spectrum is 4x off'. Single realization / fixed cosmology; z=0.3 scope-lock. This is a characterization of the under-constrained z=0.3 flux inverse problem under this FGPA forward model.",
+  "band_k_parallel_s_per_km": [
+    0.0031622776601683794,
+    0.03162277660168379
+  ],
+  "pf_gate_tolerance": 0.1,
+  "cells_exported": [
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "cells_deferred": [],
+  "render_convention": "published eval_partial_d13: tau_amp=1.0, no tau_max clamp",
+  "checkpoint_tau_amp_per_cell": {
+    "P1": 1.045479260409416,
+    "P2": 1.1168591245441828,
+    "P3": 1.092010690853572,
+    "P4": 1.0609803341926922
+  }
+}

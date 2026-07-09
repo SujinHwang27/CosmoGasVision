@@ -1,0 +1,80 @@
+{
+  "artifact": "fig2a-mean-flux-table.csv",
+  "producing_function": "src.export.export_mean_flux_table",
+  "source_data_path": "experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json + experiments/nerf/LEDGER.md \u00a73 gate table",
+  "git": {
+    "commit": "3cdd811",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-09T13:08:44"
+  },
+  "export_timestamp_utc": "2026-07-09T18:08:44.114784+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "mean_F is 4/4 PASS at the seed=42 single-seed eval but only 2/4 at the [D-44] 5-seed sightline bootstrap against the [D-13] gate band [0.974, 0.984]: P1 and P2 bootstrap CIs lie ENTIRELY BELOW the band (q84 < 0.974); P3/P4 are marginal (q84 just inside the band). All four bootstrap CIs sit below the Kirkman+2007 point anchor <F>=0.979. Any 'reproduces the average flux' claim MUST carry this softening. mean_F_obs = 0.979 +/- 0.005 (Kirkman+2007, z=0.3). Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "mean_F_obs": 0.979,
+  "mean_F_obs_err": 0.005,
+  "mean_F_obs_source": "Kirkman et al. 2007, MNRAS 376:1227 ([D-34])",
+  "meanF_gate_band": [
+    0.974,
+    0.984
+  ],
+  "bootstrap_spec": "[D-44] K=5 seeds {42-46}, sightline-level bootstrap, n_rays_eval=1024",
+  "bootstrap_source_json": "experiments/nerf/artifacts/eval/d44_bootstrap/d44_bootstrap_KS_meanF.json",
+  "bootstrap_gate_verdict_per_cell": {
+    "P1": "FAIL(CI-below-band)",
+    "P2": "FAIL(CI-below-band)",
+    "P3": "PASS(marginal-at-q84)",
+    "P4": "PASS(marginal-at-q84)"
+  },
+  "n_bootstrap_pass_of_4": 2,
+  "cells_bootstrap_ci_below_gate_band": [
+    "P1",
+    "P2"
+  ],
+  "cells_bootstrap_ci_below_point_anchor": [
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+  ],
+  "seed42_anchor_source": "experiments/nerf/LEDGER.md \u00a73 gate table (lines 329-332)",
+  "meanF_per_seed": {
+    "P1": [
+      0.9661576747894287,
+      0.968896746635437,
+      0.9692320823669434,
+      0.9661946296691895,
+      0.965237021446228
+    ],
+    "P2": [
+      0.9689033031463623,
+      0.9736809134483337,
+      0.971659779548645,
+      0.969089150428772,
+      0.9684046506881714
+    ],
+    "P3": [
+      0.973469614982605,
+      0.9721348285675049,
+      0.9754747748374939,
+      0.9721205234527588,
+      0.968785285949707
+    ],
+    "P4": [
+      0.97242271900177,
+      0.9741093516349792,
+      0.9737880229949951,
+      0.9745922088623047,
+      0.9728357195854187
+    ]
+  }
+}
