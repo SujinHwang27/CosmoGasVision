@@ -3,6 +3,10 @@
 
 This supplementary atom contains the material removed from \S\ref{sec:method} for the CVPR 8-page main paper. The derivations and audits below are the source of the claims that the main paper carries as one-line summaries.
 
+\subsection{Bounded-activation constants and training-configuration hyperparameters}
+\label{sec:suppl:method:constants}
+Exact constants compressed from \S\ref{sec:method} for the CVPR 8-pp main. \textbf{Bounded physics layer ([D-02]).} Final-layer activations enforce physical scales field-by-field: $\rho/\bar\rho$ via unscaled Softplus, $T$ via $\texttt{Softplus}\cdot 10^4 + 10^3$ K, $X_{HI}$ via Sigmoid in $[0,1]$, and $v_{\text{pec}}$ via $\texttt{Tanh}\cdot 500$ km/s. \textbf{Training configuration ([D-14]/[D-23]).} We optimize with AdamW ($\beta=(0.9,0.999)$, weight decay $10^{-6}$, gradient L2 clip $1.0$) on a single \texttt{ml.g5.xlarge} (NVIDIA A10G, 24 GB) per tier under the tier-aware schedule T1 $n_{\text{rays}}{=}64\,/\,50$k steps, T2 $256/25$k, T3 $1024/12.5$k, T4 $16{,}384/12.5$k (deferred), with per-tier linear-warmup-then-cosine LR $0\!\to\!5\!\times\!10^{-4}\!\to\!5\!\times\!10^{-6}$. Peak VRAM follows the [D-23] linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB (Tab.~\ref{tab:per-tier-vram}).
+
 \subsection{Saturated-absorber detection: Bolton--Haehnelt derivation}
 \label{sec:suppl:method:bh}
 Per-sightline, we flag bins with $\tau_{GT} > 10^5$ as saturated cores, then expand each core to its connected component of bins with $\tau_{GT} > 10$ (the saturated wing). The threshold $\tau_{\text{core}} = 10^5$ is derived from the Voigt line-center identity (Bolton \& Haehnelt~\cite{bolton_haehnelt2007} Eq. 5) for thermal Doppler broadening at $T = 10^4$ K:
