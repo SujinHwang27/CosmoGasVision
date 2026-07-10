@@ -2,20 +2,20 @@
 \label{sec:experiments}
 
 \subsection{Dataset}
-We use the \textbf{Sherwood Simulation Suite}~\cite{bolton2017sherwood} 60 Mpc/h Planck-cosmology volume at $2048^3$ resolution; the dev redshift is $z = 0.3$. Each snapshot ships 16{,}384 sightlines along a single axis at 2048 velocity bins per ray, with ground-truth $\tau_{HI}(v)$ stored as \texttt{tauH1\_2048\_n16384\_z0.300.dat}. Sherwood ships four feedback variants: $P_1$ (no feedback), $P_2$ (stellar wind), $P_3$ (wind $+$ AGN), $P_4$ (wind $+$ strong AGN), an ablation matrix over baryonic feedback prescriptions. We train one independent field per variant so a downstream feedback-classification probe cannot leak the label through a conditioning input. We report Tiers 1--3 across all four variants; Tier 4 is not opened, because a scaling build-out is not warranted at this regime (\S\ref{sec:nextsteps:scope}).
+We use the \textbf{Sherwood Simulation Suite}~\cite{bolton2017sherwood} 60 Mpc/h Planck-cosmology volume at $2048^3$ resolution; the dev redshift is $z = 0.3$. Each snapshot ships 16{,}384 sightlines along a single axis at 2048 velocity bins per ray, with ground-truth $\tau_{HI}(v)$ stored as \texttt{tauH1\_2048\_n16384\_z0.300.dat}. Sherwood ships four feedback variants: $P_1$ (no feedback), $P_2$ (stellar wind), $P_3$ (wind $+$ AGN), $P_4$ (wind $+$ strong AGN), an ablation matrix over baryonic feedback prescriptions. We train one independent field per variant so a downstream feedback-classification probe cannot leak the label through a conditioning input. We report Tiers 1--3 across all four variants; the densest tier (Tier 4, $n_{\text{rays}}=16{,}384$) is not run --- the close-out characterization rests on the $n_{\text{rays}}=1024$ grid probe (\S\ref{sec:experiments:gridprobe}) and the project is not extended past it (\S\ref{sec:nextsteps:scope}).
 
 \subsection{Evaluation Metrics}
 Three primary structure gates are computed against the simulation ground truth on the rendered $F=e^{-\tau}$:
 \begin{itemize}
     \item \textbf{1D flux power spectrum} $P_F(k_\parallel)$ (Hann-windowed periodogram, $dv/\sum w^2$ leakage compensation): $|\Delta P_F / P_F| < \GatePF$ averaged over $k_\parallel \in [10^{\PFkLoExp}, 10^{\PFkHiExp}]$ s/km~\cite{walther2018powerspectrum, boera2019thermal}.
     \item \textbf{Density-density cross-correlation} $\xi_{\hat\rho, \rho}(r)$ --- a Stark-style FFT cross-power, normalized by each field's global std and inverse-transformed, on the periodic 60 Mpc/h grid~\cite{lee2015, stark2015tomography}. The $\xi(r{=}2\,h^{-1}\,\text{Mpc}) > \GateXi$ bar is \emph{demoted} below: the estimator returns a cross-correlation \emph{function} that decays with $r$, not a per-lag coefficient, so even truth-vs-truth scores only $\XiCeiling$ at $r = 2\,h^{-1}$ Mpc and no field can reach $\GateXi$. We report $\xi$ ceiling-relative.
-    \item \textbf{Flux PDF}: two-sample KS distance on $F$ restricted to $F \in [\PDFwinLo, \PDFwinHi]$ (lower cut excludes saturated absorbers; upper cut excludes continuum/metal-line residuals near $F\approx 1$~\cite{lee2015}): KS $< \GateKS$.
+    \item \textbf{Flux PDF}: two-sample KS distance on $F$ restricted to $F \in [\PDFwinLo, \PDFwinHi]$ (cuts exclude saturated absorbers and continuum/metal-line residuals~\cite{lee2015}): KS $< \GateKS$.
 \end{itemize}
-The fiducial pass point is $P_1$, $z = 0.3$, $n_{\text{rays}} = 1024$. The differentiable integrator was re-validated end-to-end at production architecture on the AWS SageMaker \texttt{ml.g5.xlarge} loop with S3 checkpoint sync; peak VRAM at the smallest tier is $\TonePeakVRAM$ GB, the anchor for the per-tier microbatch table of \S\ref{sec:method}.
+The fiducial pass point is $P_1$, $z = 0.3$, $n_{\text{rays}} = 1024$. The integrator was re-validated end-to-end at production architecture; peak VRAM at the smallest tier is $\TonePeakVRAM$ GB, the anchor for the per-tier microbatch table of \S\ref{sec:method} (validation loop in suppl.).
 
 \subsection{Stage 2b cost-survey: mean-flux anchor retraction}
 \label{sec:experiments:cost-survey-sweep}
-The Stage 2b cost-survey production sweep ran the per-tier schedule across all four feedback variants at Tiers 1--3 (12 banked cells, all PASS pre-registered safety rails; micro-grid calibration and per-tier numerics in suppl.). Those runs were trained against a broken anchor $\langle F\rangle_{\text{obs}} = 0.877$ --- a $z\!\sim\!2$ value mislabeled as $z=0.3$, retracted for the verified $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$~\cite{kirkman2007}. The structure gates ($P_F$, KS-PDF, $\xi_{\hat\rho,\rho}$) are anchor-invariant by construction (invariant to uniform multiplicative rescaling of $\hat F$), so the cost-survey calibration evidence survives the retraction; a separate corrected-anchor full-schedule run (\texttt{pub-t1}, $50{,}000$ steps, four physics) supplies the structure-gate readout of \S\ref{sec:experiments:cosmological-eval}. The $\tau_{\max}=10$ cap is locked by a sensitivity sweep (suppl.).
+The Stage 2b cost-survey sweep ran the per-tier schedule across all four variants at Tiers 1--3 (12 banked cells, all PASS pre-registered safety rails; calibration and per-tier numerics in suppl.). Those runs used a broken anchor $\langle F\rangle_{\text{obs}} = 0.877$ --- a $z\!\sim\!2$ value mislabeled as $z=0.3$, retracted for the verified $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$~\cite{kirkman2007}. The structure gates ($P_F$, KS-PDF, $\xi_{\hat\rho,\rho}$) are anchor-invariant by construction (invariant to uniform rescaling of $\hat F$), so the calibration evidence survives the retraction; a separate corrected-anchor run (\texttt{pub-t1}, $50{,}000$ steps, four physics) supplies the structure-gate readout of \S\ref{sec:experiments:cosmological-eval}. The $\tau_{\max}=10$ cap is locked by a sensitivity sweep (suppl.).
 
 \subsection{Production MLP: structure-gate readout}
 \label{sec:experiments:headline}
@@ -27,8 +27,8 @@ Tab.~\ref{tab:headline-3gate} consolidates the structure-gate readout for the pr
 
 \begin{table*}[t]
     \centering
-    \renewcommand{\arraystretch}{1.2}
-    \setlength{\tabcolsep}{4pt}
+    \renewcommand{\arraystretch}{1.05}
+    \setlength{\tabcolsep}{3.5pt}
     \footnotesize
     \begin{tabular}{l|cc|cc|cc|c}
     Cell & $\langle F_{\text{pred}}\rangle$ (mean $\pm \sigma$) & MF call & KS ($<\!\GateKS$, mean $\pm \sigma$) & KS call & $|\Delta P_F/P_F|$ ($<\!\GatePFdec$) & $P_F$ call & $r_\rho^{\log}$ ($>\!\GateXi$)$^\dagger$ \\
@@ -44,9 +44,9 @@ Tab.~\ref{tab:headline-3gate} consolidates the structure-gate readout for the pr
     \label{tab:headline-3gate}
 \end{table*}
 
-\subsection{\texorpdfstring{Cosmological evaluation: $P_F$ falsifies the rescale-preview reading}{Cosmological evaluation: P_F falsifies the rescale-preview reading}}
+\subsection{\texorpdfstring{Cosmological evaluation: $P_F$ falsifies the rescale-preview reading}{Cosmological evaluation: PF falsifies the rescale-preview reading}}
 \label{sec:experiments:cosmological-eval}
-The cost-survey ``rescale-as-preview'' interpretation is empirically falsified by the trained-at-target result: $4\times$ more training and the corrected anchor increased $|\Delta P_F/P_F|$ at $P_1$ rather than reducing it (overlay in suppl.). At the corrected anchor and full publication schedule (per-cell values in suppl.), the four-physics \texttt{pub-t1} bundle closes mean-flux in $4/4$ cells (cross-physics spread $\meanFseedFortyTwoSpread$, $<\!1\%$) and the flux-PDF KS gate in $3/4$, while $|\Delta P_F/P_F|$ stays uniformly $\PFfactorOverGateLo\times$--$\PFfactorOverGateHi\times$ over the $\GatePFdec$ gate. This conjunction --- matched mean-flux, near-uniform KS closure, and a uniformly $\sim\!4\times$-over $P_F$ residual --- is inconsistent with a calibration deficit: \emph{$P_F$ is structurally bound, not calibration-bound}. The gap is in second-order spectroscopic statistics that survive matched mean-flux and matched flux PDF, and it is not an MLP-capacity limit --- the explicit-grid probe (\S\ref{sec:experiments:gridprobe}) shows it persists at the maximal-capacity parameterization, where the under-constraint of the inverse problem is the operative cause. Log-space $\tau$-MSE is not a sufficient proxy for the structure-gate statistics (suppl.).
+The cost-survey ``rescale-as-preview'' reading is falsified by the trained-at-target result: $4\times$ more training and the corrected anchor \emph{increased} $|\Delta P_F/P_F|$ at $P_1$ (overlay in suppl.). At the corrected anchor and full schedule (per-cell values in suppl.), the four-physics \texttt{pub-t1} bundle closes mean-flux $4/4$ (cross-physics spread $\meanFseedFortyTwoSpread$, $<\!1\%$) and the flux-PDF KS gate $3/4$, while $|\Delta P_F/P_F|$ stays uniformly $\PFfactorOverGateLo\times$--$\PFfactorOverGateHi\times$ over the $\GatePFdec$ gate. Matched mean-flux and near-uniform KS closure with a uniformly $\sim\!4\times$-over $P_F$ residual is inconsistent with a calibration deficit: \emph{$P_F$ is structurally bound, not calibration-bound}. The gap is in second-order spectroscopic statistics that survive matched mean-flux and matched flux PDF, and it is not an MLP-capacity limit --- the explicit-grid probe (\S\ref{sec:experiments:gridprobe}) shows it persists at the maximal-capacity parameterization. Log-space $\tau$-MSE is not a sufficient proxy for the structure gates (suppl.).
 
 \subsection{\texorpdfstring{$\tau$-binned residual decomposition: saturation-regime under-fitting, positively identified cross-physics}{tau-binned residual decomposition: saturation-regime under-fitting, positively identified cross-physics}}
 \label{sec:experiments:tau-binned}
@@ -62,7 +62,7 @@ The MLP diagnosis of \S\ref{sec:experiments:cosmological-eval}--\S\ref{sec:exper
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\linewidth]{figures/d73_k2_truth_vs_grid.png}
+    \includegraphics[width=0.84\linewidth]{figures/d73_k2_truth_vs_grid.png}
     \caption{\textbf{K2 degeneracy ($z{=}0.3$, $P_1$, $G{=}192$, plain-[D-24], Juno job 221335).} The true sightline fields forward-modeled through the same integrator (free $\tau_{\text{amp}}$) score flux data loss $\KTwoTruthLoss$, flat over $\tau_{\text{amp}}\in[0.2,4]$ (shaded); the trained grid scores $\KTwoGridLoss$ (dashed), about $\KTwoMarginFactor\times$ lower. \emph{Verdict:} the grid fits the flux better than the true field does, so the flux optimum does not identify the true 3D field --- the inverse problem is under-constrained under this forward model. The amplitude-flatness rules out a calibration escape.}
     \label{fig:k2-degeneracy}
 \end{figure}
@@ -73,7 +73,7 @@ The MLP diagnosis of \S\ref{sec:experiments:cosmological-eval}--\S\ref{sec:exper
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\linewidth]{figures/d73_xi_ceiling_relative.png}
+    \includegraphics[width=0.84\linewidth]{figures/d73_xi_ceiling_relative.png}
     \caption{\textbf{3D $\xi(r)$ is ceiling-relative; the $\GateXi$ gate is unreachable ($z{=}0.3$, $P_1$, $G{=}192$).} Even truth-vs-truth reaches only $\XiCeiling$ at $r{=}2\,h^{-1}$Mpc under the implemented global-normalized estimator, so the dotted $\GateXi$ bar cannot be passed by any field. The neural grid ($\XiGrid$) recovers $\XiCeilingFraction$ of that ceiling and sits below truth-plus-100\%-noise ($\XiTruthNoiseHundred$); the Wiener lower bound ($\geq\!\WienerXiLowerBound$) is shown for context. \emph{Verdict:} weak structure recovery, not a $\GateXi$-gate ``catastrophic fail''; the comparison is additionally frame-confounded ($\Delta\chi\!\sim\!\FrameDeltaChiRms$--$\FrameDeltaChiPNF\,h^{-1}$Mpc at the gate scale).}
     \label{fig:xi-ceiling}
 \end{figure}
