@@ -87,7 +87,7 @@ ax.set_xlabel(r"$\tau_{\mathrm{amp}}$ (free amplitude)")
 ax.set_ylabel(r"flux data loss $\mathcal{L}_{\mathrm{data}}$")
 ax.set_ylim(0, max(curve.max() * 1.15, 0.013))
 ax.set_title(r"K2: the grid fits flux better than the true field"
-             "\n" r"($z{=}0.3$, $P_1$, $G{=}192$, plain-[D-24])", fontsize=9)
+             "\n" r"($z{=}0.3$, $P_1$, $G{=}192$, log-space flux loss)", fontsize=9)
 ax.legend(fontsize=8, loc="upper right")
 fig.tight_layout()
 fig.savefig(f"{FIGDIR}/d73_k2_truth_vs_grid.png", dpi=200)
@@ -128,7 +128,7 @@ ax.plot(GRID_R, GRID_XI, color="#d62728", lw=2, marker="s", ms=3,
 ax.scatter([2.0], [wiener_xi2], color="#9467bd", zorder=5, s=40, marker="D",
            label=rf"Wiener lower bound ($\geq{wiener_xi2:g}$)")
 ax.axhline(0.6, color="black", ls=":", lw=1.5)
-ax.text(5.0, 0.615, r"demoted [D-13] $0.6$ gate --- unreachable (even truth$\times$truth $=0.03$)",
+ax.text(5.0, 0.615, r"demoted $0.6$ gate --- unreachable (even truth$\times$truth $=0.03$)",
         fontsize=7.5, va="bottom", ha="center")
 ax.axvline(2.0, color="gray", ls=":", lw=0.8, alpha=0.6)
 ax.set_xlabel(r"$r$ [$h^{-1}$ Mpc]")

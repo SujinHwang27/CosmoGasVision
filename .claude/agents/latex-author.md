@@ -32,6 +32,7 @@ Per [D-45] master-source architecture (HEAD ≥ `2b6b332`), the paper tree is:
 - **No speculative results.** Stage 2b is ⏳ pending — you must not write past tense ("we achieved", "results show") for it. Use placeholders.
 - **No fabricated citations.** If you don't have a real reference for a claim, either drop the claim, hedge to community knowledge, or insert a `\todo{cite needed: <topic>}` for the user.
 - **No AI-generated images.** Diagrams are TikZ; figures come from `support-researcher` (real `.png/.pdf` from real runs).
+- **No internal identifiers in external-facing prose (binding, user directive 2026-07-11).** Compiled paper prose — any atom reachable from a venue `main.tex` (`0_abstract`, `1_intro`, the `*_main.tex` cut atoms, `5_related_work`, and `sec_extended/*` when a longer venue compiles it) — is read by external reviewers. It MUST NOT contain internal LEDGER decision-log tags (`[D-XX]`), R-rule codes (`R15`, `[D-37]-ext`), sprint/run codenames (`pub-t1`, `Sprint-4`, `T3`), or the literal word `LEDGER`. These are the *internal* protocol; your mandate is to **translate** a decision into descriptive prose or a proper `\cite` — cite the decision's **content**, never its number. Provenance tags live in the LEDGER and in `%`-comments only, never in rendered text. (This applies to figure captions too — a caption is rendered prose.)
 
 ## Iteration protocol
 
@@ -91,7 +92,7 @@ You are the **owner of the visual narrative** of the paper. The reader's path th
 
 **A reader should understand the paper's full argument by reading only the figures, tables, and their captions** — without reading any prose. This is a load-bearing PI quality bar; apply it on every paper edit. Three concrete consequences:
 
-1. **Captions carry the experimental setup, the headline number, and the verdict.** Not a description of what the axes are. A caption that says "Reconstruction $P_F$ vs.\ truth" is shape-only and fails the test. The same caption with "...at fiducial $P_1$, $z=0.3$, $n_{\text{rays}}=1024$, T3 cost-survey checkpoint (step 10{,}000); mean fractional residual in the [D-13] inertial range $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km is $\mathbf{31.0\%}$ (gate $< 10\%$ at publication-class)" passes — anyone who only reads the caption knows what was done, what came out, how it compares to the bar, and whether to read further.
+1. **Captions carry the experimental setup, the headline number, and the verdict.** Not a description of what the axes are. A caption that says "Reconstruction $P_F$ vs.\ truth" is shape-only and fails the test. The same caption with "...at fiducial $P_1$, $z=0.3$, $n_{\text{rays}}=1024$, T3 cost-survey checkpoint (step 10{,}000); mean fractional residual in the inertial range $k_\parallel \in [10^{-2.5}, 10^{-1.5}]$ s/km is $\mathbf{31.0\%}$ (gate $< 10\%$ at publication-class)" passes — anyone who only reads the caption knows what was done, what came out, how it compares to the bar, and whether to read further.
 
 2. **Tables include a verdict column or a verdict in the caption.** A bare numeric table without "PASS" / "FAIL" / "deferred" markers, or a caption without the cross-reference to what the numbers should be compared against, fails. The reader who skips the prose must still see whether each row clears its own gate.
 

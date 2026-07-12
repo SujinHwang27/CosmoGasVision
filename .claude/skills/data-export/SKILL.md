@@ -99,6 +99,24 @@ Lead with the empirical observation; the honest framing wins on first pass
 stored P1 sightline, not a typical spectrum") still carries its honest selection
 caveat.
 
+## Internal-identifier scrub gate (ALL external exports — data AND figures)
+Every artifact leaving the project — CSV/JSON, provenance sidecar, **and any figure
+ART (its rendered labels, titles, axes, captions)** — MUST be free of the project's
+*internal* protocol identifiers before it ships. Barred on any consumer-facing surface:
+- LEDGER decision-log tags — `[D-XX]` (`[D-24]`, `[D-73]`, …).
+- R-rule codes (`R15`, `[D-37]-ext`) and sprint/run codenames (`pub-t1`, `Sprint-4`,
+  `T3`, `Rung-4`).
+- The literal word `LEDGER` / "Mirrors LEDGER §X".
+
+These are internal — they mean nothing to an external reader and expose private
+process. Caveats may cite a decision's **content** ("the mean-flux anchor", not "the
+[D-11] anchor"); the D-XX provenance belongs in the sidecar's internal-lineage field,
+never in consumer copy or on the figure. **For figures, verify the rendered image, not
+just the filename**: grep the generator for `D-[0-9]`/`LEDGER`, and if it hits, ship a
+publication variant (`support-researcher` owns the stripped-label render) — never the
+internal LEDGER-mirror diagram. *(Added 2026-07-11 after the `method_pipeline` figure
+shipped to selements-website carrying `[D-06]/[D-11]/[D-24]` labels.)*
+
 ## How to service a new <consumer> request
 1. **Enumerate the source data this session** (data-engineer mandatory trigger):
    `ls -la` the source dir; confirm path, shape, dtype, finiteness, physical
@@ -116,7 +134,10 @@ caveat.
 8. **Add tests** to `tests/test_export.py` (synthetic fixtures for write/validate
    logic; mark any real-`Sherwood/` test `@pytest.mark.slow`).
 9. If the export is claim-bearing, run it past the **honest-reporting
-   verb-ceiling gate** above before shipping copy.
+   verb-ceiling gate** above before shipping copy. For **every** export (claim-bearing
+   or not, data or figure), also run the **internal-identifier scrub gate** — no
+   `[D-XX]` / `LEDGER` / sprint-codename on any consumer-facing surface, figure ART
+   included.
 
 ## Registered consumers
 - **selements-website** — curates project sources across the author's projects;
@@ -136,5 +157,8 @@ caveat.
 - Comment lines in a CSV destined for a comment-unaware downstream parser.
 - A claim-bearing caveat that exceeds the honest-reporting verb-ceiling
   (e.g. "reconstructs the 3D IGM", "fails all three gates").
+- Shipping an artifact **or figure** that renders internal identifiers
+  (`[D-XX]`, `LEDGER`, "Mirrors LEDGER §X", sprint/run codenames) to an external
+  consumer — verify the figure ART, not just its filename (internal-identifier scrub gate).
 - Forgetting the MANIFEST row (orphan export, no lineage).
 - Committing export work on `exp/<name>` or `main` instead of `service/data-export`.

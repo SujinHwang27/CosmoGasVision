@@ -18,5 +18,8 @@ You produce visualizations and quantitative comparisons.
 ## Constraint
 Generate figures **programmatically** (Matplotlib, Plotly, TikZ). Do not use AI image-generation tools — figures must be reproducible and scientifically precise.
 
+## Publication-figure hygiene — no internal identifiers (binding, user directive 2026-07-11)
+Any figure destined for a paper (`papers/`) or an external consumer (a `data-export` recipient, a public site) MUST NOT render internal identifiers in its labels, titles, axes, or caption: no LEDGER decision tags (`[D-XX]`), R-rule codes, sprint/run codenames (`pub-t1`, `Sprint-4`), or "Mirrors LEDGER §X". Those belong in the LEDGER and in internal diagnostic figures under `experiments/<name>/artifacts/`, never on a surface a reviewer or the public sees. If a generator was authored as an internal LEDGER-mirroring diagram (e.g. `scripts/make_method_pipeline_fig.py`, which prints `[D-06]/[D-11]/[D-21]/[D-24]`), it needs a **publication variant** — a stripped label set (or a `--publication` flag) — before its output ships to `papers/` or an export. The boundary is external-facing vs internal; scrub the external ones.
+
 ## Coordination
 The latex-author depends on your figures. Hand off DVC paths, not raw bytes — the paper references via path so the manuscript reflects the final project state.

@@ -139,8 +139,8 @@ def build():
     rho = add_node(ax, 7.10, 7.70, 1.55, 0.55,
                    r"$\rho$  (Softplus)", "neural")
     temp = add_node(ax, 7.10, 7.00, 1.55, 0.55,
-                    r"$T$  (Softplus$\times$1e4 + 1e3)",
-                    "neural", fontsize=8.5)
+                    r"$T$  (Softplus$\,{\times}10^{4}{+}10^{3}$)",
+                    "neural", fontsize=7.5)
     xhi = add_node(ax, 7.10, 6.30, 1.55, 0.55,
                    r"$X_{HI}$  (Sigmoid)", "neural")
     vpec = add_node(ax, 7.10, 5.60, 1.55, 0.55,
@@ -158,7 +158,7 @@ def build():
                  "3. Differentiable Physics Bridge", "physics")
     sightlines = add_node(
         ax, 10.15, 7.45, 3.05, 0.85,
-        "1D Sightline\nSampling Grid (RSD-convolved [D-06])",
+        "1D Sightline\nSampling Grid (RSD-convolved)",
         "physics", fontsize=9,
     )
     voigt = add_node(
@@ -183,7 +183,7 @@ def build():
 
     # ===== Subgraph 4: Optimization Objectives =============================
     add_subgraph(ax, 0.20, 0.30, 11.70, 3.80,
-                 "4. Optimization Objectives  [D-24] / [D-11] / [D-21]",
+                 "4. Optimization Objectives",
                  "supvis")
 
     # ground truth on the left
@@ -195,7 +195,7 @@ def build():
     # mask
     mask = add_node(
         ax, 4.85, 3.10, 3.20, 0.95,
-        "Saturated-Absorber Mask  [D-24]\n"
+        "Saturated-Absorber Mask\n"
         r"core $\tau_{\rm GT}\!>\!10^{5}$;  wing $\tau_{\rm GT}\!>\!10$ CC",
         "supvis", fontsize=8.5,
     )
@@ -204,7 +204,7 @@ def build():
     # L_data
     l_data = add_node(
         ax, 4.85, 1.55, 3.85, 1.05,
-        r"$\mathcal{L}_{\rm data}$  (log1p+cap+mask MSE)  [D-24]"
+        r"$\mathcal{L}_{\rm data}$  (log1p+cap+mask MSE)"
         "\n"
         r"$\langle (\log(1{+}\tau^{\rm eff}_{\rm pred}){-}\log(1{+}\tau^{\rm eff}_{\rm GT}))^{2}\rangle_{\rm non\!-\!DLA}$"
         "\n"
@@ -214,7 +214,7 @@ def build():
     # L_meanF
     l_meanf = add_node(
         ax, 9.10, 1.55, 4.10, 1.05,
-        r"$\mathcal{L}_{\rm meanF}$  (mean-flux soft anchor)  [D-11]"
+        r"$\mathcal{L}_{\rm meanF}$  (mean-flux soft anchor)"
         "\n"
         r"$\lambda_{F}\,(\langle F_{\rm pred}\rangle - \langle F\rangle_{\rm obs})^{2}$"
         "\n"
@@ -234,7 +234,7 @@ def build():
     # Two-pass surrogate
     twopass = add_node(
         ax, 14.10, 1.55, 3.40, 2.45,
-        "[D-21] Two-Pass Surrogate\n\n"
+        "Two-Pass Surrogate\n\n"
         "Pass 1:  cycle-mean\n"
         r"$\langle F\rangle_{\rm cycle}$  (no\_grad)"
         "\n\n"
@@ -265,7 +265,7 @@ def build():
     )
     ax.text(
         8.0, 0.05,
-        "Mirrors LEDGER §0 (post [D-06]/[D-07]/[D-24]/[D-11]/[D-21]/[D-23] amendments)",
+        "CosmoGasVision (S. Hwang, in preparation)",
         ha="center", va="bottom", fontsize=8.5,
         color="#555555", style="italic",
     )

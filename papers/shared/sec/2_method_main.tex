@@ -25,7 +25,7 @@ where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\te
 \begin{equation}
 H(a, x) \approx e^{-x^2} - \frac{a}{\sqrt{\pi} x^2} \big[ e^{-2x^2} (4x^4 + 7x^2 + 4 + 1.5x^{-2}) - 1.5x^{-2} - 1 \big]
 \end{equation}
-allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix ([D-57]); the explicit-grid probe of \S\ref{sec:method:gridprobe} is supervised through the same forward model.
+allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix; the explicit-grid probe of \S\ref{sec:method:gridprobe} is supervised through the same forward model.
 
 \subsection{Lyman-alpha Forest Loss: Saturated-Absorber Mask, Cap, and Log-Space Supervision}
 \label{sec:method:loss}
