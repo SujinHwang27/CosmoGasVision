@@ -3,18 +3,18 @@
 
 \begin{figure*}[t]
     \centering
-    \includegraphics[width=\textwidth]{figures/method_pipeline}
+    \includegraphics[width=0.80\textwidth]{figures/method_pipeline}
     \caption{The IGM-NeRF tomography pipeline. An 8-layer / 256-unit MLP (494{,}084 parameters) maps comoving 3D coordinates inside a 60 Mpc/h Sherwood box (normalized to $[0,1]^3$) through Fourier positional encoding ($L=10$) to four bounded astrophysical fields ($\rho/\bar\rho$, $T$, $X_{HI}$, $v_{\text{pec}}$). A differentiable RSD-convolved Voigt integrator with learnable amplitude $\mathcal{A}$ projects these fields to 1D optical depth $\tau(v)$, supervised against Sherwood ground truth under a log1p+cap+mask loss with the mean-flux anchor at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$~\cite{kirkman2007}.}
     \label{fig:pipeline}
 \end{figure*}
 
-The core of \emph{CosmoGasVision} is an MLP $F_{\theta}: \mathbf{x} \to (\rho, T, X_{HI}, v_{\text{pec}})$, where $\mathbf{x} \in \mathbb{R}^3$ are comoving coordinates inside a 60 Mpc/h Sherwood box, normalized to $[0, 1]^3$. The end-to-end pipeline --- coordinate normalization, Fourier positional encoding, bounded-output MLP, RSD-convolved Voigt projection, and log1p+cap+mask supervision with the mean-flux anchor --- is shown in Fig.~\ref{fig:pipeline}.
+The core of \emph{CosmoGasVision} is an MLP $F_{\theta}: \mathbf{x} \to (\rho, T, X_{HI}, v_{\text{pec}})$, where $\mathbf{x} \in \mathbb{R}^3$ are comoving coordinates inside a 60 Mpc/h Sherwood box, normalized to $[0, 1]^3$. Fig.~\ref{fig:pipeline} shows the end-to-end pipeline: Fourier encoding, bounded-output MLP, RSD-convolved Voigt projection, and log1p+cap+mask supervision with the mean-flux anchor.
 
 \subsection{Neural Field Architecture}
 We adopt an 8-layer MLP with 256 hidden units per layer (494{,}084 parameters). To resolve the small-scale filamentary structures of the Cosmic Web, we use Fourier positional encoding~\cite{mildenhall2020nerf} $\gamma(\mathbf{x}) = (\sin(2^k\pi\mathbf{x}), \cos(2^k\pi\mathbf{x}))_{k=0}^{L-1}$ with $L=10$, sized to the $\sim\!100\times$ overdensity peaks of massive filaments.
 
 \subsection{Bounded Physics Layer}
-Final-layer activations enforce physical scales: $\rho/\bar\rho$ via unscaled Softplus, $T$ via $\texttt{Softplus}\cdot 10^4 + 10^3$ K, $X_{HI}$ via Sigmoid in $[0,1]$, $v_{\text{pec}}$ via $\texttt{Tanh}\cdot 500$ km/s.
+Final-layer activations enforce physical scales on each field: Softplus for $\rho/\bar\rho$ and $T$, Sigmoid for $X_{HI}\in[0,1]$, and scaled Tanh for $v_{\text{pec}}$ (exact scale constants in suppl.).
 
 \subsection{Differentiable Physics Integrator}
 The reconstruction is supervised by comparing rendered $\tau_{\text{rendered}}(v)$ against the simulation ground-truth $\tau_{GT}(v)$. The optical depth is an RSD convolution summing every source-bin's normalized line profile over every observed-velocity bin:
@@ -25,7 +25,7 @@ where $x_{\text{src,obs}} = (v_{\text{obs}} - v_{\text{src}} - v_{\text{pec},\te
 \begin{equation}
 H(a, x) \approx e^{-x^2} - \frac{a}{\sqrt{\pi} x^2} \big[ e^{-2x^2} (4x^4 + 7x^2 + 4 + 1.5x^{-2}) - 1.5x^{-2} - 1 \big]
 \end{equation}
-allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix ([D-57]); the explicit-grid probe of \S\ref{sec:method:gridprobe} is supervised through the same forward model.
+allowing loss gradients to propagate back through the damping wings to the MLP parameters $\theta$. The integrator was audited end-to-end after a factor-12.9 damping-coefficient fix; the explicit-grid probe of \S\ref{sec:method:gridprobe} is supervised through the same forward model.
 
 \subsection{Lyman-alpha Forest Loss: Saturated-Absorber Mask, Cap, and Log-Space Supervision}
 \label{sec:method:loss}
@@ -41,10 +41,10 @@ The forward model is invariant under $\rho \to k\rho,\ \mathcal{A} \to \mathcal{
 \begin{equation}
 \mathcal{L}_{\text{meanF}} = \lambda_F \big( \langle e^{-\tau_{\text{pred}}}\rangle - \langle F\rangle_{\text{obs}} \big)^2
 \end{equation}
-at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ from Kirkman et al.~\cite{kirkman2007} ($D_A(z) = 0.016(1+z)^{1.01}$ evaluated at $z=0.3$), with $\lambda_F = 1.0$. The Sec.~\ref{sec:experiments} cost-survey runs were trained against an earlier broken anchor $0.877$ (a $z\!\sim\!2$ value mislabeled as $z=0.3$); we retain those runs because the structure gates of Sec.~\ref{sec:experiments} are anchor-invariant (anchor calibration shifts only the absolute $\rho$ amplitude, not the structure-residual ratios). The mean-flux constraint uses a two-pass surrogate: cycle-mean under \texttt{torch.no\_grad()}, then per-microbatch backward through a linearization $\mathcal{L}_{\text{mb}}=\mathcal{L}_{\text{data,mb}}+c\langle F\rangle_{\text{mb}}$ with $c=2\lambda_F(F_{\text{cycle}}-\langle F\rangle_{\text{obs}})$ held constant for the cycle. Derivation in supplementary.
+at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ from Kirkman et al.~\cite{kirkman2007}, with $\lambda_F = 1.0$. The preliminary Stage 2b sweep of Sec.~\ref{sec:experiments} used an earlier broken anchor $0.877$; we retain it because the structure gates are anchor-invariant (calibration shifts only the absolute $\rho$ amplitude, not the structure-residual ratios). The constraint uses a two-pass surrogate to avoid \texttt{retain\_graph} in gradient accumulation; derivation in suppl.
 
 \subsection{Training Configuration}
-We optimize with AdamW ($\beta=(0.9,0.999)$, weight decay $10^{-6}$, gradient L2 clip $1.0$) on a single \texttt{ml.g5.xlarge} (NVIDIA A10G, 24 GB) per tier under a tier-aware schedule (T1 $n_{\text{rays}}{=}64$ $/\,50$k steps, T2 $256/25$k, T3 $1024/12.5$k, T4 $16{,}384/12.5$k deferred), with per-tier linear-warmup-then-cosine LR $0\!\to\!5\!\times\!10^{-4}\!\to\!5\!\times\!10^{-6}$. Peak-VRAM follows the linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB, validated cross-tier (see suppl.).
+We optimize with AdamW under a tier-aware schedule (sightline count $n_{\text{rays}}$ rising T1 $64$ through T4 $16{,}384$, the highest tier deferred) with per-tier linear-warmup-then-cosine LR. Peak VRAM follows the validated linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB (optimizer hyperparameters, per-tier step counts, and the VRAM table in suppl.).
 
 \subsection{Explicit-Voxel-Grid Probe}
 \label{sec:method:gridprobe}
