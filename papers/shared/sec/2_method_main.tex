@@ -41,7 +41,7 @@ The forward model is invariant under $\rho \to k\rho,\ \mathcal{A} \to \mathcal{
 \begin{equation}
 \mathcal{L}_{\text{meanF}} = \lambda_F \big( \langle e^{-\tau_{\text{pred}}}\rangle - \langle F\rangle_{\text{obs}} \big)^2
 \end{equation}
-at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ from Kirkman et al.~\cite{kirkman2007}, with $\lambda_F = 1.0$. The Sec.~\ref{sec:experiments} cost-survey runs used an earlier broken anchor $0.877$; we retain them because the structure gates are anchor-invariant (calibration shifts only the absolute $\rho$ amplitude, not the structure-residual ratios). The constraint uses a two-pass surrogate to avoid \texttt{retain\_graph} in gradient accumulation; derivation in suppl.
+at $\langle F\rangle_{\text{obs}}(z=0.3) = \AnchorMeanF \pm \AnchorMeanFsigma$ from Kirkman et al.~\cite{kirkman2007}, with $\lambda_F = 1.0$. The preliminary Stage 2b sweep of Sec.~\ref{sec:experiments} used an earlier broken anchor $0.877$; we retain it because the structure gates are anchor-invariant (calibration shifts only the absolute $\rho$ amplitude, not the structure-residual ratios). The constraint uses a two-pass surrogate to avoid \texttt{retain\_graph} in gradient accumulation; derivation in suppl.
 
 \subsection{Training Configuration}
 We optimize with AdamW under a tier-aware schedule (sightline count $n_{\text{rays}}$ rising T1 $64$ through T4 $16{,}384$, the highest tier deferred) with per-tier linear-warmup-then-cosine LR. Peak VRAM follows the validated linear model $\hat{V}_{\text{peak}}\approx\TonePeakVRAM\cdot\min(n_{\text{rays}},\mu\text{batch})/64$ GB (optimizer hyperparameters, per-tier step counts, and the VRAM table in suppl.).
