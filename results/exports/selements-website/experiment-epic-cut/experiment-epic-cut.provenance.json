@@ -1,0 +1,22 @@
+{
+  "commit": "1a81403",
+  "branch": "service/data-export",
+  "dirty": "True",
+  "timestamp": "2026-07-13T16:33:10",
+  "consumer": "selements-website",
+  "request_slug": "experiment-epic-cut",
+  "producing_process": "project-architect (PI) authoritative experiment-epic decomposition of the LEDGER decision chronicle (prose; no data/figure owed)",
+  "request_origin": "selements-website repo — story-editor experiment-epic cut request (pre-planning structural backbone for episodes 03+; plan-free by design — no proposed arc was sent, to avoid anchoring)",
+  "artifact": "experiment-epic-cut.md",
+  "deliverable_type": "prose decomposition of record (PI epic cut + D-XX mapping + resource base + 6 fork rulings + non-claim confirmations); NOT a data export",
+  "source_documents": [
+    "experiments/nerf/LEDGER.md — read in full (§1 Pulse, §3 decision log [D-01]..[D-74], §6 artifacts, §7 session history)",
+    "experiments/nerf/design/D73_project_diagnosis_v2.md — close-out spine, read in full",
+    "results/exports/selements-website/MANIFEST.md — couriered-set enumeration (what the consumer already holds)"
+  ],
+  "verification": "All 'verified on disk' artifact paths in the note were checked via filesystem enumeration this session (both by the PI agent and independently by the export courier); paths flagged 'LEDGER-cited, not re-verified' were not. Load-bearing numbers independently cross-checked against LEDGER §1/§3 by the courier: P_F residuals 0.4155/0.3757/0.3592/0.3613, R in [18.87,23.75], D1-D4 signatures, K2 0.0026 vs 0.0101, grid P_F 0.0352, xi 0.0075 vs ceiling 0.0298, G=192, Wiener >=0.079, A1 var-ratios 2.5e-6..6.6e-6, skip-rich Wilcoxon p=1.0.",
+  "verb_ceiling": "[D-37] honest-reporting + [D-73] close-out. Claim-bearing: the epic cut restates results-of-record with their binding caveats (integrator slack on the 4x; ceiling-relative ~25% under a demoted estimator; verdicts-not-magnitudes on grid-vs-MLP; z=0.3 + FGPA forward-model scope-lock; fails-2-of-3-directly-evaluated, never all-three; four axes never twelve; 192^3 never 48^3).",
+  "internal_identifier_note": "DELIBERATE EXCEPTION per registered precedent (narrative-arc-honesty-review 2026-06-29, tomography-framing-check 2026-07-07): this note is editorial backbone for the story-editor and carries [D-XX] tags, LEDGER section pointers, run codenames, and R-rule references BY REQUEST — the request explicitly asks for the D-** mapping as binding data. These identifiers are BARRED from published episode copy and figure art; the note's header restates the scrub obligation to the consumer.",
+  "honest_caveat": "This is the PI's decomposition of the decision chronicle, not new science: 8 experiment epics (ep03 pub-t1 anchored run; ep04-ep07 the four intervention axes D1-D4; ep08 trainability wall grouped; ep09 A1 head probe; ep10 grid-probe close-out), Stage-3 ruled a separate satellite, Two-Pass Surrogate + degeneracy/anchor mechanism ruled into ep02 with the anchor value-correction saga in ep03. Fork rulings and the epic/D-XX/resource mapping are binding on structure; storytelling remains selements'. Single realization, Sherwood P1 fiducial, 60 cMpc/h box, z=0.3 scope-lock throughout.",
+  "courier_target": "content/cosmo-gas-vision/sources/ (selements-website repo) — request->source courier"
+}
