@@ -1,0 +1,12 @@
+key,value
+intervention,condition the density head on the line-of-sight velocity gradient (an architecture-INPUT change; the lesson is UNCHANGED)
+conditioning_signal,"d(v_pec)/d(chi) computed once from the TRUE Sherwood gas by finite difference, standardized, FROZEN (detached -- no gradient to the network, so the network cannot alter it)"
+why_truth_anchored,"unlike the previous episode's regularizer, the clue is fixed against truth; the network cannot satisfy it by shrinking its own outputs"
+loss_form,"UNCHANGED from the production baseline (same data loss, same mean-flux anchor, same amplitude prior); the only change is one extra input feature"
+gate_discipline,"first spec written under the recalibrated discipline: hedged design verbs, six pre-committed smoke gates, and an anti-degeneracy audit table"
+density_floor_origin,the density-spread and X_HI-spread floors were born from the previous episode's constant-collapse: value-agnostic spread floors set at 10x (density) and 100x (neutral fraction) the truth medians; the neutral-fraction floor also sits 1.8x above that episode's collapse value
+physics,P1 (fiducial) only
+smoke_run,"50 steps, n_rays=64, microbatch=32, seed 0, anchor 0.979, minutes on the host machine (device: cpu per the run log), no paid dispatch"
+verdict,5/6 gates PASS; the density-spread floor FAILED at 0.0071 vs 1.45 -> retired at smoke
+cost,saved ~$1.50 of paid GPU (the full-scale stage was never dispatched); spent ~$0 paid -- minutes of host compute
+stop_rule,any single pre-committed gate FAIL stops paid dispatch; no confirmation run was run this time (the floor breach was unambiguous)

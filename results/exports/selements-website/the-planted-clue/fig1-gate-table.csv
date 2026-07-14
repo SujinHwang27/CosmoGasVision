@@ -1,0 +1,7 @@
+gate,label,measured,floor_or_threshold,verdict
+1,No NaN anywhere,all finite,no NaN/Inf,PASS
+2,Training loss descends,ratio 0.349 (0.0318 -> 0.0111),final/initial < 0.85,PASS
+3,Mean flux stays near the anchor,1.0000 (drift 0.021 from 0.979),within 0.05 of 0.979,PASS (but see the tell)
+4,Absorption-amplitude knob stable,0.9924,"within [0.5, 2.0]",PASS
+5,Density field keeps spread (anti-collapse floor),0.0071,spread > 1.45,FAIL (~200x below floor)
+6,Neutral-fraction field keeps spread (anti-collapse floor),0.0332,spread > 6e-5,PASS (~550x above floor)

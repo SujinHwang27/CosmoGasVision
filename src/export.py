@@ -1415,3 +1415,279 @@ def export_d41_run_config(out_dir: str) -> Dict[str, Any]:
         extra_sidecar=extra,
     )
     return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep06 "the-planted-clue" batch — the [D-42] velocity-gradient conditioning
+# intervention (architecture-INPUT axis; loss UNCHANGED) and its D3
+# asymmetric-head collapse. Gate values are BANKED from the [D-42] Addendum
+# authoritative readout (the on-disk gates JSON is header-only — an MLflow
+# loss-history wiring gap; see D42_GATES_JSON_BROKEN). The scalar smoke trace
+# is RE-READ from the local tracker (it survived, like ep05); the per-HEAD
+# spread trace did NOT survive (only the step-50 endpoints are of record).
+# Per the ep05 finding, verdict/gate CSVs ship a reader-facing `label` column.
+# =========================================================================== #
+
+D42_SMOKE_RUN_ID: str = "63e6990b085b46258a52530989b2edfc"
+D42_GATES_JSON_BROKEN: str = (
+    "experiments/nerf/artifacts/eval/d42_smoke/d42_smoke_P1_gates.json"
+)
+
+# The six pre-committed smoke gates (authoritative [D-42] Addendum readout).
+# label = reader-facing; every value is banked from the decision record.
+D42_GATE_TABLE: List[Dict[str, Any]] = [
+    {"gate": "1", "label": "No NaN anywhere",
+     "measured": "all finite", "floor_or_threshold": "no NaN/Inf", "verdict": "PASS"},
+    {"gate": "2", "label": "Training loss descends",
+     "measured": "ratio 0.349 (0.0318 -> 0.0111)", "floor_or_threshold": "final/initial < 0.85",
+     "verdict": "PASS"},
+    {"gate": "3", "label": "Mean flux stays near the anchor",
+     "measured": "1.0000 (drift 0.021 from 0.979)", "floor_or_threshold": "within 0.05 of 0.979",
+     "verdict": "PASS (but see the tell)"},
+    {"gate": "4", "label": "Absorption-amplitude knob stable",
+     "measured": "0.9924", "floor_or_threshold": "within [0.5, 2.0]", "verdict": "PASS"},
+    {"gate": "5", "label": "Density field keeps spread (anti-collapse floor)",
+     "measured": "0.0071", "floor_or_threshold": "spread > 1.45", "verdict": "FAIL (~200x below floor)"},
+    {"gate": "6", "label": "Neutral-fraction field keeps spread (anti-collapse floor)",
+     "measured": "0.0332", "floor_or_threshold": "spread > 6e-5", "verdict": "PASS (~550x above floor)"},
+]
+
+# Per-head asymmetric-collapse signature (step-50 endpoints, banked from the
+# [D-42] Addendum mechanism paragraphs). Values the record gives as "approx"
+# (median ~0.0003, ~4.4e-3) are flagged approximate in the sidecar.
+D42_HEAD_ASYMMETRY: List[Dict[str, Any]] = [
+    {"head": "density", "label": "Density head (the one the clue was fed to)",
+     "spread_measured": 0.0071, "spread_floor": 1.45, "spread_verdict": "FAIL",
+     "pred_median_approx": 0.0003, "truth_median": 0.145,
+     "pred_min": 0.0000, "pred_max": 0.0071,
+     "outcome": "collapsed to a sliver near zero (truth median ~500x the predicted median)"},
+    {"head": "X_HI", "label": "Neutral-fraction head",
+     "spread_measured": 0.0332, "spread_floor": 6e-5, "spread_verdict": "PASS",
+     "pred_median_approx": 4.4e-3, "truth_median": 6.0e-7,
+     "pred_min": 4.8e-11, "pred_max": 3.3e-2,
+     "outcome": "kept spatial structure (spread matches the truth dynamic range; absolute level ~7300x high)"},
+]
+
+D42_RUN_CONFIG: List[Tuple[str, Any]] = [
+    ("intervention", "condition the density head on the line-of-sight velocity gradient (an architecture-INPUT change; the lesson is UNCHANGED)"),
+    ("conditioning_signal", "d(v_pec)/d(chi) computed once from the TRUE Sherwood gas by finite difference, standardized, FROZEN (detached -- no gradient to the network, so the network cannot alter it)"),
+    ("why_truth_anchored", "unlike the previous episode's regularizer, the clue is fixed against truth; the network cannot satisfy it by shrinking its own outputs"),
+    ("loss_form", "UNCHANGED from the production baseline (same data loss, same mean-flux anchor, same amplitude prior); the only change is one extra input feature"),
+    ("gate_discipline", "first spec written under the recalibrated discipline: hedged design verbs, six pre-committed smoke gates, and an anti-degeneracy audit table"),
+    ("density_floor_origin", "the density-spread and X_HI-spread floors were born from the previous episode's constant-collapse: value-agnostic spread floors set at 10x (density) and 100x (neutral fraction) the truth medians; the neutral-fraction floor also sits 1.8x above that episode's collapse value"),
+    ("physics", "P1 (fiducial) only"),
+    ("smoke_run", "50 steps, n_rays=64, microbatch=32, seed 0, anchor 0.979, minutes on the host machine (device: cpu per the run log), no paid dispatch"),
+    ("verdict", "5/6 gates PASS; the density-spread floor FAILED at 0.0071 vs 1.45 -> retired at smoke"),
+    ("cost", "saved ~$1.50 of paid GPU (the full-scale stage was never dispatched); spent ~$0 paid -- minutes of host compute"),
+    ("stop_rule", "any single pre-committed gate FAIL stops paid dispatch; no confirmation run was run this time (the floor breach was unambiguous)"),
+]
+
+
+def export_d42_gate_table(out_dir: str) -> Dict[str, Any]:
+    """ep06 fig1: the six pre-committed smoke gates (BANKED authoritative
+    readout; the on-disk JSON is header-only). Ships a reader-facing `label`
+    column per the ep05 finding."""
+    rows = list(D42_GATE_TABLE)
+    _validate_rows("d42-gate-table", rows)
+    n_pass = sum(1 for r in rows if r["verdict"].startswith("PASS"))
+    n_fail = sum(1 for r in rows if r["verdict"].startswith("FAIL"))
+    if (n_pass, n_fail) != (5, 1):
+        raise AssertionError(f"gate tally {n_pass}P/{n_fail}F != banked 5P/1F.")
+
+    caveat = (
+        "The six pre-committed smoke gates, and the debut of the pre-registered "
+        "gate discipline. Values are the AUTHORITATIVE decision-record readout: "
+        "the on-disk gates JSON is HEADER-ONLY -- every gate reads pass=false "
+        "with 'loss_history not provided', an experiment-tracker wiring gap, NOT "
+        "the real result (path in the provenance lineage) -- so this table is "
+        "exported from the six-gate table banked in the decision record, not "
+        "from that file. 5/6 PASS; the density-spread gate FAILED at "
+        "0.0071 against its 1.45 floor (~200x below). The mean-flux gate 'PASSED' "
+        "at 1.0000 -- but that pass is the tell: a wide-thresholded check (within "
+        "0.05 of 0.979) let perfectly transparent gas slip through as if healthy "
+        "(see the head-asymmetry artifact). Single realization / fixed cosmology "
+        "(Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "n_pass": n_pass, "n_fail": n_fail,
+        "on_disk_json_status": "header-only/empty (tracker loss-history wiring gap); NOT the readout",
+        "internal_lineage": (
+            "[D-42] Addendum 1 six-gate table (authoritative); MLflow run "
+            f"{D42_SMOKE_RUN_ID}; broken JSON {D42_GATES_JSON_BROKEN}"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig1-gate-table.csv",
+        fieldnames=["gate", "label", "measured", "floor_or_threshold", "verdict"],
+        rows=rows,
+        producing_fn="src.export.export_d42_gate_table",
+        source_data_path="decision record (banked authoritative readout; the on-disk JSON is header-only)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "n_pass": n_pass, "n_fail": n_fail}
+
+
+def export_d42_head_asymmetry(out_dir: str) -> Dict[str, Any]:
+    """ep06 fig2: the per-head asymmetric-collapse signature -- the density head
+    dead near zero while the X_HI head kept structure (BANKED step-50
+    endpoints; the per-head spread trace did not survive)."""
+    rows: List[Dict[str, Any]] = []
+    for h in D42_HEAD_ASYMMETRY:
+        floor_ratio = h["spread_floor"] / h["spread_measured"]
+        rows.append({
+            "head": h["head"], "label": h["label"],
+            "spread_measured": float(h["spread_measured"]),
+            "spread_floor": float(h["spread_floor"]),
+            "spread_verdict": h["spread_verdict"],
+            "spread_vs_floor": (f"{floor_ratio:.0f}x below floor" if h["spread_verdict"] == "FAIL"
+                                else f"{1.0/floor_ratio:.0f}x above floor"),
+            "pred_median_approx": float(h["pred_median_approx"]),
+            "truth_median": float(h["truth_median"]),
+            "outcome": h["outcome"],
+        })
+    _validate_rows("d42-head-asymmetry", rows)
+    # The two heads must disagree on verdict -- that IS the signature.
+    verdicts = {r["spread_verdict"] for r in rows}
+    if verdicts != {"PASS", "FAIL"}:
+        raise AssertionError(f"head-asymmetry expects one PASS + one FAIL; got {verdicts}.")
+
+    caveat = (
+        "The D3 asymmetric-head collapse, measured at step 50. Distinct from the "
+        "two earlier failures: the first shrank a structured answer (amplitude "
+        "wrong, shape kept); the second abandoned structure everywhere (all "
+        "fields constant); this one is PARTIAL -- collapse hiding in a single "
+        "head of a multi-head machine. The density head -- the very head the "
+        "velocity-gradient clue was fed to -- collapsed to a sliver near zero "
+        "(spread 0.0071 vs its 1.45 floor; predicted median ~0.0003 vs truth "
+        "0.145), while the neutral-fraction head kept spatial structure (spread "
+        "0.0332, ~550x above its own floor). The density collapse to near-zero "
+        "is what drove the mean flux to 1.0000: near-zero density means near-zero "
+        "absorption means transparent gas. These are step-50 endpoint values -- "
+        "the per-head spread was not logged per step, so there is no trace to "
+        "draw. Medians marked _approx are the decision record's approximate "
+        "values. Single realization / fixed "
+        "cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "step_of_measurement": 50,
+        "trace_availability": "step-50 endpoints only; the per-head spread was not logged per step",
+        "internal_lineage": "[D-42] Addendum 1 mechanism paragraphs (density-head / X_HI-head readout)",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2-head-asymmetry.csv",
+        fieldnames=["head", "label", "spread_measured", "spread_floor", "spread_verdict",
+                    "spread_vs_floor", "pred_median_approx", "truth_median", "outcome"],
+        rows=rows,
+        producing_fn="src.export.export_d42_head_asymmetry",
+        source_data_path="decision record (banked step-50 per-head readout)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d42_smoke_trace(
+    out_dir: str,
+    db_path: str = MLFLOW_DB,
+    run_id: str = D42_SMOKE_RUN_ID,
+) -> Dict[str, Any]:
+    """ep06 fig3: the scalar 50-step smoke trace, RE-READ from the local
+    tracker (it survived). The mean-flux path climbing to 1.0000 is the
+    plottable story; the per-head spread trace did NOT survive (see fig2)."""
+    keys = ["loss", "loss_data", "loss_meanF", "mean_flux_pred", "tau_amp"]
+    series = _read_mlflow_metric_series(db_path, run_id, keys)
+    steps = sorted(series["loss"])
+    if not steps or steps[0] != 1 or steps[-1] != len(steps):
+        raise AssertionError("smoke trace incomplete: expected contiguous steps from 1.")
+    for k in keys:
+        if sorted(series[k]) != steps:
+            raise AssertionError(f"metric {k!r} missing steps vs loss.")
+
+    # Consistency vs banked endpoints (the [D-42] Addendum gate table).
+    if abs(series["loss"][steps[0]] - 0.0318) > 5e-4:
+        raise AssertionError(f"loss step1 {series['loss'][steps[0]]} != banked 0.0318.")
+    if abs(series["loss"][steps[-1]] - 0.0111) > 5e-4:
+        raise AssertionError(f"loss step50 {series['loss'][steps[-1]]} != banked 0.0111.")
+    if abs(series["mean_flux_pred"][steps[-1]] - 1.0) > 5e-4:
+        raise AssertionError(f"mean_F step50 {series['mean_flux_pred'][steps[-1]]} != banked 1.0000.")
+    if abs(series["tau_amp"][steps[-1]] - 0.9924) > 1e-3:
+        raise AssertionError(f"tau_amp step50 {series['tau_amp'][steps[-1]]} != banked 0.9924.")
+
+    rows = [{"step": s, "loss_total": series["loss"][s], "loss_data": series["loss_data"][s],
+             "loss_mean_flux_term": series["loss_meanF"][s],
+             "mean_flux_pred": series["mean_flux_pred"][s], "tau_amp": series["tau_amp"][s]}
+            for s in steps]
+    _validate_rows("d42-smoke-trace", rows)
+    _validate_flux("d42-smoke-trace mean_flux_pred", np.array([r["mean_flux_pred"] for r in rows]))
+
+    caveat = (
+        "50-step host smoke trace for the velocity-gradient conditioning "
+        "intervention (P1, single seed), re-read from the experiment tracker. "
+        "The plottable story is the mean flux climbing from 0.874 THROUGH the "
+        "0.979 anchor and landing on 1.0000 -- the tell, for the second time in "
+        "the arc, but this time it slipped past a wide-thresholded gate as a "
+        "'pass'. The density collapse that CAUSED the transparency is not "
+        "visible in this scalar trace: the per-head spread was not logged per "
+        "step, so it is a step-50 endpoint only (see fig2-head-asymmetry). "
+        "Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); "
+        "z=0.3 scope-lock."
+    )
+    extra = {
+        "n_steps": len(steps),
+        "per_head_spread_trace": "NOT available (endpoint-only at step 50; see fig2)",
+        "internal_lineage": f"[D-42] Addendum 1 smoke; MLflow run {run_id} (local store); cloud_runs/d42_smoke_P1/smoke_stdout.log",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig3-smoke-trace.csv",
+        fieldnames=["step", "loss_total", "loss_data", "loss_mean_flux_term",
+                    "mean_flux_pred", "tau_amp"],
+        rows=rows,
+        producing_fn="src.export.export_d42_smoke_trace",
+        source_data_path=f"{db_path} (local MLflow store, run {run_id})",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d42_run_config(out_dir: str) -> Dict[str, Any]:
+    """ep06 spec readout (BANKED): the conditioning input, the unchanged loss,
+    the six gates + floor provenance, config, and the cost framing."""
+    rows = [{"key": k, "value": str(v)} for k, v in D42_RUN_CONFIG]
+    _validate_rows("d42-run-config", rows)
+    caveat = (
+        "Intervention spec of record. The change is to the machine's INPUT, not "
+        "its lesson: the loss is byte-for-byte the production objective, and the "
+        "network is handed one extra feature -- the line-of-sight velocity "
+        "gradient taken from the simulation's own truth, frozen so the network "
+        "cannot alter it. This was the first spec under the recalibrated "
+        "discipline (hedged verbs, pre-committed gates, an anti-degeneracy "
+        "audit). The honest edge: the audit did NOT anticipate a per-head "
+        "collapse -- it imagined a constant-everywhere collapse like the "
+        "previous episode's -- and it was the collapse-agnostic density-spread "
+        "FLOOR, inherited from that episode, that caught this different shape. "
+        "Cost: saved ~$1.50 of paid GPU by not dispatching the full stage; spent "
+        "~$0 paid (minutes of host compute); no confirmation run this time -- the "
+        "floor breach was unambiguous. The story is the discipline."
+    )
+    extra = {"internal_lineage": "[D-42] Spec (math contract, smoke gates, audit table) + Addendum 1 verdict"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="spec-run-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows,
+        producing_fn="src.export.export_d42_run_config",
+        source_data_path="decision record (banked spec; see internal_lineage)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

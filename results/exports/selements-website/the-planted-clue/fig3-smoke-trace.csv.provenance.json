@@ -1,0 +1,21 @@
+{
+  "artifact": "fig3-smoke-trace.csv",
+  "producing_function": "src.export.export_d42_smoke_trace",
+  "source_data_path": "mlflow.db (local MLflow store, run 63e6990b085b46258a52530989b2edfc)",
+  "git": {
+    "commit": "9a04066",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T17:07:25"
+  },
+  "export_timestamp_utc": "2026-07-14T22:07:25.029817+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "50-step host smoke trace for the velocity-gradient conditioning intervention (P1, single seed), re-read from the experiment tracker. The plottable story is the mean flux climbing from 0.874 THROUGH the 0.979 anchor and landing on 1.0000 -- the tell, for the second time in the arc, but this time it slipped past a wide-thresholded gate as a 'pass'. The density collapse that CAUSED the transparency is not visible in this scalar trace: the per-head spread was not logged per step, so it is a step-50 endpoint only (see fig2-head-asymmetry). Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "n_steps": 50,
+  "per_head_spread_trace": "NOT available (endpoint-only at step 50; see fig2)",
+  "internal_lineage": "[D-42] Addendum 1 smoke; MLflow run 63e6990b085b46258a52530989b2edfc (local store); cloud_runs/d42_smoke_P1/smoke_stdout.log"
+}

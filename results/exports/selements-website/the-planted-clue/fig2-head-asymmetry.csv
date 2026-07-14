@@ -1,0 +1,3 @@
+head,label,spread_measured,spread_floor,spread_verdict,spread_vs_floor,pred_median_approx,truth_median,outcome
+density,Density head (the one the clue was fed to),0.0071,1.45,FAIL,204x below floor,0.0003,0.145,collapsed to a sliver near zero (truth median ~500x the predicted median)
+X_HI,Neutral-fraction head,0.0332,6e-05,PASS,553x above floor,0.0044,6e-07,kept spatial structure (spread matches the truth dynamic range; absolute level ~7300x high)

@@ -1,0 +1,22 @@
+{
+  "artifact": "fig1-gate-table.csv",
+  "producing_function": "src.export.export_d42_gate_table",
+  "source_data_path": "decision record (banked authoritative readout; the on-disk JSON is header-only)",
+  "git": {
+    "commit": "9a04066",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T17:07:24"
+  },
+  "export_timestamp_utc": "2026-07-14T22:07:24.601495+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The six pre-committed smoke gates, and the debut of the pre-registered gate discipline. Values are the AUTHORITATIVE decision-record readout: the on-disk gates JSON is HEADER-ONLY -- every gate reads pass=false with 'loss_history not provided', an experiment-tracker wiring gap, NOT the real result (path in the provenance lineage) -- so this table is exported from the six-gate table banked in the decision record, not from that file. 5/6 PASS; the density-spread gate FAILED at 0.0071 against its 1.45 floor (~200x below). The mean-flux gate 'PASSED' at 1.0000 -- but that pass is the tell: a wide-thresholded check (within 0.05 of 0.979) let perfectly transparent gas slip through as if healthy (see the head-asymmetry artifact). Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "n_pass": 5,
+  "n_fail": 1,
+  "on_disk_json_status": "header-only/empty (tracker loss-history wiring gap); NOT the readout",
+  "internal_lineage": "[D-42] Addendum 1 six-gate table (authoritative); MLflow run 63e6990b085b46258a52530989b2edfc; broken JSON experiments/nerf/artifacts/eval/d42_smoke/d42_smoke_P1_gates.json"
+}

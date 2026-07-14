@@ -1,0 +1,21 @@
+{
+  "artifact": "fig2-head-asymmetry.csv",
+  "producing_function": "src.export.export_d42_head_asymmetry",
+  "source_data_path": "decision record (banked step-50 per-head readout)",
+  "git": {
+    "commit": "9a04066",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T17:07:24"
+  },
+  "export_timestamp_utc": "2026-07-14T22:07:24.694014+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The D3 asymmetric-head collapse, measured at step 50. Distinct from the two earlier failures: the first shrank a structured answer (amplitude wrong, shape kept); the second abandoned structure everywhere (all fields constant); this one is PARTIAL -- collapse hiding in a single head of a multi-head machine. The density head -- the very head the velocity-gradient clue was fed to -- collapsed to a sliver near zero (spread 0.0071 vs its 1.45 floor; predicted median ~0.0003 vs truth 0.145), while the neutral-fraction head kept spatial structure (spread 0.0332, ~550x above its own floor). The density collapse to near-zero is what drove the mean flux to 1.0000: near-zero density means near-zero absorption means transparent gas. These are step-50 endpoint values -- the per-head spread was not logged per step, so there is no trace to draw. Medians marked _approx are the decision record's approximate values. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "step_of_measurement": 50,
+  "trace_availability": "step-50 endpoints only; the per-head spread was not logged per step",
+  "internal_lineage": "[D-42] Addendum 1 mechanism paragraphs (density-head / X_HI-head readout)"
+}

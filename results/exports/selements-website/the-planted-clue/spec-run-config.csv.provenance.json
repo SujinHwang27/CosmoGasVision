@@ -1,0 +1,19 @@
+{
+  "artifact": "spec-run-config.csv",
+  "producing_function": "src.export.export_d42_run_config",
+  "source_data_path": "decision record (banked spec; see internal_lineage)",
+  "git": {
+    "commit": "9a04066",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T17:07:25"
+  },
+  "export_timestamp_utc": "2026-07-14T22:07:25.141082+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Intervention spec of record. The change is to the machine's INPUT, not its lesson: the loss is byte-for-byte the production objective, and the network is handed one extra feature -- the line-of-sight velocity gradient taken from the simulation's own truth, frozen so the network cannot alter it. This was the first spec under the recalibrated discipline (hedged verbs, pre-committed gates, an anti-degeneracy audit). The honest edge: the audit did NOT anticipate a per-head collapse -- it imagined a constant-everywhere collapse like the previous episode's -- and it was the collapse-agnostic density-spread FLOOR, inherited from that episode, that caught this different shape. Cost: saved ~$1.50 of paid GPU by not dispatching the full stage; spent ~$0 paid (minutes of host compute); no confirmation run this time -- the floor breach was unambiguous. The story is the discipline.",
+  "internal_lineage": "[D-42] Spec (math contract, smoke gates, audit table) + Addendum 1 verdict"
+}

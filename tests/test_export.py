@@ -537,3 +537,101 @@ def test_export_d41_scrub_gate_on_consumer_surfaces(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep06 "the-planted-clue" batch ([D-42] banked gate/head exports + local-tracker
+# scalar trace re-read). Synthetic fixtures.
+# --------------------------------------------------------------------------- #
+def _synthetic_d42_db(tmp_path: Path, break_meanF: bool = False) -> str:
+    import sqlite3
+    p = tmp_path / "mlflow_d42.db"
+    con = sqlite3.connect(str(p))
+    con.execute("create table metrics (key text, value real, timestamp int, "
+                "run_uuid text, step int)")
+    run = X.D42_SMOKE_RUN_ID
+    n = 50
+    for step in range(1, n + 1):
+        t = (step - 1) / (n - 1)
+        end_mf = 0.95 if break_meanF else 1.0
+        vals = {
+            "loss": 0.0318 * (1 - t) + 0.0111 * t,
+            "loss_data": 0.0208 * (1 - t) + 0.0106 * t,
+            "loss_meanF": 0.011 * (1 - t) + 0.00044 * t,
+            "mean_flux_pred": 0.8743 * (1 - t) + end_mf * t,
+            "tau_amp": 1.0 * (1 - t) + 0.9924 * t,
+        }
+        for k, v in vals.items():
+            con.execute("insert into metrics values (?,?,?,?,?)", (k, v, 0, run, step))
+    con.commit()
+    con.close()
+    return str(p)
+
+
+def test_export_d42_gate_table(tmp_path):
+    res = X.export_d42_gate_table(out_dir=str(tmp_path))
+    assert (res["n_pass"], res["n_fail"]) == (5, 1)
+    rows = _read_csv(Path(res["artifact"]))
+    g5 = next(r for r in rows if r["gate"] == "5")
+    assert g5["measured"] == "0.0071" and "FAIL" in g5["verdict"]
+    # No snake_case machine keys in the reader-facing label column (ep05 finding).
+    assert all(" " in r["label"] for r in rows)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "HEADER-ONLY" in meta["caveat"]
+    assert "the tell" in meta["caveat"]
+
+
+def test_export_d42_head_asymmetry_requires_split_verdict(tmp_path):
+    res = X.export_d42_head_asymmetry(out_dir=str(tmp_path))
+    rows = _read_csv(Path(res["artifact"]))
+    assert {r["spread_verdict"] for r in rows} == {"PASS", "FAIL"}
+    dens = next(r for r in rows if r["head"] == "density")
+    assert dens["spread_verdict"] == "FAIL"
+    assert "204x below floor" in dens["spread_vs_floor"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "PARTIAL" in meta["caveat"]
+    assert "endpoint" in meta["caveat"].lower() or "step-50" in meta["caveat"]
+
+
+def test_export_d42_smoke_trace_reads_tracker(tmp_path):
+    db = _synthetic_d42_db(tmp_path)
+    res = X.export_d42_smoke_trace(out_dir=str(tmp_path), db_path=db)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 50
+    assert float(rows[-1]["mean_flux_pred"]) == pytest.approx(1.0, abs=5e-4)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: per-head spread is NOT in this scalar trace.
+    assert "NOT available" in meta["per_head_spread_trace"]
+    assert "slipped past a wide-thresholded gate" in meta["caveat"]
+
+
+def test_export_d42_smoke_trace_rejects_meanF_drift(tmp_path):
+    db = _synthetic_d42_db(tmp_path, break_meanF=True)
+    with pytest.raises(AssertionError, match="mean_F step50"):
+        X.export_d42_smoke_trace(out_dir=str(tmp_path), db_path=db)
+
+
+def test_export_d42_run_config_input_not_lesson(tmp_path):
+    res = X.export_d42_run_config(out_dir=str(tmp_path))
+    rows = {r["key"]: r["value"] for r in _read_csv(Path(res["artifact"]))}
+    assert "UNCHANGED" in rows["loss_form"]
+    assert "FROZEN" in rows["conditioning_signal"] or "detached" in rows["conditioning_signal"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "did NOT anticipate a per-head collapse" in meta["caveat"]
+
+
+def test_export_d42_scrub_gate_on_consumer_surfaces(tmp_path):
+    db = _synthetic_d42_db(tmp_path)
+    outs = [
+        X.export_d42_gate_table(out_dir=str(tmp_path)),
+        X.export_d42_head_asymmetry(out_dir=str(tmp_path)),
+        X.export_d42_smoke_trace(out_dir=str(tmp_path), db_path=db),
+        X.export_d42_run_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Tier-1", "Juno", "Sprint", "63e6990b", "d42_smoke")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)
