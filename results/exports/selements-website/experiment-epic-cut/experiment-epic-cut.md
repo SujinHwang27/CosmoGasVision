@@ -179,3 +179,15 @@ Per Fork 4 ruling below, ep02 absorbs: [D-01] Tepper-García analytic Voigt, [D-
 - Figures: `papers/shared/figures/` (`method_pipeline.png`, `tau_binned_all_residual.png`, `pf_overlay_falsification.png`, `d73_k2_truth_vs_grid.png`, `d73_xi_ceiling_relative.png`)
 
 Everything above except the couriered items (narrative-arc-honesty-review; tomography-framing-check + verification-01-revised-paragraph; the `the-neural-field/` fig1–fig3 CSVs with sidecars) is **still in the source repo** — the website cannot pull it; anything needed beyond the couriered set must be requested as a new courier batch, and ep10's figure data (`d73_k2_truth_vs_grid`, `d73_xi_ceiling_relative`, plus the pf_sharpener/battery JSONs) is the obvious next batch when those episodes are written.
+
+---
+
+## §4. Amendments
+
+**Amendment 1 (2026-07-14, PI — ratified during the ep04 `the-direct-attack` courier gate; requested by selements alongside that batch):**
+
+1. **Fork 4 amendment (2026-07-14, PI):** the lesson-building narration ([D-24] loss contract + [D-13] gate definitions) cedes from ep02 to ep03, where published episode 03 already carries it cleanly; rebuilt ep02 narrows to the machine + the density–amplitude degeneracy [D-10] + the mean-flux anchor mechanism [D-11] + the Two-Pass Surrogate [D-21] + the pipeline figure. Binding caveats travel with the content wherever it lands (gate definitions keep the [D-36] "0.6 bar is a project-side adoption" note; the loss contract keeps its later "within-this-supervision-regime" scoping).
+
+2. **[D-38] assignment (2026-07-14, PI):** the component-necessity ablation maps to **ep03 as D-internal** (it belongs to the loss narrative now living there per the Fork 4 amendment, and chronologically to ep03's anchor-saga beat-1), with binding caveat: it ran at the broken 0.877 anchor on the 25k-step preview config — it must never be narrated as an ablation **of** the corrected-anchor run — and its finding is config-scoped: cap+mask not load-bearing on the one un-stressed configuration exercised, methods claim narrows to log1p alone, cap/mask retained as defense-in-depth explicitly untested on stressed configs.
+
+3. **Old-numbering addendum (2026-07-14, PI):** the narrative-arc-honesty-review (2026-06-29) predates this cut and uses the drafted 4-episode numbering: its "ep02" = new **ep03** (guidance already absorbed in the published episode); its "ep03" and "ep04" (grid victory / wall detonation) = new **ep10 jointly** (one experiment per Fork 3; the reversal is intra-episode structure). Old-ep03 guidance ("the most expressive field we could build closes the gate nothing else could") must **never** be applied to new-ep03, whose run is the production MLP that fails the flux-power gate 0/4.
