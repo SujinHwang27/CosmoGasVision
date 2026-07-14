@@ -3852,3 +3852,134 @@ User directive: do everything that can be done locally so next-session is just T
 - Files touched: `papers/cvpr2026/main.tex`; `papers/shared/sec/{1_intro,2_method_main,3_experiments_main,4_next_steps_main}.tex`;
   `papers/shared/sec_extended/{2_method_supplement,3_experiments_supplement,4_next_steps_supplement}.tex`.
   numbers.tex macro discipline preserved (no inline numerals in result claims). CI to verify ≤8pp + zero undefined refs.
+
+---
+
+## Appendix A — Pedagogical Companion: Mental Models & Architecture-Anatomy Map (2026-07-13)
+
+> **Status: NON-NORMATIVE.** This appendix is explanatory commentary, not decision record. It
+> introduces no new [D-XX] entries, changes no verdicts, and restates numbers already banked in
+> §1/§3 — if any restatement here conflicts with a §3 decision entry, §3 wins. Provenance:
+> authored 2026-07-13 (user-directed) during the selements-website experiment-epic-cut session,
+> as a teaching-register companion to the [D-39]→[D-73] intervention campaign. Useful for:
+> onboarding a collaborator, mentor/handoff conversations, and translating the campaign for
+> CV/ML audiences. All [D-37] caveats ride: the K2 4× margin includes integrator-induced slack;
+> the under-constraint verdict is scoped to z=0.3 under this FGPA forward model; grid-vs-MLP
+> P_F magnitudes are verdict-comparable, not a same-config contrast.
+
+### A.1 Mental models of the campaign (one per experiment)
+
+Framing image for the whole arc: the baseline model is **a student who nails the class average
+but fails the essay**; everything after is diagnosing why.
+
+**A.1.0 — Baseline pub-t1 run ([D-39]): the revealer, not a fix.** Matched mean flux and the
+pixel histogram; missed P_F by 3.6–4.2× the 10% gate, error concentrated in the saturated band
+(R ∈ [18.87, 23.75], 4/4 physics).
+*Mental model:* a photo with the right overall brightness and the right tonal histogram — but
+blurred. Every summary statistic passes; the texture is gone, and it is worst exactly where the
+image clips to black.
+
+**A.1.1 — Sat-aware P_F band loss ([D-40], axis D1): put the failing metric in the loss.**
+*Mental model:* **teaching to the test — the student found the shortcut.** The spectrum-loss
+term collapsed 5 orders while eval P_F got 37.4% *worse*: it turned the volume knob down
+(amplitude-shrink, shape preserved — log-shape Pearson 0.8346, amplitude ratio 0.4293) instead
+of playing the song right. Lesson: integrated statistics are gameable.
+
+**A.1.2 — Per-pixel FGPA-tail regularizer ([D-41], axis D2): a pointwise physics rule.**
+*Mental model:* **grading the student against their own answer key.** The rule was evaluated at
+the network's own predicted state, so the network predicted nothing everywhere (constant
+fields, τ→0, mean_F→1.0000) — silence violates no rule. Lesson: regularizers must anchor to
+ground truth, not to the model's own outputs.
+
+**A.1.3 — Velocity-gradient conditioning ([D-42], axis D3): a truth-derived input hint.**
+*Mental model:* **slipping the student a cheat-sheet — and getting back a blank page.** No loss
+change at all; the density head still collapsed flat (spread 0.0071, 200× below the 1.45 floor)
+while the X_HI head kept structure. The hint was fine; the failure lives downstream of inputs.
+
+**A.1.4 — physics_id-embedding joint training ([D-46], axis D4): 4× more data.**
+*Mental model:* **more textbooks for the same failing student — who learned to tell the four
+books apart and wrote the same trivial answer in all of them.** Embedding non-degenerate (max
+pairwise L2 = 7.045) yet all fields collapsed. Lesson: not data starvation. Closes the 4-axis
+cascade: loss-integrated / loss-per-pixel / architecture-input / data, four distinct degeneracy
+signatures (D1–D4), one unmoved wall.
+
+**A.1.5 — The trainability cluster ([D-60]/[D-63]/[D-65] + [D-69] (γ)): supervise the target
+directly, then shake every lever.** Direct log-P_F MSE collapsed to the constant-mean basin
+(var_pf_band_ratio 0.0063 → the 7-lever cluster all land 3.7e-7–2.9e-6, a 0.89-decade (~8×)
+band across LR, clipping, reduction op, k-norm target, microbatch, physics).
+*Mental model:* **a car stuck in mud — swap the driver, the tires, the fuel; the wheels spin
+identically every time.** Sharpest datum: per-task gradient imbalance repaired by 4.36 decades
+(~22,000:1 → 0.98) and the collapse did not move. When perfectly repairing the engine changes
+nothing, the car is chained to the ground — the pathology is upstream of everything being
+tuned. (The (γ) ρ-MSE probe carries its mandatory 1-of-3 lr-cell caveat.)
+
+**A.1.6 — Skip-rich MLP body ([D-71]): change the trunk.**
+*Mental model:* **new plumbing, same clog.** n=10 seeds, Wilcoxon FAIL, p=1.0, all Δ_seed
+negative. (Narrow scope: skip-rich × (γ) × P1 z=0.3 × n_grid=768 × 500 steps.)
+
+**A.1.7 — A1 linear log-ρ head probe ([D-73] §E/am-2): remove the output head.**
+*Mental model:* **the singer sounds muffled, so you hand them a new microphone — same
+silence.** COLLAPSE head-invariantly (Var ratio 2.5e-6–6.6e-6, all 9 cells; Softplus controls
+indistinguishable). It was never the mic. Every part of the *model* is now individually
+acquitted. (Scope: Mode B only.)
+
+**A.1.8 — The free voxel grid ([D-73] (1d′)): the endgame.**
+*Mental model:* **28M independent dials instead of one lump of clay — the infinite-capacity
+control group.** No weight sharing, no priors; the same byte-identical [D-24] flux objective.
+It trained (var_pf 1.0959), closed the P_F gate the MLP failed (0.0352 vs 0.4155,
+verdicts-not-magnitudes) — and fit the observed flux ~4× better than the TRUE field does
+through the same integrator (K2: 0.0026 vs 0.0101) while recovering only weak 3D structure
+(~25% of the demoted-estimator ceiling). **The right scene loses the fitting contest.** The
+lineup came back empty: none of the arrestable suspects (loss, inputs, data, optimizer, body,
+head, representation) did it. The data itself does not hold the answer — at this redshift,
+under this forward model.
+
+Shape of the campaign: A.1.1–A.1.4 each *taught a design rule* (don't grade integrated stats;
+anchor rules to truth; hints don't fix downstream collapse; not data volume); A.1.5–A.1.7
+*eliminated suspects organ by organ*; A.1.8 *convicted the problem*. No experiment was wasted —
+each failure is what makes the final verdict believable rather than a single-shot excuse.
+
+### A.2 Architecture-anatomy map (which organ each experiment operated on)
+
+```
+[data: sightlines] → [inputs + encoding] → [MLP body] → [output heads] → [forward renderer (Voigt/RSD)] → [rendered flux]
+                                                                                                              ↓
+        backprop (Adam, autograd) ←—— [LOSS: [D-24] masked log-τ MSE + [D-11] mean-flux anchor] ←— compare to observed flux
+                                      [METRICS/gates: P_F, ξ, KS ([D-13]) — held fixed, pre-registered]
+```
+
+| # | Experiment | Organ tweaked | Held fixed |
+|---|---|---|---|
+| A.1.0 | pub-t1 baseline ([D-39]) | none — reference configuration | — |
+| A.1.1 | sat-aware P_F loss ([D-40]) | **loss** (integrated-statistic terms) | forward, body, heads, data |
+| A.1.2 | FGPA-tail regularizer ([D-41]) | **loss** (pointwise regularizer term) | ditto |
+| A.1.3 | velocity-gradient input ([D-42]) | **input layer** (truth-derived feature) | loss untouched — lesson from A.1.1–2 |
+| A.1.4 | physics_id pooling ([D-46]) | **training data** (+ embedding input) | loss, body, heads, renderer |
+| A.1.5 | trainability cluster ([D-60]/[D-63]/[D-65]/[D-69]) | **supervision target** (direct P_F, then direct ρ) **+ backprop plumbing** (GradNorm, LR, clip, reduction, k-norm, microbatch) | body, heads |
+| A.1.6 | skip-rich MLP ([D-71]) | **network body/trunk** | supervision from A.1.5; renderer out of loop |
+| A.1.7 | A1 head probe ([D-73] §E) | **output head** (Softplus removed) | ditto |
+| A.1.8 | voxel grid ([D-73] (1d′)) | **entire representation** (encoding+body+heads → explicit 4×192³ lattice) | loss + renderer byte-identical to baseline |
+
+Three anatomical observations:
+
+1. **The forward function was never tweaked — by design.** The differentiable renderer is the
+   physics contract; changing it changes *what problem is being solved*. It was audited once
+   ([D-57]: latent damping-coefficient factor-12.9 bug found, fixed, impact-bounded ~250× under
+   the gate) — verification, not experiment. Having held it fixed all campaign is exactly why
+   the final verdict is scoped "under this forward model."
+2. **A.1.5(γ)–A.1.7 cut the renderer out of the loop entirely** (direct ρ supervision, no flux,
+   no Voigt integration) and the collapse persisted — the decisive isolation that the
+   trainability pathology lives in the field-model × loss-landscape, not the physics layer.
+   Which makes A.1.8 clean: renderer back in, only the representation swapped → trainability
+   fine → the earlier collapse was representation×supervision, and the remaining failure is the
+   data.
+3. **The metrics were the one organ deliberately never tuned** — gates pre-registered and held
+   fixed so passing meant something. The single change at that layer was the endgame ξ-demotion
+   ([D-36] correction note / [D-73] am-9 S5+S7), and that was a *defect finding* (estimator
+   ceiling 0.0298 on truth-vs-truth; real-vs-redshift-space frame confound), disclosed as such:
+   the bar was retired, not lowered.
+
+Sweep order, organ by organ: loss (×2) → inputs → data → supervision target + optimizer
+(×7 levers) → body → head → whole representation. Every organ of the learning system got its
+turn except the two held fixed on purpose (renderer, metrics) — which is what makes "it was
+none of the organs" a defensible conviction of the problem itself.
