@@ -1,0 +1,28 @@
+{
+  "artifact": "fig3-verdict-table.csv",
+  "producing_function": "src.export.export_d41_verdict_table",
+  "source_data_path": "decision record (banked scalars; see internal_lineage)",
+  "git": {
+    "commit": "d1fadd9",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T12:02:19"
+  },
+  "export_timestamp_utc": "2026-07-14T17:02:19.989270+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Two-stage verdict of record. The 50-step smoke triggered the FAIL (on the mean-flux tell) and the full-scale stage was skipped under the standing stop rule; the retrospective review then challenged the smoke-scale verdict and one full-scale confirmation run was authorized, which RATIFIED it: flux-power residual pinned at ~1.0 (vs 0.4155 baseline -- state it as the residual ceiling, i.e. no flux structure; do NOT quote a 'times worse' multiple) and a KS '0' that is a degenerate empty sample, not a pass. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "confirmation_run": {
+    "pf_residual_mean": 0.999965,
+    "pf_residual_baseline": 0.4155,
+    "ks_distance_raw": 0.0,
+    "ks_reading": "degenerate empty sample (constant F~1 leaves no pixels in the [0.05,0.95] analysis window) -- NOT a pass",
+    "steps": 25000,
+    "wallclock": "55:46",
+    "cost_spent": "~$1.50 paid GPU"
+  },
+  "internal_lineage": "[D-41] verdict + [D-42-meta] Addendum 1 items 4+13 (K4/D3 settlement)"
+}

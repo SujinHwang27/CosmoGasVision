@@ -1,0 +1,14 @@
+key,value
+intervention,"per-voxel physics prior: penalize deviation of the network's (density, temperature) -> absorption relation from the FGPA tail scaling on diffuse bins"
+scaling_form,tau proportional to Delta^1.6 T^-0.7 (Hui & Gnedin 1997; exponents frozen)
+regularizer_weight,0.1
+huber_delta,0.5
+valid_tau_ceiling,0.5
+anchor_constant_C_log_units,-9.2151
+anchor_constant_source,truth-side cache; valid mask 131072/131072 source bins (100%)
+exponents_truth_fit_later,"beta_emp 1.67 (4% off frozen 1.6); gamma_emp -0.41 (40% off frozen -0.7); scatter 0.139 dex over 7.58M voxels -- verdict unaffected, lesson banked"
+physics,P1 (fiducial) only
+smoke_run,"50 steps, n_rays=64, microbatch=32, seed 0, anchor 0.979, host CPU, minutes of compute, no paid dispatch"
+smoke_verdict,FAIL on the mean-flux tell; full-scale stage initially skipped (~$1.50 / ~50 min paid GPU saved)
+full_scale_confirmation,"one full-scale confirmation run later executed (user-authorized during the retrospective review): 25,000 steps, ~56 min wallclock, ~$1.50 -- verdict RATIFIED at scale"
+stop_rule,"no paid dispatch on a failing smoke; the confirmation run was review-mandated, not a retry"

@@ -412,3 +412,128 @@ def test_export_d40_scrub_gate_on_consumer_surfaces(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep05 "the-physics-constraint" batch (banked [D-41] exports + local-tracker
+# re-read). Synthetic fixtures; no dependence on the real mlflow.db/artifacts.
+# --------------------------------------------------------------------------- #
+def _synthetic_mlflow_db(tmp_path: Path, break_endpoint: bool = False,
+                         drop_step: bool = False) -> str:
+    import sqlite3
+    p = tmp_path / "mlflow_synth.db"
+    con = sqlite3.connect(str(p))
+    con.execute("create table metrics (key text, value real, timestamp int, "
+                "run_uuid text, step int)")
+    run = X.D41_SMOKE_RUN_ID
+    n = 50
+    for step in range(1, n + 1):
+        t = (step - 1) / (n - 1)
+        vals = {
+            "loss_fgpa_tail": 6.367 * (1 - t) + 0.3085 * t,
+            "mean_flux_pred": 0.8687 * (1 - t) + 1.0 * t,
+            "tau_amp": 1.0 * (1 - t) + 0.9906 * t,
+            "loss_data": 0.02, "loss_meanF": 0.01, "loss": 0.5,
+        }
+        if break_endpoint and step == n:
+            vals["mean_flux_pred"] = 0.95
+        for k, v in vals.items():
+            if drop_step and k == "tau_amp" and step == 25:
+                continue
+            con.execute("insert into metrics values (?,?,?,?,?)", (k, v, 0, run, step))
+    con.commit()
+    con.close()
+    return str(p)
+
+
+def _synthetic_d41_collapse(tmp_path: Path, tamper: bool = False) -> str:
+    def block(lo, med, hi):
+        return {"min": lo, "median": med, "mean": med, "max": hi}
+    payload = {
+        "truth": {"density": block(0.007, 0.145, 6456.5),
+                  "X_HI": block(7.6e-11, 6.0e-07, 2.3e-04),
+                  "n_HI": block(8.8e-12, 8.4e-08, 4.1e-02),
+                  "n_HI_lt_1e9_frac": 0.004},
+        "fgpa_tail_tier1_pred": {"density": block(68.3, 71.5, 74.7),
+                                 "X_HI": block(2.1e-05, 3.3e-05, 5.2e-05),
+                                 "n_HI": block(1.6e-03, 2.4e-03, 3.6e-03),
+                                 "n_HI_lt_1e9_frac": 0.0},
+        "collapse_ratio_med": {"density": 71.5 / 0.145,
+                               "X_HI": 3.3e-05 / 6.0e-07,
+                               "n_HI": (2.4e-03 / 8.4e-08) if not tamper else 999.0},
+    }
+    p = tmp_path / "d41_collapse.json"
+    p.write_text(json.dumps(payload))
+    return str(p)
+
+
+def test_export_d41_smoke_trace_reads_tracker(tmp_path):
+    db = _synthetic_mlflow_db(tmp_path)
+    res = X.export_d41_smoke_trace(out_dir=str(tmp_path), db_path=db)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 50
+    assert float(rows[-1]["mean_flux_pred"]) == 1.0
+    assert res["descent_factor"] == pytest.approx(6.367 / 0.3085, rel=1e-6)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: the tell's licensed reading + smoke-vs-ratification split.
+    assert "fingerprint of collapse" in meta["caveat"]
+    assert "RATIFIED" in meta["caveat"]
+
+
+def test_export_d41_smoke_trace_rejects_endpoint_drift(tmp_path):
+    db = _synthetic_mlflow_db(tmp_path, break_endpoint=True)
+    with pytest.raises(AssertionError, match="disagree with"):
+        X.export_d41_smoke_trace(out_dir=str(tmp_path), db_path=db)
+
+
+def test_export_d41_smoke_trace_rejects_missing_steps(tmp_path):
+    db = _synthetic_mlflow_db(tmp_path, drop_step=True)
+    with pytest.raises(AssertionError, match="missing steps"):
+        X.export_d41_smoke_trace(out_dir=str(tmp_path), db_path=db)
+
+
+def test_export_d41_collapse_signature(tmp_path):
+    src = _synthetic_d41_collapse(tmp_path)
+    res = X.export_d41_collapse_signature(out_dir=str(tmp_path), collapse_json=src)
+    rows = _read_csv(Path(res["artifact"]))
+    assert [r["field"] for r in rows] == ["density", "X_HI", "n_HI"]
+    assert float(rows[0]["pred_median"]) == pytest.approx(71.5)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: attribution to the confirmation run + corrected mechanism.
+    assert "CONFIRMATION" in meta["caveat"]
+    assert "CONSTANT-PREDICTION COLLAPSE" in meta["caveat"]
+    assert "empirically" in meta["caveat"]
+
+
+def test_export_d41_collapse_signature_rejects_tampered_ratio(tmp_path):
+    src = _synthetic_d41_collapse(tmp_path, tamper=True)
+    with pytest.raises(AssertionError, match="disagrees with banked"):
+        X.export_d41_collapse_signature(out_dir=str(tmp_path), collapse_json=src)
+
+
+def test_export_d41_verdict_and_config_honesty(tmp_path):
+    res3 = X.export_d41_verdict_table(out_dir=str(tmp_path))
+    meta3 = json.loads(Path(res3["sidecar"]).read_text())
+    assert "EMPTY" in json.dumps(_read_csv(Path(res3["artifact"])))
+    assert "do NOT quote" in meta3["caveat"]
+    res4 = X.export_d41_run_config(out_dir=str(tmp_path))
+    meta4 = json.loads(Path(res4["sidecar"]).read_text())
+    assert "measure the relation from truth" in meta4["caveat"]
+
+
+def test_export_d41_scrub_gate_on_consumer_surfaces(tmp_path):
+    db = _synthetic_mlflow_db(tmp_path)
+    src = _synthetic_d41_collapse(tmp_path)
+    outs = [
+        X.export_d41_smoke_trace(out_dir=str(tmp_path), db_path=db),
+        X.export_d41_collapse_signature(out_dir=str(tmp_path), collapse_json=src),
+        X.export_d41_verdict_table(out_dir=str(tmp_path)),
+        X.export_d41_run_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Tier-1", "Tier-2", "tier1", "Juno", "Sprint", "197381")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)

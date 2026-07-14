@@ -1100,3 +1100,318 @@ def export_d40_run_config(out_dir: str) -> Dict[str, Any]:
         extra_sidecar=extra,
     )
     return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep05 "the-physics-constraint" batch — the [D-41] per-pixel FGPA-tail
+# regularizer and its D2 constant-prediction collapse. One RE-READ artifact
+# (the 50-step smoke trace, read from the LOCAL MLflow store — this run
+# executed on the host, so unlike ep04 the trajectory is recoverable) and
+# three BANKED artifacts. The verdict history of record: smoke FAIL (the
+# mean-F tell) -> retrospective challenge -> user-authorized Tier-1
+# confirmation (Juno 197381, 25k steps) which RATIFIED the verdict and
+# yielded the field-level collapse diagnosis; the mechanism narrative was
+# then corrected from "drove absorption to zero" to constant-prediction
+# collapse (the [D-42-meta] Addendum 1 item 4+13 record).
+# =========================================================================== #
+
+MLFLOW_DB: str = "mlflow.db"
+D41_SMOKE_RUN_ID: str = "21fb45cb3cd54793911824950591d44c"
+D41_COLLAPSE_JSON: str = (
+    "experiments/nerf/artifacts/eval/cleanup_pass/"
+    "item4_n_HI_distribution_tier1_fgpatail.json"
+)
+D41_ITEMS_268_JSON: str = "experiments/nerf/artifacts/eval/cleanup_pass/items_2_6_8.json"
+
+# Banked smoke endpoints (decision-record step table; consistency-asserted
+# against the tracker re-read).
+D41_SMOKE_ENDPOINTS: Dict[str, Tuple[float, float]] = {
+    "loss_fgpa_tail": (6.367, 0.3085),
+    "mean_flux_pred": (0.8687, 1.0000),
+    "tau_amp": (1.0000, 0.9906),
+}
+
+# Banked Tier-1 ratification scalars (retrospective Addendum record).
+D41_TIER1: Dict[str, Any] = {
+    "pf_residual_mean": 0.999965,
+    "pf_residual_baseline": 0.4155,
+    "ks_distance_raw": 0.0,
+    "ks_reading": "degenerate empty sample (constant F~1 leaves no pixels in the [0.05,0.95] analysis window) -- NOT a pass",
+    "steps": 25000,
+    "wallclock": "55:46",
+    "cost_spent": "~$1.50 paid GPU",
+}
+
+D41_RUN_CONFIG: List[Tuple[str, Any]] = [
+    ("intervention", "per-voxel physics prior: penalize deviation of the network's (density, temperature) -> absorption relation from the FGPA tail scaling on diffuse bins"),
+    ("scaling_form", "tau proportional to Delta^1.6 T^-0.7 (Hui & Gnedin 1997; exponents frozen)"),
+    ("regularizer_weight", 0.1),
+    ("huber_delta", 0.5),
+    ("valid_tau_ceiling", 0.5),
+    ("anchor_constant_C_log_units", -9.2151),
+    ("anchor_constant_source", "truth-side cache; valid mask 131072/131072 source bins (100%)"),
+    ("exponents_truth_fit_later", "beta_emp 1.67 (4% off frozen 1.6); gamma_emp -0.41 (40% off frozen -0.7); scatter 0.139 dex over 7.58M voxels -- verdict unaffected, lesson banked"),
+    ("physics", "P1 (fiducial) only"),
+    ("smoke_run", "50 steps, n_rays=64, microbatch=32, seed 0, anchor 0.979, host CPU, minutes of compute, no paid dispatch"),
+    ("smoke_verdict", "FAIL on the mean-flux tell; full-scale stage initially skipped (~$1.50 / ~50 min paid GPU saved)"),
+    ("full_scale_confirmation", "one full-scale confirmation run later executed (user-authorized during the retrospective review): 25,000 steps, ~56 min wallclock, ~$1.50 -- verdict RATIFIED at scale"),
+    ("stop_rule", "no paid dispatch on a failing smoke; the confirmation run was review-mandated, not a retry"),
+]
+
+
+def _read_mlflow_metric_series(
+    db_path: str, run_id: str, keys: Sequence[str]
+) -> Dict[str, Dict[int, float]]:
+    """Read per-step metric series for one run from a local MLflow SQLite
+    store (read-only; deterministic ORDER BY step)."""
+    import sqlite3
+
+    series: Dict[str, Dict[int, float]] = {k: {} for k in keys}
+    con = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    try:
+        cur = con.execute(
+            "select key, step, value from metrics where run_uuid = ? and key in ({}) "
+            "order by step".format(",".join("?" * len(keys))),
+            [run_id, *keys],
+        )
+        for key, step, value in cur.fetchall():
+            series[key][int(step)] = float(value)
+    finally:
+        con.close()
+    return series
+
+
+def export_d41_smoke_trace(
+    out_dir: str,
+    db_path: str = MLFLOW_DB,
+    run_id: str = D41_SMOKE_RUN_ID,
+) -> Dict[str, Any]:
+    """ep05 fig1: the 50-step smoke trace, RE-READ from the local tracker.
+
+    The descent-vs-tell figure: the regularizer term falls ~20x while the
+    predicted mean flux climbs to exactly 1.0000 (perfect transparency) and
+    the amplitude guard holds. Endpoints are consistency-asserted against the
+    banked decision-record step table.
+    """
+    keys = ["loss_fgpa_tail", "mean_flux_pred", "loss_data", "loss_meanF",
+            "tau_amp", "loss"]
+    series = _read_mlflow_metric_series(db_path, run_id, keys)
+    steps = sorted(series["loss_fgpa_tail"])
+    if not steps or steps[0] != 1 or steps[-1] != len(steps):
+        raise AssertionError("smoke trace incomplete: expected contiguous steps from 1.")
+    for k in keys:
+        if sorted(series[k]) != steps:
+            raise AssertionError(f"metric {k!r} missing steps vs loss_fgpa_tail.")
+
+    for k, (start, end) in D41_SMOKE_ENDPOINTS.items():
+        got_start, got_end = series[k][steps[0]], series[k][steps[-1]]
+        if abs(got_start - start) > 5e-4 * max(1.0, abs(start)) or \
+           abs(got_end - end) > 5e-4 * max(1.0, abs(end)):
+            raise AssertionError(
+                f"{k}: tracker endpoints ({got_start}, {got_end}) disagree with "
+                f"banked record ({start}, {end})."
+            )
+
+    rows = [
+        {"step": s, **{k: series[k][s] for k in keys}}
+        for s in steps
+    ]
+    _validate_rows("d41-smoke-trace", rows)
+    F = np.array([r["mean_flux_pred"] for r in rows])
+    _validate_flux("d41-smoke-trace mean_flux_pred", F)
+
+    caveat = (
+        "50-step host smoke trace for the per-pixel physics-prior intervention "
+        "(P1, single seed), re-read from the experiment tracker. The added "
+        "term descends ~20x (6.37 -> 0.31) while the predicted mean flux "
+        "climbs to 1.0000 EXACTLY -- perfectly transparent gas. The 1.0000 "
+        "looks like passing and is the fingerprint of collapse: the score the "
+        "anchor reports is quietly satisfied by a universe with nothing in it. "
+        "The amplitude guard held (0.99), so the escape was through the "
+        "fields, not the calibration. Smoke-scale evidence: the verdict this "
+        "trace triggered was later RATIFIED by a full-scale confirmation run "
+        "(see fig3); cite the smoke as the trigger, the confirmation as the "
+        "ratification. Single realization / fixed cosmology (Sherwood, one "
+        "60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "n_steps": len(steps),
+        "descent_factor_loss_fgpa_tail": series["loss_fgpa_tail"][steps[0]] / series["loss_fgpa_tail"][steps[-1]],
+        "internal_lineage": f"[D-41] smoke; MLflow run {run_id} (local store); cloud_runs/fgpa_tail_smoke.log",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig1-smoke-trace.csv",
+        fieldnames=["step", *keys],
+        rows=rows,
+        producing_fn="src.export.export_d41_smoke_trace",
+        source_data_path=f"{db_path} (local MLflow store, run {run_id})",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "descent_factor": extra["descent_factor_loss_fgpa_tail"]}
+
+
+def export_d41_collapse_signature(
+    out_dir: str,
+    collapse_json: str = D41_COLLAPSE_JSON,
+) -> Dict[str, Any]:
+    """ep05 fig2: the field-level collapse signature (BANKED Tier-1 diagnostic).
+
+    Truth vs predicted per-field distribution summaries from the confirmation
+    run's checkpoint: every field collapsed to a near-constant (density
+    68.3-74.7 around 71.5; X_HI ~3.3e-5), and predicted n_HI is ~28,000x
+    LARGER than the truth median -- the empirical refutation of the initial
+    "drove absorption to zero" reading.
+    """
+    d = _read_banked_json(collapse_json)
+    truth, pred, ratio = d["truth"], d["fgpa_tail_tier1_pred"], d["collapse_ratio_med"]
+
+    rows: List[Dict[str, Any]] = []
+    for field in ("density", "X_HI", "n_HI"):
+        t, p = truth[field], pred[field]
+        if not (p["min"] > 0 and t["min"] > 0):
+            raise AssertionError(f"{field}: non-positive field values in banked diagnostic.")
+        rederived = p["median"] / t["median"]
+        if abs(rederived - ratio[field]) > 1e-9 * abs(ratio[field]):
+            raise AssertionError(f"{field}: re-derived median ratio disagrees with banked.")
+        rows.append({
+            "field": field,
+            "truth_min": float(t["min"]), "truth_median": float(t["median"]),
+            "truth_max": float(t["max"]),
+            "pred_min": float(p["min"]), "pred_median": float(p["median"]),
+            "pred_max": float(p["max"]),
+            "pred_over_truth_median": float(ratio[field]),
+        })
+    _validate_rows("d41-collapse-signature", rows)
+
+    caveat = (
+        "Field-level collapse signature, measured on the full-scale "
+        "CONFIRMATION run's checkpoint (25,000 steps) -- not on the 50-step "
+        "smoke; always attribute these numbers to the confirmation run. Truth "
+        "spans decades in every field; the prediction is a near-constant in "
+        "every field (density 68.3-74.7 around 71.5 -- 494x the truth median "
+        "of 0.145; X_HI ~3.3e-5). Predicted n_HI is ~28,000x LARGER than the "
+        "truth median: nothing was driven to zero. The licensed mechanism of "
+        "record is CONSTANT-PREDICTION COLLAPSE -- constants trivially "
+        "satisfy the enforced physics relation (one equation, three "
+        "constants), and the mean-flux anchor pulls the resulting constant "
+        "absorption toward transparency. The initial 'network drove "
+        "absorption to zero, evading the anchor' reading is empirically "
+        "wrong and may be narrated only as the corrected first guess. Single "
+        "realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 "
+        "scope-lock."
+    )
+    extra = {
+        "frac_n_HI_below_1e-9": {
+            "truth": truth["n_HI_lt_1e9_frac"],
+            "prediction": pred["n_HI_lt_1e9_frac"],
+        },
+        "internal_lineage": (
+            "[D-42-meta] Addendum 1 items 4+13; Tier-1 Juno job 197381 "
+            "(RUN_TAG P1-N64-S0-1778508750-7f0c7e), eval job 197387; "
+            "checkpoint cloud_runs/fgpa-tail-tier1-P1-step25k.pt"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2-collapse-signature.csv",
+        fieldnames=["field", "truth_min", "truth_median", "truth_max",
+                    "pred_min", "pred_median", "pred_max", "pred_over_truth_median"],
+        rows=rows,
+        producing_fn="src.export.export_d41_collapse_signature",
+        source_data_path=collapse_json,
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d41_verdict_table(out_dir: str) -> Dict[str, Any]:
+    """ep05 fig3: the two-stage verdict table (BANKED) -- smoke trigger +
+    full-scale ratification."""
+    rows: List[Dict[str, Any]] = [
+        {"stage": "smoke", "metric": "regularizer_term_start", "value": 6.367,
+         "reference": "", "reading": "training start"},
+        {"stage": "smoke", "metric": "regularizer_term_end_step50", "value": 0.3085,
+         "reference": "", "reading": "~20x descent in 50 steps"},
+        {"stage": "smoke", "metric": "mean_flux_pred_end", "value": 1.0000,
+         "reference": "anchor 0.979", "reading": "the tell: exact transparency, fingerprint of collapse"},
+        {"stage": "smoke", "metric": "tau_amp_end", "value": 0.9906,
+         "reference": "guard range", "reading": "calibration guard held; escape was through the fields"},
+        {"stage": "confirmation", "metric": "pf_residual_band_mean", "value": 0.999965,
+         "reference": "production baseline 0.4155",
+         "reading": "residual pinned at its ~1.0 ceiling: essentially no flux structure at all"},
+        {"stage": "confirmation", "metric": "ks_distance", "value": 0.0,
+         "reference": "gate 0.05",
+         "reading": "a zero that means EMPTY, not perfect: constant F~1 leaves no pixels in the analysis window"},
+    ]
+    _validate_rows("d41-verdict-table", rows)
+    caveat = (
+        "Two-stage verdict of record. The 50-step smoke triggered the FAIL "
+        "(on the mean-flux tell) and the full-scale stage was skipped under "
+        "the standing stop rule; the retrospective review then challenged the "
+        "smoke-scale verdict and one full-scale confirmation run was "
+        "authorized, which RATIFIED it: flux-power residual pinned at ~1.0 "
+        "(vs 0.4155 baseline -- state it as the residual ceiling, i.e. no "
+        "flux structure; do NOT quote a 'times worse' multiple) and a KS "
+        "'0' that is a degenerate empty sample, not a pass. Single "
+        "realization / fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"confirmation_run": D41_TIER1,
+             "internal_lineage": "[D-41] verdict + [D-42-meta] Addendum 1 items 4+13 (K4/D3 settlement)"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig3-verdict-table.csv",
+        fieldnames=["stage", "metric", "value", "reference", "reading"],
+        rows=rows,
+        producing_fn="src.export.export_d41_verdict_table",
+        source_data_path="decision record (banked scalars; see internal_lineage)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d41_run_config(out_dir: str) -> Dict[str, Any]:
+    """ep05 spec readout (BANKED): regularizer form, config, two-stage stop
+    discipline, and the frozen-exponents confession."""
+    rows = [{"key": k, "value": str(v)} for k, v in D41_RUN_CONFIG]
+    _validate_rows("d41-run-config", rows)
+    caveat = (
+        "Intervention spec of record. The exponents were frozen from the "
+        "Hui & Gnedin 1997 scaling; a later fit to the simulation's own truth "
+        "found the temperature exponent materially off (-0.41 vs the frozen "
+        "-0.7) -- the verdict is unaffected (the collapse is a separate "
+        "mechanism), but the lesson was banked: measure the relation from "
+        "truth before freezing textbook values. Cost framing: the smoke cost "
+        "minutes of host CPU and no paid dispatch; skipping the full stage "
+        "saved ~$1.50 of paid GPU; the later review-mandated confirmation run "
+        "spent ~$1.50 to ratify the verdict at scale. The story is the "
+        "discipline: a cheap pre-committed test called it, and the review "
+        "refused to let a smoke-scale verdict stand unchallenged."
+    )
+    extra = {
+        "smoke_device_evidence": (
+            "banked smoke log cloud_runs/fgpa_tail_smoke.log, first line: "
+            "'Using device: cpu' (per-gate C3 proviso: CPU wording retained "
+            "with banked citation)"
+        ),
+        "internal_lineage": "[D-41] Spec + Verdict; [D-42-meta] item 8 (beta/gamma truth fit) + item 13 (Tier-1 authorization)",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="spec-run-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows,
+        producing_fn="src.export.export_d41_run_config",
+        source_data_path="decision record (banked spec; see internal_lineage)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

@@ -1,0 +1,7 @@
+stage,metric,value,reference,reading
+smoke,regularizer_term_start,6.367,,training start
+smoke,regularizer_term_end_step50,0.3085,,~20x descent in 50 steps
+smoke,mean_flux_pred_end,1.0,anchor 0.979,"the tell: exact transparency, fingerprint of collapse"
+smoke,tau_amp_end,0.9906,guard range,calibration guard held; escape was through the fields
+confirmation,pf_residual_band_mean,0.999965,production baseline 0.4155,residual pinned at its ~1.0 ceiling: essentially no flux structure at all
+confirmation,ks_distance,0.0,gate 0.05,"a zero that means EMPTY, not perfect: constant F~1 leaves no pixels in the analysis window"

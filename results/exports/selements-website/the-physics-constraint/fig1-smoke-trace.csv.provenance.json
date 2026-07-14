@@ -1,0 +1,21 @@
+{
+  "artifact": "fig1-smoke-trace.csv",
+  "producing_function": "src.export.export_d41_smoke_trace",
+  "source_data_path": "mlflow.db (local MLflow store, run 21fb45cb3cd54793911824950591d44c)",
+  "git": {
+    "commit": "d1fadd9",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T12:02:19"
+  },
+  "export_timestamp_utc": "2026-07-14T17:02:19.792779+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "50-step host smoke trace for the per-pixel physics-prior intervention (P1, single seed), re-read from the experiment tracker. The added term descends ~20x (6.37 -> 0.31) while the predicted mean flux climbs to 1.0000 EXACTLY -- perfectly transparent gas. The 1.0000 looks like passing and is the fingerprint of collapse: the score the anchor reports is quietly satisfied by a universe with nothing in it. The amplitude guard held (0.99), so the escape was through the fields, not the calibration. Smoke-scale evidence: the verdict this trace triggered was later RATIFIED by a full-scale confirmation run (see fig3); cite the smoke as the trigger, the confirmation as the ratification. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "n_steps": 50,
+  "descent_factor_loss_fgpa_tail": 20.638631550740048,
+  "internal_lineage": "[D-41] smoke; MLflow run 21fb45cb3cd54793911824950591d44c (local store); cloud_runs/fgpa_tail_smoke.log"
+}

@@ -1,0 +1,23 @@
+{
+  "artifact": "fig2-collapse-signature.csv",
+  "producing_function": "src.export.export_d41_collapse_signature",
+  "source_data_path": "experiments/nerf/artifacts/eval/cleanup_pass/item4_n_HI_distribution_tier1_fgpatail.json",
+  "git": {
+    "commit": "d1fadd9",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T12:02:19"
+  },
+  "export_timestamp_utc": "2026-07-14T17:02:19.887847+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Field-level collapse signature, measured on the full-scale CONFIRMATION run's checkpoint (25,000 steps) -- not on the 50-step smoke; always attribute these numbers to the confirmation run. Truth spans decades in every field; the prediction is a near-constant in every field (density 68.3-74.7 around 71.5 -- 494x the truth median of 0.145; X_HI ~3.3e-5). Predicted n_HI is ~28,000x LARGER than the truth median: nothing was driven to zero. The licensed mechanism of record is CONSTANT-PREDICTION COLLAPSE -- constants trivially satisfy the enforced physics relation (one equation, three constants), and the mean-flux anchor pulls the resulting constant absorption toward transparency. The initial 'network drove absorption to zero, evading the anchor' reading is empirically wrong and may be narrated only as the corrected first guess. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "frac_n_HI_below_1e-9": {
+    "truth": 0.0039844512939453125,
+    "prediction": 0.0
+  },
+  "internal_lineage": "[D-42-meta] Addendum 1 items 4+13; Tier-1 Juno job 197381 (RUN_TAG P1-N64-S0-1778508750-7f0c7e), eval job 197387; checkpoint cloud_runs/fgpa-tail-tier1-P1-step25k.pt"
+}
