@@ -1,0 +1,23 @@
+{
+  "artifact": "fig1-verdict-table.csv",
+  "producing_function": "src.export.export_d40_verdict_table",
+  "source_data_path": "decision record (banked scalars; see internal_lineage)",
+  "git": {
+    "commit": "facae56",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T09:53:54"
+  },
+  "export_timestamp_utc": "2026-07-14T14:53:54.287403+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Verdict table of record for the saturation-aware flux-power band-loss intervention (P1 only, single seed, 12,500 steps at minimal-intervention weights). The training-time band-loss values are ENDPOINTS of record (0.99 -> 6.77e-6); the full per-step trajectory did not survive the compute-site round-trip, so the five-orders descent must be cited as endpoints, never drawn as a curve. The five-orders descent is NOT a win: eval flux-power residual worsened +37.4% vs the production baseline and the flux-PDF KS gate broke (3.8x over). Reference values for P_F/KS come from the 50k-step production baseline (the intervention ran 12,500 steps; the FAIL verdict is the pre-committed criterion -- verdict-level, with the schedule difference disclosed); loss_data is compared at matched step count. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "train_steps": 12500,
+  "pf_worsening_pct_vs_baseline": 37.352587244283995,
+  "ks_over_gate_factor": 3.776,
+  "trajectory_recoverability": "endpoints only -- local tracker holds the 50-step smoke, not this run; compute-site metric store never round-tripped; banked step-10000 checkpoint has no loss history",
+  "internal_lineage": "[D-40] + Addendum 1; MLflow run 87dcf9e6...; compute job 197319 (train) / 197328 (eval)"
+}

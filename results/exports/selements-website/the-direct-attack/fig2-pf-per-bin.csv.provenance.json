@@ -1,0 +1,35 @@
+{
+  "artifact": "fig2-pf-per-bin.csv",
+  "producing_function": "src.export.export_d40_pf_per_bin",
+  "source_data_path": "experiments/nerf/artifacts/eval/sat_aware_hypc/87dcf9e63564465489f770266fcec197_pf_per_bin.json",
+  "git": {
+    "commit": "facae56",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T09:53:54"
+  },
+  "export_timestamp_utc": "2026-07-14T14:53:54.403292+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Per-bin flux power P_F(k_par) for the saturation-aware intervention run vs truth (P1, eval n_rays=1024/seed=42). The mechanism table behind the failure signature: in the gate band the model preserves the SHAPE of P_F (log-space Pearson 0.8346) while rendering it at ~0.43x the true amplitude (band ratio mean 0.4293) -- amplitude-shrink with shape preservation, NOT a constant-prediction collapse, and NOT the flux->1 transparency collapse of the later interventions. Three window-null NaN bins dropped (k-axis matches the ep03 fig1-pf-miss.csv 17-bin axis; overlay the production baseline from that file -- do not re-ship it). Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "pf_band_s_per_km": [
+    0.0031622776601683794,
+    0.03162277660168379
+  ],
+  "n_bins_shipped": 17,
+  "n_nan_bins_dropped": 3,
+  "diagnostics_banked": {
+    "log10_std_pred_in_band": 0.2161401921473702,
+    "log10_std_truth_in_band": 0.1594843421668013,
+    "band_ratio_mean": 0.42928034232712786,
+    "band_ratio_std": 0.12107347182092874,
+    "pearson_log_in_band": 0.834617053552296,
+    "mean_abs_rel_diff_in_band": 0.5707196576728721
+  },
+  "pearson_log_rederived": 0.8346170535522957,
+  "internal_lineage": "[D-40] Addendum 1 per-bin dump (scripts/diag_pf_per_bin.py); verdict string of record: REFUTED-strict-C: shape preserved (pearson>0.7) but amplitude suppressed; degeneracy is scale-distortion, not constant-collapse",
+  "checkpoint_of_record": "cloud_runs/sat-aware-smoke-step10k.pt"
+}

@@ -276,3 +276,139 @@ def test_export_single_sightline_bounds_and_index(tmp_path):
         fm, ft = float(r["F_mlp"]), float(r["F_truth"])
         assert 0.0 <= fm <= 1.0 + 1e-9
         assert 0.0 <= ft <= 1.0 + 1e-9
+
+
+# --------------------------------------------------------------------------- #
+# ep04 "the-direct-attack" batch (banked [D-40] exports). Synthetic fixtures;
+# no dependence on the real sat_aware_hypc artifacts.
+# --------------------------------------------------------------------------- #
+def _synthetic_d40_per_bin(tmp_path: Path, nan_in_band: bool = False,
+                           band=(10 ** -2.5, 10 ** -1.5)) -> str:
+    k = [1e-3, 4e-3, 6e-3, 1e-2, 2e-2, 5e-2]
+    p_truth = [float("nan"), 2.0, 1.5, 1.0, 0.5, 0.1]
+    if nan_in_band:
+        p_truth[2] = float("nan")
+    p_pred = [t * 0.4 for t in p_truth]  # exact proportionality -> pearson 1.0
+    ratio = [p / t if t == t else float("nan") for p, t in zip(p_pred, p_truth)]
+    rel = [r - 1.0 if r == r else float("nan") for r in ratio]
+    in_band = [band[0] <= x <= band[1] for x in k]
+    payload = {
+        "run_id": "synthetic",
+        "ckpt_path": "synthetic.pt",
+        "pf_band_s_per_km": list(band),
+        "k_axis": k,
+        "P_truth": p_truth,
+        "P_pred": p_pred,
+        "P_pred_over_P_truth": ratio,
+        "rel_diff_per_bin": rel,
+        "in_band_mask": in_band,
+        "diagnostics": {
+            "log10_std_pred_in_band": 0.25,
+            "log10_std_truth_in_band": 0.25,
+            "band_ratio_mean": 0.4,
+            "band_ratio_std": 0.0,
+            "pearson_log_in_band": 1.0,
+            "mean_abs_rel_diff_in_band": 0.6,
+        },
+        "hypothesis_c_verdict": "synthetic",
+    }
+    p = tmp_path / "d40_per_bin.json"
+    p.write_text(json.dumps(payload))
+    return str(p)
+
+
+def _synthetic_d40_baseline(tmp_path: Path) -> str:
+    payload = {
+        c: {"log_std_pred": 0.3, "log_std_truth": 0.2, "ratio_mean": rm,
+            "ratio_std": 0.4, "pearson_log": 0.85}
+        for c, rm in (("P1", 0.98), ("P2", 0.97), ("P3", 0.74), ("P4", 0.79))
+    }
+    p = tmp_path / "d40_baseline.json"
+    p.write_text(json.dumps(payload))
+    return str(p)
+
+
+def test_export_d40_pf_per_bin_drops_nan_and_reproduces_diags(tmp_path):
+    src = _synthetic_d40_per_bin(tmp_path)
+    res = X.export_d40_pf_per_bin(out_dir=str(tmp_path), per_bin_json=src)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 5  # one out-of-band NaN bin dropped
+    assert [int(r["in_gate_band"]) for r in rows] == [1, 1, 1, 1, 0]
+    assert res["pearson_log_rederived"] == pytest.approx(1.0)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert meta["n_nan_bins_dropped"] == 1
+    # Honesty: the caveat names the signature, not constant collapse.
+    assert "amplitude-shrink" in meta["caveat"]
+    assert "shape preservation" in meta["caveat"]
+
+
+def test_export_d40_pf_per_bin_refuses_nan_inside_band(tmp_path):
+    src = _synthetic_d40_per_bin(tmp_path, nan_in_band=True)
+    with pytest.raises(AssertionError, match="inside the gate band"):
+        X.export_d40_pf_per_bin(out_dir=str(tmp_path), per_bin_json=src)
+
+
+def test_export_d40_pf_per_bin_rejects_wrong_band(tmp_path):
+    src = _synthetic_d40_per_bin(tmp_path, band=(1e-3, 1e-1))
+    with pytest.raises(AssertionError, match="band edges"):
+        X.export_d40_pf_per_bin(out_dir=str(tmp_path), per_bin_json=src)
+
+
+def test_export_d40_verdict_table_banked_values(tmp_path):
+    res = X.export_d40_verdict_table(out_dir=str(tmp_path))
+    assert res["n_rows"] == 5
+    assert res["pf_worsening_pct"] == pytest.approx(37.35, abs=0.05)
+    rows = {r["metric"]: r for r in _read_csv(Path(res["artifact"]))}
+    assert float(rows["pf_residual_band_mean"]["sat_aware_run"]) == 0.5707
+    assert float(rows["ks_distance"]["sat_aware_run"]) == 0.1888
+    assert float(rows["train_loss_pf_band_final"]["sat_aware_run"]) == 6.77e-06
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: endpoints-only rule + not-a-win framing must ride the caveat.
+    assert "ENDPOINTS" in meta["caveat"] or "endpoints" in meta["caveat"]
+    assert "NOT a win" in meta["caveat"]
+    assert meta["train_steps"] == 12500
+
+
+def test_export_d40_shape_amplitude_summary(tmp_path):
+    src = _synthetic_d40_per_bin(tmp_path)
+    base = _synthetic_d40_baseline(tmp_path)
+    res = X.export_d40_shape_amplitude_summary(
+        out_dir=str(tmp_path), per_bin_json=src, baseline_json=base)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 5
+    assert rows[0]["model"] == "sat_aware_intervention"
+    assert float(rows[0]["amplitude_ratio_mean"]) == pytest.approx(0.4)
+    assert [r["physics"] for r in rows[1:]] == ["P1", "P2", "P3", "P4"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: baseline-only scope of the cross-physics rows.
+    assert "P1 only" in meta["caveat"]
+
+
+def test_export_d40_run_config_discipline_framing(tmp_path):
+    res = X.export_d40_run_config(out_dir=str(tmp_path))
+    rows = {r["key"]: r["value"] for r in _read_csv(Path(res["artifact"]))}
+    assert rows["train_steps"] == "12500"
+    assert rows["physics"] == "P1 (fiducial) only"
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "argued, not tested" in meta["caveat"]
+
+
+def test_export_d40_scrub_gate_on_consumer_surfaces(tmp_path):
+    """No internal identifiers on any consumer-facing surface (caveats, CSV
+    headers/values). Internal tags are confined to internal_lineage."""
+    src = _synthetic_d40_per_bin(tmp_path)
+    base = _synthetic_d40_baseline(tmp_path)
+    outs = [
+        X.export_d40_verdict_table(out_dir=str(tmp_path)),
+        X.export_d40_pf_per_bin(out_dir=str(tmp_path), per_bin_json=src),
+        X.export_d40_shape_amplitude_summary(out_dir=str(tmp_path),
+                                             per_bin_json=src, baseline_json=base),
+        X.export_d40_run_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Tier-1", "Tier-2", "Juno", "Sprint")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)

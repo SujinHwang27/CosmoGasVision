@@ -1,0 +1,16 @@
+key,value
+intervention,three loss terms added to the production objective
+loss_term_1,saturation-band weighting of the data loss (weight 3.0)
+loss_term_2,"rank-order pairwise surrogate (weight 0.1, 512 pairs)"
+loss_term_3,band-integrated relative flux-power residual (weight 1.0)
+physics,P1 (fiducial) only
+train_n_rays,64
+train_microbatch,1024
+train_steps,12500
+train_seed,0
+mean_flux_anchor,0.979
+eval_n_rays,1024
+eval_seed,42
+stop_rule,pre-committed FAIL criterion fixed before dispatch
+follow_up_cancelled,all-four-physics full-schedule stage cancelled on falsification
+cost_saved_estimate,~$4-6 / ~6.6 GPU-hr / ~1h37m wall

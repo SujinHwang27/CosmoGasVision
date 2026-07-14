@@ -1,0 +1,24 @@
+{
+  "artifact": "fig2-shape-amplitude-summary.csv",
+  "producing_function": "src.export.export_d40_shape_amplitude_summary",
+  "source_data_path": "experiments/nerf/artifacts/eval/sat_aware_hypc/87dcf9e63564465489f770266fcec197_pf_per_bin.json + experiments/nerf/artifacts/eval/sat_aware_hypc/pubt1_xphysics_pf_perbin.json",
+  "git": {
+    "commit": "facae56",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-14T09:53:54"
+  },
+  "export_timestamp_utc": "2026-07-14T14:53:54.452393+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Shape-vs-amplitude summary of the failure signature: the intervention run (P1) preserves the P_F shape (log-Pearson 0.8346) at a uniformly suppressed ~0.43x amplitude (scatter 0.12), while the production baseline holds amplitude ratio ~0.74-0.98 (scatter 0.31-0.46) across all four feedback variants. The signature is amplitude-shrink WITH shape preservation -- a scale distortion, not a constant collapse. The intervention was run on P1 only: the cross-physics rows describe the BASELINE only, and nothing here licenses a claim about how the intervention would behave on P2-P4. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "internal_lineage": "[D-40] Addendum 1 diagnostics + cross-physics baseline per-bin summary"
+}

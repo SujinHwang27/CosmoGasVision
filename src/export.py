@@ -769,3 +769,334 @@ def export_single_sightline(
         "n_bins": len(rows),
         "representative_ray_global_index": ray_global,
     }
+
+
+# =========================================================================== #
+# ep04 "the-direct-attack" batch — the [D-40] saturation-aware P_F band-loss
+# intervention and its D1 (amplitude-shrink, shape-preserved) collapse.
+# All four exports are BANKED-source: they read decision-record scalars and the
+# on-disk per-bin diagnostic JSONs; nothing is recomputed from sim data.
+# =========================================================================== #
+
+# Banked per-bin diagnostic artifacts ([D-40] Addendum 1; READ, do not recompute).
+D40_PF_PER_BIN_JSON: str = (
+    "experiments/nerf/artifacts/eval/sat_aware_hypc/"
+    "87dcf9e63564465489f770266fcec197_pf_per_bin.json"
+)
+D40_BASELINE_PER_BIN_JSON: str = (
+    "experiments/nerf/artifacts/eval/sat_aware_hypc/pubt1_xphysics_pf_perbin.json"
+)
+
+# [D-40] verdict-of-record scalars (decision record 2026-05-10 + Addendum 1).
+# The training-time loss_pf_band values are ENDPOINTS ONLY, at the precision the
+# decision record banked them: the full per-step trajectory did not survive the
+# compute-site round-trip (the local MLflow store holds only the 50-step smoke
+# run ea2eec25...; the compute-site file store for run 87dcf9e6... was never
+# imported; the banked step-10000 checkpoint carries no loss history).
+D40_VERDICT_OF_RECORD: Dict[str, Any] = {
+    "pf_residual_band_mean": {"sat_aware": 0.5707, "reference": 0.4155,
+                              "reference_source": "production baseline P1 (50k-step schedule)",
+                              "gate": 0.10},
+    "ks_distance": {"sat_aware": 0.1888, "reference": 0.0325,
+                    "reference_source": "production baseline P1 (50k-step schedule)",
+                    "gate": 0.05},
+    "loss_data_at_step_10000": {"sat_aware": 0.0100, "reference": 0.0025,
+                                "reference_source": "preview run at matched step count",
+                                "gate": None},
+    "train_loss_pf_band_start": {"sat_aware": 0.99, "reference": None,
+                                 "reference_source": None, "gate": None},
+    "train_loss_pf_band_final": {"sat_aware": 6.77e-06, "reference": None,
+                                 "reference_source": None, "gate": None},
+}
+D40_TRAIN_STEPS: int = 12500
+
+# [D-40] intervention spec of record (three added loss terms + run config +
+# pre-committed stop discipline).
+D40_RUN_CONFIG: List[Tuple[str, Any]] = [
+    ("intervention", "three loss terms added to the production objective"),
+    ("loss_term_1", "saturation-band weighting of the data loss (weight 3.0)"),
+    ("loss_term_2", "rank-order pairwise surrogate (weight 0.1, 512 pairs)"),
+    ("loss_term_3", "band-integrated relative flux-power residual (weight 1.0)"),
+    ("physics", "P1 (fiducial) only"),
+    ("train_n_rays", 64),
+    ("train_microbatch", 1024),
+    ("train_steps", 12500),
+    ("train_seed", 0),
+    ("mean_flux_anchor", 0.979),
+    ("eval_n_rays", 1024),
+    ("eval_seed", 42),
+    ("stop_rule", "pre-committed FAIL criterion fixed before dispatch"),
+    ("follow_up_cancelled", "all-four-physics full-schedule stage cancelled on falsification"),
+    ("cost_saved_estimate", "~$4-6 / ~6.6 GPU-hr / ~1h37m wall"),
+]
+
+
+def _read_banked_json(path: str) -> Dict[str, Any]:
+    """Read a banked diagnostic JSON (tolerates NaN literals per json spec ext)."""
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def export_d40_verdict_table(out_dir: str) -> Dict[str, Any]:
+    """ep04 fig1: the training-vs-eval contrast as a verdict table (BANKED).
+
+    The episode's decisive datum: the added training term collapsed five orders
+    of magnitude (0.99 -> 6.77e-6 over 12,500 steps) while the eval flux-power
+    residual WORSENED (0.5707 vs the 0.4155 production baseline, +37.4%) and
+    the flux-PDF KS gate broke (0.1888 vs the 0.05 gate). Endpoints only; the
+    per-step trajectory is not recoverable (see D40_VERDICT_OF_RECORD note).
+    """
+    rows: List[Dict[str, Any]] = []
+    for metric, d in D40_VERDICT_OF_RECORD.items():
+        rows.append({
+            "metric": metric,
+            "sat_aware_run": d["sat_aware"],
+            "reference_value": d["reference"] if d["reference"] is not None else "",
+            "reference_source": d["reference_source"] or "",
+            "gate": d["gate"] if d["gate"] is not None else "",
+        })
+    _validate_rows("d40-verdict-table", rows)
+
+    pf = D40_VERDICT_OF_RECORD["pf_residual_band_mean"]
+    worsening_pct = 100.0 * (pf["sat_aware"] - pf["reference"]) / pf["reference"]
+
+    caveat = (
+        "Verdict table of record for the saturation-aware flux-power band-loss "
+        "intervention (P1 only, single seed, 12,500 steps at minimal-intervention "
+        "weights). The training-time band-loss values are ENDPOINTS of record "
+        "(0.99 -> 6.77e-6); the full per-step trajectory did not survive the "
+        "compute-site round-trip, so the five-orders descent must be cited as "
+        "endpoints, never drawn as a curve. The five-orders descent is NOT a "
+        "win: eval flux-power residual worsened +37.4% vs the production "
+        "baseline and the flux-PDF KS gate broke (3.8x over). Reference values "
+        "for P_F/KS come from the 50k-step production baseline (the intervention "
+        "ran 12,500 steps; the FAIL verdict is the pre-committed criterion -- "
+        "verdict-level, with the schedule difference disclosed); loss_data is "
+        "compared at matched step count. Single realization / fixed cosmology "
+        "(Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "train_steps": D40_TRAIN_STEPS,
+        "pf_worsening_pct_vs_baseline": worsening_pct,
+        "ks_over_gate_factor": D40_VERDICT_OF_RECORD["ks_distance"]["sat_aware"] / 0.05,
+        "trajectory_recoverability": (
+            "endpoints only -- local tracker holds the 50-step smoke, not this "
+            "run; compute-site metric store never round-tripped; banked "
+            "step-10000 checkpoint has no loss history"
+        ),
+        "internal_lineage": "[D-40] + Addendum 1; MLflow run 87dcf9e6...; compute job 197319 (train) / 197328 (eval)",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig1-verdict-table.csv",
+        fieldnames=["metric", "sat_aware_run", "reference_value", "reference_source", "gate"],
+        rows=rows,
+        producing_fn="src.export.export_d40_verdict_table",
+        source_data_path="decision record (banked scalars; see internal_lineage)",
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "pf_worsening_pct": worsening_pct}
+
+
+def export_d40_pf_per_bin(
+    out_dir: str,
+    per_bin_json: str = D40_PF_PER_BIN_JSON,
+) -> Dict[str, Any]:
+    """ep04 fig2: per-bin P_F table behind the D1 mechanism (BANKED JSON).
+
+    Ships k, P_F_pred (sat-aware), P_F_truth, pred/truth ratio, relative
+    difference, and the in-gate-band flag. Window-null NaN bins are dropped
+    (matching the ep03 fig1-pf-miss.csv k-axis so the site can overlay the
+    production-baseline curve directly). Re-derives the banked headline
+    diagnostics from the shipped rows and asserts consistency.
+    """
+    d = _read_banked_json(per_bin_json)
+    k = np.asarray(d["k_axis"], dtype=np.float64)
+    p_pred = np.asarray(d["P_pred"], dtype=np.float64)
+    p_truth = np.asarray(d["P_truth"], dtype=np.float64)
+    ratio = np.asarray(d["P_pred_over_P_truth"], dtype=np.float64)
+    rel = np.asarray(d["rel_diff_per_bin"], dtype=np.float64)
+    in_band = np.asarray(d["in_band_mask"], dtype=bool)
+    band_lo, band_hi = (float(x) for x in d["pf_band_s_per_km"])
+
+    if not np.isclose(band_lo, PF_BAND_LO) or not np.isclose(band_hi, PF_BAND_HI):
+        raise AssertionError("banked band edges disagree with the published P_F band.")
+
+    keep = np.isfinite(p_truth) & np.isfinite(p_pred)
+    if in_band[~keep].any():
+        raise AssertionError("a window-null bin lies inside the gate band; refusing to drop it.")
+    k, p_pred, p_truth, ratio, rel, in_band = (
+        a[keep] for a in (k, p_pred, p_truth, ratio, rel, in_band)
+    )
+    _validate_pf("d40-per-bin P_pred", p_pred)
+    _validate_pf("d40-per-bin P_truth", p_truth)
+    if not (np.diff(k) > 0).all() or float(k[0]) <= 0.0:
+        raise AssertionError("k axis not positive/ascending after NaN drop.")
+
+    # Consistency: re-derive the banked headline diagnostics from shipped rows.
+    diag = d["diagnostics"]
+    band_rel = np.abs(rel[in_band])
+    if not np.isclose(float(band_rel.mean()), float(diag["mean_abs_rel_diff_in_band"]), atol=1e-12):
+        raise AssertionError("re-derived in-band |rel diff| mean disagrees with banked diagnostics.")
+    lp, lt = np.log10(p_pred[in_band]), np.log10(p_truth[in_band])
+    pearson = float(np.corrcoef(lp, lt)[0, 1])
+    if not np.isclose(pearson, float(diag["pearson_log_in_band"]), atol=1e-9):
+        raise AssertionError("re-derived in-band log-Pearson disagrees with banked diagnostics.")
+    if not np.isclose(float(ratio[in_band].mean()), float(diag["band_ratio_mean"]), atol=1e-12):
+        raise AssertionError("re-derived in-band ratio mean disagrees with banked diagnostics.")
+
+    rows = [
+        {
+            "k_parallel_s_per_km": float(k[i]),
+            "P_F_sat_aware": float(p_pred[i]),
+            "P_F_truth": float(p_truth[i]),
+            "pred_over_truth": float(ratio[i]),
+            "rel_diff": float(rel[i]),
+            "in_gate_band": int(in_band[i]),
+        }
+        for i in range(k.size)
+    ]
+    _validate_rows("d40-pf-per-bin", rows)
+
+    caveat = (
+        "Per-bin flux power P_F(k_par) for the saturation-aware intervention "
+        "run vs truth (P1, eval n_rays=1024/seed=42). The mechanism table "
+        "behind the failure signature: in the gate band the model preserves the "
+        "SHAPE of P_F (log-space Pearson 0.8346) while rendering it at ~0.43x "
+        "the true amplitude (band ratio mean 0.4293) -- amplitude-shrink with "
+        "shape preservation, NOT a constant-prediction collapse, and NOT the "
+        "flux->1 transparency collapse of the later interventions. Three "
+        "window-null NaN bins dropped (k-axis matches the ep03 fig1-pf-miss.csv "
+        "17-bin axis; overlay the production baseline from that file -- do not "
+        "re-ship it). Single realization / fixed cosmology (Sherwood, one "
+        "60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "pf_band_s_per_km": [band_lo, band_hi],
+        "n_bins_shipped": int(k.size),
+        "n_nan_bins_dropped": int((~keep).sum()),
+        "diagnostics_banked": diag,
+        "pearson_log_rederived": pearson,
+        "internal_lineage": (
+            "[D-40] Addendum 1 per-bin dump (scripts/diag_pf_per_bin.py); "
+            "verdict string of record: " + str(d.get("hypothesis_c_verdict"))
+        ),
+        "checkpoint_of_record": d.get("ckpt_path"),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2-pf-per-bin.csv",
+        fieldnames=["k_parallel_s_per_km", "P_F_sat_aware", "P_F_truth",
+                    "pred_over_truth", "rel_diff", "in_gate_band"],
+        rows=rows,
+        producing_fn="src.export.export_d40_pf_per_bin",
+        source_data_path=per_bin_json,
+        physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "pearson_log_rederived": pearson}
+
+
+def export_d40_shape_amplitude_summary(
+    out_dir: str,
+    per_bin_json: str = D40_PF_PER_BIN_JSON,
+    baseline_json: str = D40_BASELINE_PER_BIN_JSON,
+) -> Dict[str, Any]:
+    """ep04 fig2 companion: shape-vs-amplitude summary, intervention vs the
+    production baseline across all four physics (BANKED JSONs).
+
+    The one-table form of the D1 signature: the intervention preserves shape
+    (Pearson 0.83) at ~0.43x amplitude with LOW bin-to-bin scatter (0.12),
+    while the production baseline holds amplitude ratios ~0.74-0.98 with HIGH
+    scatter (0.31-0.46) -- the intervention traded amplitude for the very term
+    it was told to minimize.
+    """
+    sat = _read_banked_json(per_bin_json)["diagnostics"]
+    base = _read_banked_json(baseline_json)
+
+    rows: List[Dict[str, Any]] = [{
+        "model": "sat_aware_intervention",
+        "physics": "P1",
+        "pearson_log_in_band": float(sat["pearson_log_in_band"]),
+        "amplitude_ratio_mean": float(sat["band_ratio_mean"]),
+        "amplitude_ratio_std": float(sat["band_ratio_std"]),
+        "log10_std_pred_in_band": float(sat["log10_std_pred_in_band"]),
+        "log10_std_truth_in_band": float(sat["log10_std_truth_in_band"]),
+    }]
+    for cell in ("P1", "P2", "P3", "P4"):
+        b = base[cell]
+        rows.append({
+            "model": "production_baseline",
+            "physics": cell,
+            "pearson_log_in_band": float(b["pearson_log"]),
+            "amplitude_ratio_mean": float(b["ratio_mean"]),
+            "amplitude_ratio_std": float(b["ratio_std"]),
+            "log10_std_pred_in_band": float(b["log_std_pred"]),
+            "log10_std_truth_in_band": float(b["log_std_truth"]),
+        })
+    _validate_rows("d40-shape-amplitude", rows)
+
+    caveat = (
+        "Shape-vs-amplitude summary of the failure signature: the intervention "
+        "run (P1) preserves the P_F shape (log-Pearson 0.8346) at a uniformly "
+        "suppressed ~0.43x amplitude (scatter 0.12), while the production "
+        "baseline holds amplitude ratio ~0.74-0.98 (scatter 0.31-0.46) across "
+        "all four feedback variants. The signature is amplitude-shrink WITH "
+        "shape preservation -- a scale distortion, not a constant collapse. The "
+        "intervention was run on P1 only: the cross-physics rows describe the "
+        "BASELINE only, and nothing here licenses a claim about how the "
+        "intervention would behave on P2-P4. Single realization / fixed "
+        "cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "internal_lineage": "[D-40] Addendum 1 diagnostics + cross-physics baseline per-bin summary",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2-shape-amplitude-summary.csv",
+        fieldnames=["model", "physics", "pearson_log_in_band", "amplitude_ratio_mean",
+                    "amplitude_ratio_std", "log10_std_pred_in_band", "log10_std_truth_in_band"],
+        rows=rows,
+        producing_fn="src.export.export_d40_shape_amplitude_summary",
+        source_data_path=f"{per_bin_json} + {baseline_json}",
+        physics_id=[1, 2, 3, 4],
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d40_run_config(out_dir: str) -> Dict[str, Any]:
+    """ep04 spec readout: the intervention's three loss terms, run config, and
+    the pre-committed stop discipline (BANKED from the decision record)."""
+    rows = [{"key": k, "value": str(v)} for k, v in D40_RUN_CONFIG]
+    _validate_rows("d40-run-config", rows)
+    caveat = (
+        "Intervention spec of record: three loss terms added to the unchanged "
+        "production objective, run on the fiducial physics variant only at a "
+        "reduced schedule (12,500 steps vs the production 50k), under a "
+        "pre-committed FAIL criterion fixed before dispatch. On falsification "
+        "the all-four-physics full-schedule follow-up was cancelled (~$4-6 "
+        "saved). The story is the discipline: a small pre-registered test "
+        "retired the intervention family -- not a big experiment failing. "
+        "Weight retuning was NOT attempted: the decision record argues the "
+        "degeneracy is in the loss SHAPE (argued, not tested)."
+    )
+    extra = {"internal_lineage": "[D-40] Spec + Verdict + Tier-2 cancellation clauses"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="spec-run-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows,
+        producing_fn="src.export.export_d40_run_config",
+        physics_id=1,
+        source_data_path="decision record (banked spec; see internal_lineage)",
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

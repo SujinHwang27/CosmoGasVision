@@ -1,0 +1,6 @@
+metric,sat_aware_run,reference_value,reference_source,gate
+pf_residual_band_mean,0.5707,0.4155,production baseline P1 (50k-step schedule),0.1
+ks_distance,0.1888,0.0325,production baseline P1 (50k-step schedule),0.05
+loss_data_at_step_10000,0.01,0.0025,preview run at matched step count,
+train_loss_pf_band_start,0.99,,,
+train_loss_pf_band_final,6.77e-06,,,
