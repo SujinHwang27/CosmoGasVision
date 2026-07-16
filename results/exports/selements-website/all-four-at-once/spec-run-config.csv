@@ -1,0 +1,11 @@
+key,value
+intervention,"pool all four Sherwood feedback variants into ONE network, with a learned 16-dimensional code per variant appended to the input (the data axis; loss UNCHANGED)"
+rationale,the deficit had looked the same in all four variants from the start; read that sameness as a signal -- pooling multiplies the strong-absorption examples each gradient step sees at fixed sightline budget
+design_scale,"full design: 1,024 sightlines per variant (4,096 pooled), interleaved per microbatch -- never dispatched"
+smoke_scale,"the 50-step smoke pooled 1,024 sightlines TOTAL across the four variants (microbatch 64, seed 0, 498,244 params)"
+gate_discipline,"seven pre-committed gates; gate 3 HARDENED per the banked lesson of the last two collapses (mean flux tested away from BOTH the anchor and 1.000); gate 7 (label distinctness) NEW, added by the audit against the one residual risk it named"
+audit_residual_risk,the audit named 'the network ignores the labels' as the residual risk and built gate 7 to catch it; the failure arrived at a surface downstream of the labels instead -- gate 7 passed while the density heads died
+verdict,"3/7 gates FAIL (flat loss; the tell in four-part unison; all four density heads ~10,000x below the spread floor) -> retired at smoke"
+what_ran,"50 steps, 196.6 s, on the host machine's GPU; no paid dispatch"
+cost,"spent ~$0 paid (minutes of host compute); the paid full-scale ladder (~$1.50 first stage, ~$10-15 if escalated) was cancelled unrun"
+stop_rule,any single gate FAIL retires the intervention at smoke; the follow-up full-scale sprint was cancelled per the pre-committed stop

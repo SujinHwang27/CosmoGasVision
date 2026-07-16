@@ -3,12 +3,12 @@
   "producing_function": "src.export.export_d41_verdict_table",
   "source_data_path": "decision record (banked scalars; see internal_lineage)",
   "git": {
-    "commit": "d1fadd9",
+    "commit": "729fbdf",
     "branch": "service/data-export",
     "dirty": "True",
-    "timestamp": "2026-07-14T12:02:19"
+    "timestamp": "2026-07-16T12:43:30"
   },
-  "export_timestamp_utc": "2026-07-14T17:02:19.989270+00:00",
+  "export_timestamp_utc": "2026-07-16T17:43:30.140216+00:00",
   "n_rays_eval": 1024,
   "eval_seed": 42,
   "physics_id": 1,

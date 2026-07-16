@@ -1,0 +1,24 @@
+{
+  "artifact": "fig2b-embedding-distances.csv",
+  "producing_function": "src.export.export_d46_embedding_distances",
+  "source_data_path": "experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json",
+  "git": {
+    "commit": "729fbdf",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-16T12:54:06"
+  },
+  "export_timestamp_utc": "2026-07-16T17:54:06.956669+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "All six pairwise distances between the four learned 16-dimensional physics codes at step 50: 4.6 to 7.0, every pair 46x-70x above the 0.1 distinctness floor. This is the ALIVE half of the failure signature: the network did not ignore the labels -- it learned four genuinely distinct codes and routed all four into the same trivial-flux solution (fig2a). Licensed reading stops there: distinct codes at the conditioning layer certify only that the labels were not collapsed -- the record's own lesson is that this gate alone cannot certify the codes were doing physics-relevant work. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-46] Addendum 2 (gate 7); experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json"
+}

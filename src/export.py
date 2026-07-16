@@ -1343,7 +1343,7 @@ def export_d41_verdict_table(out_dir: str) -> Dict[str, Any]:
         {"stage": "smoke", "metric": "tau_amp_end", "value": 0.9906,
          "reference": "guard range", "reading": "calibration guard held; escape was through the fields"},
         {"stage": "confirmation", "metric": "pf_residual_band_mean", "value": 0.999965,
-         "reference": "production baseline 0.4155",
+         "reference": "production baseline 0.4155 (verdict-level only; no multiple licensed against a ceiling-saturated residual)",
          "reading": "residual pinned at its ~1.0 ceiling: essentially no flux structure at all"},
         {"stage": "confirmation", "metric": "ks_distance", "value": 0.0,
          "reference": "gate 0.05",
@@ -1687,6 +1687,306 @@ def export_d42_run_config(out_dir: str) -> Dict[str, Any]:
         producing_fn="src.export.export_d42_run_config",
         source_data_path="decision record (banked spec; see internal_lineage)",
         physics_id=1,
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep07 "all-four-at-once" batch — the [D-46] physics_id-embedding joint
+# training (data axis) and its D4 combined-trivial-collapse-with-active-
+# embedding, retired at a 50-step P-mixed host smoke; the epic that closes
+# the four-axis cascade. UNLIKE ep06, the on-disk gates JSON is HEALTHY
+# (full loss_history + structured per-gate readouts + the complete pairwise
+# embedding-distance matrix) — every artifact here is RE-READ from it, with
+# consistency asserts against the decision-record Addendum table. The
+# per-step mean-flux trace was NOT logged (endpoints only, per physics).
+# =========================================================================== #
+
+D46_GATES_JSON: str = (
+    "experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json"
+)
+D46_PHYSICS_LABELS: List[str] = ["P1 (no feedback)", "P2 (stellar)", "P3 (AGN)", "P4 (strong AGN)"]
+
+# Banked consistency anchors (decision-record Addendum gate table).
+D46_BANKED: Dict[str, Any] = {
+    "gate2_ratio": 1.0036, "gate4_tau_amp": 0.991,
+    "gate5_spreads": [6.4e-5, 7.5e-6, 2.0e-4, 8.9e-7],
+    "gate7_max_l2": 7.045, "n_pass": 4, "n_fail": 3,
+}
+
+
+def _read_d46_gates(gates_json: str) -> Dict[str, Any]:
+    d = _read_banked_json(gates_json)
+    g = d["gates"]
+    # Consistency vs the banked Addendum table.
+    if abs(g["gate_2_loss_descent"]["observed_ratio"] - D46_BANKED["gate2_ratio"]) > 5e-4:
+        raise AssertionError("gate-2 ratio disagrees with the banked record.")
+    if abs(g["gate_4_tau_amp_window"]["observed"] - D46_BANKED["gate4_tau_amp"]) > 5e-3:
+        raise AssertionError("gate-4 tau_amp disagrees with the banked record.")
+    for got, banked in zip(g["gate_5_density_spread"]["observed_spread_per_physics"],
+                           D46_BANKED["gate5_spreads"]):
+        if abs(got - banked) > 0.1 * banked:
+            raise AssertionError("gate-5 spreads disagree with the banked record.")
+    if abs(g["gate_7_embedding_nondegeneracy"]["observed_max"] - D46_BANKED["gate7_max_l2"]) > 1e-2:
+        raise AssertionError("gate-7 max L2 disagrees with the banked record.")
+    n_pass = sum(1 for v in g.values() if v["pass"])
+    if (n_pass, len(g) - n_pass) != (D46_BANKED["n_pass"], D46_BANKED["n_fail"]):
+        raise AssertionError("gate tally disagrees with the banked 4 PASS / 3 FAIL.")
+    return d
+
+
+def export_d46_gate_table(out_dir: str, gates_json: str = D46_GATES_JSON) -> Dict[str, Any]:
+    """ep07 fig1: the seven pre-committed smoke gates, RE-READ from the healthy
+    on-disk gates JSON (consistency-asserted against the decision record)."""
+    d = _read_d46_gates(gates_json)
+    g = d["gates"]
+    rows: List[Dict[str, Any]] = [
+        {"gate": "1", "label": "No NaN anywhere", "measured": "all finite",
+         "floor_or_threshold": "no NaN/Inf", "verdict": "PASS"},
+        {"gate": "2", "label": "Training loss keeps descending",
+         "measured": f"ratio {g['gate_2_loss_descent']['observed_ratio']:.4f} "
+                     f"({g['gate_2_loss_descent']['observed_loss_ref']:.5f} at step 10 -> "
+                     f"{g['gate_2_loss_descent']['observed_loss_end']:.5f} at step 50)",
+         "floor_or_threshold": "step-50/step-10 < 0.85",
+         "verdict": "FAIL (flat after step 10)"},
+        {"gate": "3", "label": "Mean flux inside a healthy window and at least a hair away from 1.000 (hardened after the last two collapses)",
+         "measured": "per-variant [1.000, 1.000, 1.000, 1.000]",
+         "floor_or_threshold": "within [0.5, 0.99] AND at least 0.001 away from 1.000",
+         "verdict": "FAIL (the tell, in four-part unison -- and this time the gate caught it)"},
+        {"gate": "4", "label": "Absorption-amplitude knob stable",
+         "measured": f"{g['gate_4_tau_amp_window']['observed']:.4f}",
+         "floor_or_threshold": "within [0.5, 2.0]", "verdict": "PASS"},
+        {"gate": "5", "label": "Density field keeps spread, per variant (anti-collapse floor)",
+         "measured": "[6.4e-5, 7.5e-6, 2.0e-4, 8.9e-7]",
+         "floor_or_threshold": "spread > 1.45 each",
+         "verdict": "FAIL (7,264x to 1,624,925x below floor -- all four dead)"},
+        {"gate": "6", "label": "Neutral-fraction field keeps spread, per variant (anti-collapse floor)",
+         "measured": "[3.5e-3, 1.0e-3, 6.8e-3, 2.9e-4]",
+         "floor_or_threshold": "spread > 6e-5 each",
+         "verdict": "PASS (4.9x-113x above floor)"},
+        {"gate": "7", "label": "The four physics labels stay distinct in the learned embedding (new this episode)",
+         "measured": f"max pairwise distance {g['gate_7_embedding_nondegeneracy']['observed_max']:.3f} (all six pairs 4.6-7.0)",
+         "floor_or_threshold": "max pairwise distance > 0.1",
+         "verdict": "PASS (distinct codes -- and that is the strange part)"},
+    ]
+    _validate_rows("d46-gate-table", rows)
+    caveat = (
+        "The seven pre-committed smoke gates for the pooled-physics "
+        "intervention; the gate set hardened again this episode (gate 3 now "
+        "tests the mean flux away from BOTH the anchor and 1.000 -- the "
+        "banked lesson of the last two collapses -- and gate 7, embedding "
+        "distinctness, is new). 3/7 FAIL: the loss went flat after step 10 "
+        "(ratio 1.0036), the mean flux landed on 1.000 in all four variants "
+        "at once (the tell's third appearance -- caught cleanly this time), "
+        "and every density head collapsed between ~7,000x and ~1,600,000x "
+        "below the spread floor. "
+        "4/7 PASS -- including gate 7: the four labels stayed genuinely "
+        "distinct while all four routes led to the same transparent gas. "
+        "Values re-read from the on-disk gate readout (healthy this run) and "
+        "consistency-checked against the decision record. Single realization "
+        "/ fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "n_pass": 4, "n_fail": 3,
+        "run_config": {k: d[k] for k in ("steps_completed", "training_seconds",
+                                         "model_params", "hidden_dim",
+                                         "n_rays_pooled", "microbatch", "seed")},
+        "internal_lineage": f"[D-46] Addendum 2 gate table; {D46_GATES_JSON}; scripts/d46_50step_host_smoke.py",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig1-gate-table.csv",
+        fieldnames=["gate", "label", "measured", "floor_or_threshold", "verdict"],
+        rows=rows,
+        producing_fn="src.export.export_d46_gate_table",
+        source_data_path=gates_json,
+        physics_id=[1, 2, 3, 4],
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d46_d4_signature(out_dir: str, gates_json: str = D46_GATES_JSON) -> Dict[str, Any]:
+    """ep07 fig2a: the D4 per-variant signature -- dead density heads, alive
+    X_HI heads, the tell in unison. RE-READ from the gates JSON."""
+    d = _read_d46_gates(gates_json)
+    g = d["gates"]
+    dens = g["gate_5_density_spread"]["observed_spread_per_physics"]
+    xhi = g["gate_6_xhi_spread"]["observed_spread_per_physics"]
+    mf = g["gate_3_mean_F_window"]["observed_per_physics"]
+    rows: List[Dict[str, Any]] = []
+    for i, label in enumerate(D46_PHYSICS_LABELS):
+        rows.append({
+            "physics": f"P{i+1}", "label": label,
+            "density_spread": float(dens[i]), "density_floor": 1.45,
+            "density_vs_floor": f"{1.45/dens[i]:,.0f}x below floor",
+            "xhi_spread": float(xhi[i]), "xhi_floor": 6e-5,
+            "xhi_vs_floor": f"{xhi[i]/6e-5:.1f}x above floor",
+            "mean_flux": float(mf[i]),
+        })
+    _validate_rows("d46-d4-signature", rows)
+    if not all(r["density_spread"] < 1.45 and r["xhi_spread"] > 6e-5 for r in rows):
+        raise AssertionError("D4 signature expects all density FAIL + all X_HI PASS.")
+    caveat = (
+        "The D4 signature, per physics variant, at step 50: in every one of "
+        "the four variants the density head collapsed to a near-uniform "
+        "near-zero sliver (spreads 8.9e-7 to 2.0e-4 against a 1.45 floor -- "
+        "four dead heads) while the neutral-fraction head kept structure "
+        "(spreads 4.9x to 113x above its floor) and the mean flux landed on "
+        "1.000 -- the transparent-gas tell, in four-part unison. Read "
+        "alongside the embedding distances (fig2b): the four variants were "
+        "given genuinely distinct learned labels, and all four arrived at "
+        "the same trivial solution. Step-50 endpoints (the per-step per-head "
+        "trace was not logged). Single realization / fixed cosmology "
+        "(Sherwood, one 60 cMpc/h box); z=0.3 scope-lock."
+    )
+    extra = {
+        "density_min_per_physics": g["gate_5_density_spread"]["observed_min_per_physics"],
+        "density_max_per_physics": g["gate_5_density_spread"]["observed_max_per_physics"],
+        "xhi_min_per_physics": g["gate_6_xhi_spread"]["observed_min_per_physics"],
+        "xhi_max_per_physics": g["gate_6_xhi_spread"]["observed_max_per_physics"],
+        "internal_lineage": f"[D-46] Addendum 2 (gates 3/5/6); {D46_GATES_JSON}",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2a-d4-signature.csv",
+        fieldnames=["physics", "label", "density_spread", "density_floor", "density_vs_floor",
+                    "xhi_spread", "xhi_floor", "xhi_vs_floor", "mean_flux"],
+        rows=rows,
+        producing_fn="src.export.export_d46_d4_signature",
+        source_data_path=gates_json,
+        physics_id=[1, 2, 3, 4],
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d46_embedding_distances(out_dir: str, gates_json: str = D46_GATES_JSON) -> Dict[str, Any]:
+    """ep07 fig2b: the full pairwise embedding-distance matrix -- the ALIVE
+    half of D4 (four distinct codes). RE-READ from the gates JSON."""
+    d = _read_d46_gates(gates_json)
+    pairs = d["gates"]["gate_7_embedding_nondegeneracy"]["observed_pairwise"]
+    if len(pairs) != 6:
+        raise AssertionError(f"expected 6 embedding pairs, got {len(pairs)}.")
+    rows = [{
+        "pair": f"P{p['p_i']+1}-P{p['p_j']+1}",
+        "label": f"{D46_PHYSICS_LABELS[p['p_i']]} vs {D46_PHYSICS_LABELS[p['p_j']]}",
+        "embedding_distance_l2": float(p["l2"]),
+        "floor": 0.1,
+    } for p in pairs]
+    _validate_rows("d46-embedding-distances", rows)
+    caveat = (
+        "All six pairwise distances between the four learned 16-dimensional "
+        "physics codes at step 50: 4.6 to 7.0, every pair 46x-70x above the "
+        "0.1 distinctness floor. This is the ALIVE half of the failure "
+        "signature: the network did not ignore the labels -- it learned four "
+        "genuinely distinct codes and routed all four into the same "
+        "trivial-flux solution (fig2a). Licensed reading stops there: "
+        "distinct codes at the conditioning layer certify only that the "
+        "labels were not collapsed -- the record's own lesson is that this "
+        "gate alone cannot certify the codes were doing physics-relevant "
+        "work. Single realization / fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": f"[D-46] Addendum 2 (gate 7); {D46_GATES_JSON}"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig2b-embedding-distances.csv",
+        fieldnames=["pair", "label", "embedding_distance_l2", "floor"],
+        rows=rows,
+        producing_fn="src.export.export_d46_embedding_distances",
+        source_data_path=gates_json,
+        physics_id=[1, 2, 3, 4],
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d46_loss_trace(out_dir: str, gates_json: str = D46_GATES_JSON) -> Dict[str, Any]:
+    """ep07 fig3: the 50-step loss history -- the flat-after-step-10 story.
+    RE-READ from the gates JSON. The per-step mean-flux trace was NOT logged
+    (endpoints only); this is the one plottable trajectory."""
+    d = _read_d46_gates(gates_json)
+    hist = d["loss_history"]
+    if len(hist) != 50:
+        raise AssertionError(f"expected 50 loss steps, got {len(hist)}.")
+    rows = [{"step": i + 1, "loss_total": float(v)} for i, v in enumerate(hist)]
+    _validate_rows("d46-loss-trace", rows)
+    caveat = (
+        "The 50-step training-loss history for the pooled-physics smoke: the "
+        "loss reaches ~0.013 by step 10 and stays there -- step-50/step-10 "
+        "ratio 1.0036 against the <0.85 descent gate; the wiggle is noise "
+        "around a flat line, not descent. This is the one per-step trajectory "
+        "that was logged: the per-step mean flux was NOT (its per-variant "
+        "step-50 endpoints, all 1.000, are in fig1/fig2a) -- so the tell is "
+        "cited as endpoints, and only this loss curve is drawn. Single "
+        "realization / fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "gate2_ratio": d["gates"]["gate_2_loss_descent"]["observed_ratio"],
+        "mean_flux_trace": "NOT logged per step; per-variant endpoints only (see fig1/fig2a)",
+        "internal_lineage": f"[D-46] Addendum 2 (gate 2); {D46_GATES_JSON}",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="fig3-loss-trace.csv",
+        fieldnames=["step", "loss_total"],
+        rows=rows,
+        producing_fn="src.export.export_d46_loss_trace",
+        source_data_path=gates_json,
+        physics_id=[1, 2, 3, 4],
+        caveat=caveat,
+        extra_sidecar=extra,
+    )
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+D46_RUN_CONFIG: List[Tuple[str, Any]] = [
+    ("intervention", "pool all four Sherwood feedback variants into ONE network, with a learned 16-dimensional code per variant appended to the input (the data axis; loss UNCHANGED)"),
+    ("rationale", "the deficit had looked the same in all four variants from the start; read that sameness as a signal -- pooling multiplies the strong-absorption examples each gradient step sees at fixed sightline budget"),
+    ("design_scale", "full design: 1,024 sightlines per variant (4,096 pooled), interleaved per microbatch -- never dispatched"),
+    ("smoke_scale", "the 50-step smoke pooled 1,024 sightlines TOTAL across the four variants (microbatch 64, seed 0, 498,244 params)"),
+    ("gate_discipline", "seven pre-committed gates; gate 3 HARDENED per the banked lesson of the last two collapses (mean flux tested away from BOTH the anchor and 1.000); gate 7 (label distinctness) NEW, added by the audit against the one residual risk it named"),
+    ("audit_residual_risk", "the audit named 'the network ignores the labels' as the residual risk and built gate 7 to catch it; the failure arrived at a surface downstream of the labels instead -- gate 7 passed while the density heads died"),
+    ("verdict", "3/7 gates FAIL (flat loss; the tell in four-part unison; all four density heads ~10,000x below the spread floor) -> retired at smoke"),
+    ("what_ran", "50 steps, 196.6 s, on the host machine's GPU; no paid dispatch"),
+    ("cost", "spent ~$0 paid (minutes of host compute); the paid full-scale ladder (~$1.50 first stage, ~$10-15 if escalated) was cancelled unrun"),
+    ("stop_rule", "any single gate FAIL retires the intervention at smoke; the follow-up full-scale sprint was cancelled per the pre-committed stop"),
+]
+
+
+def export_d46_run_config(out_dir: str) -> Dict[str, Any]:
+    """ep07 spec readout (BANKED): pooling design, gate hardening lineage,
+    stop discipline, cost."""
+    rows = [{"key": k, "value": str(v)} for k, v in D46_RUN_CONFIG]
+    _validate_rows("d46-run-config", rows)
+    caveat = (
+        "Intervention spec of record for the fourth counterfactual, the data "
+        "axis. Two scale numbers must never be conflated: the DESIGN pooled "
+        "1,024 sightlines per variant (4,096 total), but the smoke that "
+        "retired it pooled 1,024 total -- the design scale was never "
+        "dispatched. The loss is byte-unchanged; the intervention is the "
+        "data distribution plus a learned label. The gate set is itself part "
+        "of the story: gate 3 is the previous episodes' tell-lesson written "
+        "into procedure, and it fired correctly this time; gate 7 is the "
+        "audit's named residual risk made into a check, and it passed -- the "
+        "failure came from a surface the audit did not name. Cost stated the "
+        "right way around: ~$0 paid spent; the paid ladder cancelled unrun. "
+        "Single realization / fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": "[D-46] design spec (hypothesis, math contract, smoke gates, falsification rules) + Addendum 2 verdict; [D-53] hook"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir),
+        filename="spec-run-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows,
+        producing_fn="src.export.export_d46_run_config",
+        source_data_path="decision record (banked spec; see internal_lineage)",
+        physics_id=[1, 2, 3, 4],
         caveat=caveat,
         extra_sidecar=extra,
     )

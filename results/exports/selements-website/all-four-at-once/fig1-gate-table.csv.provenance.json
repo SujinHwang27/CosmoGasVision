@@ -1,0 +1,35 @@
+{
+  "artifact": "fig1-gate-table.csv",
+  "producing_function": "src.export.export_d46_gate_table",
+  "source_data_path": "experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json",
+  "git": {
+    "commit": "729fbdf",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-16T12:54:06"
+  },
+  "export_timestamp_utc": "2026-07-16T17:54:06.766081+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The seven pre-committed smoke gates for the pooled-physics intervention; the gate set hardened again this episode (gate 3 now tests the mean flux away from BOTH the anchor and 1.000 -- the banked lesson of the last two collapses -- and gate 7, embedding distinctness, is new). 3/7 FAIL: the loss went flat after step 10 (ratio 1.0036), the mean flux landed on 1.000 in all four variants at once (the tell's third appearance -- caught cleanly this time), and every density head collapsed between ~7,000x and ~1,600,000x below the spread floor. 4/7 PASS -- including gate 7: the four labels stayed genuinely distinct while all four routes led to the same transparent gas. Values re-read from the on-disk gate readout (healthy this run) and consistency-checked against the decision record. Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "n_pass": 4,
+  "n_fail": 3,
+  "run_config": {
+    "steps_completed": 50,
+    "training_seconds": 196.5784363999992,
+    "model_params": 498244,
+    "hidden_dim": 256,
+    "n_rays_pooled": 1024,
+    "microbatch": 64,
+    "seed": 0
+  },
+  "internal_lineage": "[D-46] Addendum 2 gate table; experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json; scripts/d46_50step_host_smoke.py"
+}

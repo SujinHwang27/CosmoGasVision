@@ -635,3 +635,130 @@ def test_export_d42_scrub_gate_on_consumer_surfaces(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep07 "all-four-at-once" batch ([D-46] healthy-JSON re-reads). Synthetic
+# fixture mirrors the real gates-JSON schema.
+# --------------------------------------------------------------------------- #
+def _synthetic_d46_gates(tmp_path: Path, tamper_ratio: bool = False,
+                         flip_gate6: bool = False) -> str:
+    payload = {
+        "run_id": "synthetic", "steps_completed": 50, "training_seconds": 196.6,
+        "model_params": 498244, "hidden_dim": 256, "n_rays_pooled": 1024,
+        "microbatch": 64, "seed": 0,
+        "loss_history": [0.0267] * 9 + [0.013431730680167675] + [0.014] * 39
+                        + [0.013479930348694324],
+        "gates": {
+            "gate_1_no_nan_inf": {"pass": True},
+            "gate_2_loss_descent": {"pass": False,
+                                    "observed_ratio": 1.5 if tamper_ratio else 1.0035884927768703,
+                                    "observed_loss_ref": 0.013431730680167675,
+                                    "observed_loss_end": 0.013479930348694324},
+            "gate_3_mean_F_window": {"pass": False,
+                                     "observed_per_physics": [1.0, 1.0, 1.0, 1.0],
+                                     "observed_overall": 1.0},
+            "gate_4_tau_amp_window": {"pass": True, "observed": 0.9907260537147522},
+            "gate_5_density_spread": {"pass": False,
+                                      "observed_spread_per_physics": [6.37e-05, 7.55e-06, 2.0e-04, 8.92e-07],
+                                      "observed_min_per_physics": [1e-10] * 4,
+                                      "observed_max_per_physics": [6.4e-05, 7.6e-06, 2.0e-04, 9e-07]},
+            "gate_6_xhi_spread": {"pass": not flip_gate6,
+                                  "observed_spread_per_physics": (
+                                      [1e-6] * 4 if flip_gate6
+                                      else [3.49e-03, 1.01e-03, 6.76e-03, 2.91e-04]),
+                                  "observed_min_per_physics": [5e-06, 2e-06, 1.4e-05, 5e-07],
+                                  "observed_max_per_physics": [3.5e-03, 1.0e-03, 6.8e-03, 2.9e-04]},
+            "gate_7_embedding_nondegeneracy": {"pass": True, "observed_max": 7.045214653015137,
+                                               "observed_pairwise": [
+                                                   {"p_i": 0, "p_j": 1, "l2": 5.166},
+                                                   {"p_i": 0, "p_j": 2, "l2": 5.003},
+                                                   {"p_i": 0, "p_j": 3, "l2": 6.141},
+                                                   {"p_i": 1, "p_j": 2, "l2": 4.600},
+                                                   {"p_i": 1, "p_j": 3, "l2": 7.045214653015137},
+                                                   {"p_i": 2, "p_j": 3, "l2": 6.932}]},
+        },
+    }
+    p = tmp_path / "d46_gates.json"
+    p.write_text(json.dumps(payload))
+    return str(p)
+
+
+def test_export_d46_gate_table(tmp_path):
+    src = _synthetic_d46_gates(tmp_path)
+    res = X.export_d46_gate_table(out_dir=str(tmp_path), gates_json=src)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 7
+    assert "four-part unison" in rows[2]["verdict"]
+    assert "hardened" in rows[2]["label"]
+    assert all(" " in r["label"] for r in rows)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "caught cleanly this time" in meta["caveat"]
+
+
+def test_export_d46_rejects_banked_drift(tmp_path):
+    src = _synthetic_d46_gates(tmp_path, tamper_ratio=True)
+    with pytest.raises(AssertionError, match="gate-2 ratio disagrees"):
+        X.export_d46_gate_table(out_dir=str(tmp_path), gates_json=src)
+
+
+def test_export_d46_d4_signature(tmp_path):
+    src = _synthetic_d46_gates(tmp_path)
+    res = X.export_d46_d4_signature(out_dir=str(tmp_path), gates_json=src)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 4
+    assert all(float(r["mean_flux"]) == 1.0 for r in rows)
+    assert "x below floor" in rows[0]["density_vs_floor"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "four-part unison" in meta["caveat"]
+    assert "not logged" in meta["caveat"]
+
+
+def test_export_d46_d4_signature_requires_split_pattern(tmp_path):
+    src = _synthetic_d46_gates(tmp_path, flip_gate6=True)
+    with pytest.raises(AssertionError):
+        X.export_d46_d4_signature(out_dir=str(tmp_path), gates_json=src)
+
+
+def test_export_d46_embedding_distances(tmp_path):
+    src = _synthetic_d46_gates(tmp_path)
+    res = X.export_d46_embedding_distances(out_dir=str(tmp_path), gates_json=src)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 6
+    assert max(float(r["embedding_distance_l2"]) for r in rows) == pytest.approx(7.0452, abs=1e-3)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: the licensed-reading stop.
+    assert "cannot certify" in meta["caveat"]
+
+
+def test_export_d46_loss_trace_and_config(tmp_path):
+    src = _synthetic_d46_gates(tmp_path)
+    res = X.export_d46_loss_trace(out_dir=str(tmp_path), gates_json=src)
+    assert res["n_rows"] == 50
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "NOT logged" in meta["mean_flux_trace"]
+    res4 = X.export_d46_run_config(out_dir=str(tmp_path))
+    rows = {r["key"]: r["value"] for r in _read_csv(Path(res4["artifact"]))}
+    assert "never dispatched" in rows["design_scale"]
+    assert "1,024 sightlines TOTAL" in rows["smoke_scale"]
+    meta4 = json.loads(Path(res4["sidecar"]).read_text())
+    assert "never be conflated" in meta4["caveat"]
+
+
+def test_export_d46_scrub_gate_on_consumer_surfaces(tmp_path):
+    src = _synthetic_d46_gates(tmp_path)
+    outs = [
+        X.export_d46_gate_table(out_dir=str(tmp_path), gates_json=src),
+        X.export_d46_d4_signature(out_dir=str(tmp_path), gates_json=src),
+        X.export_d46_embedding_distances(out_dir=str(tmp_path), gates_json=src),
+        X.export_d46_loss_trace(out_dir=str(tmp_path), gates_json=src),
+        X.export_d46_run_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Tier-1", "Juno", "Sprint", "sprint-6",
+              "d46", "1778675261", "physics_id")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)

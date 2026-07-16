@@ -1,0 +1,8 @@
+gate,label,measured,floor_or_threshold,verdict
+1,No NaN anywhere,all finite,no NaN/Inf,PASS
+2,Training loss keeps descending,ratio 1.0036 (0.01343 at step 10 -> 0.01348 at step 50),step-50/step-10 < 0.85,FAIL (flat after step 10)
+3,Mean flux inside a healthy window and at least a hair away from 1.000 (hardened after the last two collapses),"per-variant [1.000, 1.000, 1.000, 1.000]","within [0.5, 0.99] AND at least 0.001 away from 1.000","FAIL (the tell, in four-part unison -- and this time the gate caught it)"
+4,Absorption-amplitude knob stable,0.9907,"within [0.5, 2.0]",PASS
+5,"Density field keeps spread, per variant (anti-collapse floor)","[6.4e-5, 7.5e-6, 2.0e-4, 8.9e-7]",spread > 1.45 each,"FAIL (7,264x to 1,624,925x below floor -- all four dead)"
+6,"Neutral-fraction field keeps spread, per variant (anti-collapse floor)","[3.5e-3, 1.0e-3, 6.8e-3, 2.9e-4]",spread > 6e-5 each,PASS (4.9x-113x above floor)
+7,The four physics labels stay distinct in the learned embedding (new this episode),max pairwise distance 7.045 (all six pairs 4.6-7.0),max pairwise distance > 0.1,PASS (distinct codes -- and that is the strange part)

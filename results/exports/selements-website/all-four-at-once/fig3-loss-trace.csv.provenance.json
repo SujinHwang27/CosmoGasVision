@@ -1,0 +1,26 @@
+{
+  "artifact": "fig3-loss-trace.csv",
+  "producing_function": "src.export.export_d46_loss_trace",
+  "source_data_path": "experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json",
+  "git": {
+    "commit": "729fbdf",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-16T12:54:07"
+  },
+  "export_timestamp_utc": "2026-07-16T17:54:07.040741+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The 50-step training-loss history for the pooled-physics smoke: the loss reaches ~0.013 by step 10 and stays there -- step-50/step-10 ratio 1.0036 against the <0.85 descent gate; the wiggle is noise around a flat line, not descent. This is the one per-step trajectory that was logged: the per-step mean flux was NOT (its per-variant step-50 endpoints, all 1.000, are in fig1/fig2a) -- so the tell is cited as endpoints, and only this loss curve is drawn. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "gate2_ratio": 1.0035884927768703,
+  "mean_flux_trace": "NOT logged per step; per-variant endpoints only (see fig1/fig2a)",
+  "internal_lineage": "[D-46] Addendum 2 (gate 2); experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json"
+}

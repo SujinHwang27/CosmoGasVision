@@ -1,0 +1,24 @@
+{
+  "artifact": "spec-run-config.csv",
+  "producing_function": "src.export.export_d46_run_config",
+  "source_data_path": "decision record (banked spec; see internal_lineage)",
+  "git": {
+    "commit": "729fbdf",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-16T12:54:07"
+  },
+  "export_timestamp_utc": "2026-07-16T17:54:07.130404+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Intervention spec of record for the fourth counterfactual, the data axis. Two scale numbers must never be conflated: the DESIGN pooled 1,024 sightlines per variant (4,096 total), but the smoke that retired it pooled 1,024 total -- the design scale was never dispatched. The loss is byte-unchanged; the intervention is the data distribution plus a learned label. The gate set is itself part of the story: gate 3 is the previous episodes' tell-lesson written into procedure, and it fired correctly this time; gate 7 is the audit's named residual risk made into a check, and it passed -- the failure came from a surface the audit did not name. Cost stated the right way around: ~$0 paid spent; the paid ladder cancelled unrun. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-46] design spec (hypothesis, math contract, smoke gates, falsification rules) + Addendum 2 verdict; [D-53] hook"
+}

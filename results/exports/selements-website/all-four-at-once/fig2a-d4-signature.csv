@@ -1,0 +1,5 @@
+physics,label,density_spread,density_floor,density_vs_floor,xhi_spread,xhi_floor,xhi_vs_floor,mean_flux
+P1,P1 (no feedback),6.367317765210156e-05,1.45,"22,773x below floor",0.003490230489660462,6e-05,58.2x above floor,1.0
+P2,P2 (stellar),7.547960120229957e-06,1.45,"192,105x below floor",0.001012219731364894,6e-05,16.9x above floor,1.0
+P3,P3 (AGN),0.00019961799819867565,1.45,"7,264x below floor",0.00676296691835887,6e-05,112.7x above floor,1.0
+P4,P4 (strong AGN),8.92348983474664e-07,1.45,"1,624,925x below floor",0.0002913196908593818,6e-05,4.9x above floor,1.0

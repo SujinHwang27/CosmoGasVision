@@ -1,0 +1,48 @@
+{
+  "artifact": "fig2a-d4-signature.csv",
+  "producing_function": "src.export.export_d46_d4_signature",
+  "source_data_path": "experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json",
+  "git": {
+    "commit": "729fbdf",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-16T12:54:06"
+  },
+  "export_timestamp_utc": "2026-07-16T17:54:06.874536+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The D4 signature, per physics variant, at step 50: in every one of the four variants the density head collapsed to a near-uniform near-zero sliver (spreads 8.9e-7 to 2.0e-4 against a 1.45 floor -- four dead heads) while the neutral-fraction head kept structure (spreads 4.9x to 113x above its floor) and the mean flux landed on 1.000 -- the transparent-gas tell, in four-part unison. Read alongside the embedding distances (fig2b): the four variants were given genuinely distinct learned labels, and all four arrived at the same trivial solution. Step-50 endpoints (the per-step per-head trace was not logged). Single realization / fixed cosmology (Sherwood, one 60 cMpc/h box); z=0.3 scope-lock.",
+  "density_min_per_physics": [
+    8.447332833227961e-10,
+    1.7196891133330894e-10,
+    4.825658095342078e-09,
+    1.7034049518138694e-11
+  ],
+  "density_max_per_physics": [
+    6.367402238538489e-05,
+    7.548132089141291e-06,
+    0.000199622823856771,
+    8.923660175241821e-07
+  ],
+  "xhi_min_per_physics": [
+    5.115333806315903e-06,
+    2.0337424757599365e-06,
+    1.403090118401451e-05,
+    5.30232227902161e-07
+  ],
+  "xhi_max_per_physics": [
+    0.003495345823466778,
+    0.001014253473840654,
+    0.006776997819542885,
+    0.00029184992308728397
+  ],
+  "internal_lineage": "[D-46] Addendum 2 (gates 3/5/6); experiments/nerf/artifacts/eval/d46_smoke/d46_smoke_1778675261_gates.json"
+}

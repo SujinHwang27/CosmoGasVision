@@ -1,0 +1,7 @@
+pair,label,embedding_distance_l2,floor
+P1-P2,P1 (no feedback) vs P2 (stellar),5.166106224060059,0.1
+P1-P3,P1 (no feedback) vs P3 (AGN),5.003330707550049,0.1
+P1-P4,P1 (no feedback) vs P4 (strong AGN),6.141312122344971,0.1
+P2-P3,P2 (stellar) vs P3 (AGN),4.599832057952881,0.1
+P2-P4,P2 (stellar) vs P4 (strong AGN),7.045214653015137,0.1
+P3-P4,P3 (AGN) vs P4 (strong AGN),6.932199478149414,0.1
