@@ -1,0 +1,8 @@
+key,value
+what_changed,the supervision TARGET: score the network directly on the log flux power spectrum (later: on a re-normalized version; later still: on the density field itself via pretraining)
+balancing,"the two-task weighting used a published gradient-balancing method, run in a SIMPLIFIED variant on the first dispatch (the full method segfaulted on the local development host; unit-tested in isolation, it ran on the cluster in the later pilot chain)"
+stop_discipline,every paid run carried a pre-committed step-200 variance stop gate and a hard step cap; most runs retired at step 200 -- minutes into budgets of hours
+where_it_ran,"paid runs on the compute cluster; the feasibility gate and the pretraining probe on the host machine (minutes, no paid dispatch)"
+cost_framing,"NO campaign-total dollar figure is banked for this group -- do not quote one; per-run budgets were small and capped, and most runs retired at tiny fractions of budget; the licensed form is qualitative: a sequence of small capped runs, each stopped by a pre-committed gate"
+what_the_campaign_established,"a collapsed basin robust to every lever pulled on the loss side; per-task balance necessary but not sufficient; the pathology upstream, in the supervision-target structure"
+what_it_did_not_establish,"that the direct-target idea is impossible (the first falsification was of a simplified instrument); that the loss-construction class is exhausted (one named alternative was de-prioritized, never tested); that the architecture axis fails (one architecture was falsified, narrowly)"

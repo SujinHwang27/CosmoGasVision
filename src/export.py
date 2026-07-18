@@ -1991,3 +1991,241 @@ def export_d46_run_config(out_dir: str) -> Dict[str, Any]:
         extra_sidecar=extra,
     )
     return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep08 "changing-the-target" batch — the GROUPED trainability-wall epic:
+# the direct flux-power supervision arc, the seven-lever collapsed-basin
+# cluster, and the three closing probes. The caveat-densest batch of the arc.
+# fig1/fig2/spec BANKED from the decision record ([D-60] arc, [D-63]/[D-65]
+# tables); fig3 RE-READ from the three on-disk verdict artifacts. The
+# skip-rich rows carry the record's AMENDED readings (primary-observable
+# swap; Wilcoxon direction; init-confound demotion of the per-seed deltas).
+# =========================================================================== #
+
+D63_CLUSTER_JSON_SOURCES: str = "decision record 5-attempt table + 2 diagnostic absorptions"
+D69_FGPA_VERDICT_JSON: str = "experiments/nerf/artifacts/d62_3_stage1_verdict.json"
+D69_LRPROBE_SUMMARY_JSON: str = "experiments/nerf/artifacts/d69_lr_probe/summary.json"
+D71_SKIPRICH_VERDICT_JSON: str = "cloud_runs/stage1a-1b-skiprich-203337-verdict.json"
+
+D60_ARC_ROWS: List[Dict[str, Any]] = [
+    {"beat": "1", "label": "First dispatch of the direct flux-power objective",
+     "what_happened": "retired mid-run at step 2,271: the task-balancing weights ran away (ratio ~1,154:1) under a SIMPLIFIED variant of the published balancing method (the full method segfaulted on the local development host, so this dispatch ran the simplified variant; the full method later ran on the cluster in the pilot chain)",
+     "licensed_status": "instrument falsified, hypothesis narrowed -- the simplified balancing variant failed, NOT the direct-target idea itself"},
+    {"beat": "2", "label": "Pilot chain: two wiring bugs found and fixed",
+     "what_happened": "a silent 5,000-step null (the new term was never wired into the gradients), caught by a deliberately-broken test run; then a computation-graph break, caught the same way; then a clean pilot",
+     "licensed_status": "the first 'result' was no result at all -- a bug, not evidence; the honesty beat is that the project proved its own null wrong before believing anything"},
+    {"beat": "3", "label": "The clean pilot's verdict",
+     "what_happened": "retired at step 200 under the pre-committed stop gate: the predicted flux-power variance had collapsed to 0.0063 of truth",
+     "licensed_status": "real evidence, not a bug -- the first sighting of the collapsed basin"},
+]
+
+# The seven-lever cluster ([D-63] 5-attempt table + [D-65] 2 diagnostics),
+# plus the healthy reference row (A7a control, production run).
+D63_CLUSTER_ROWS: List[Dict[str, Any]] = [
+    {"lever": "retune-1", "label": "Learning rate, first retune", "what_varied": "lr=1e-4, warmup 1000",
+     "var_pf_band_ratio": 2.51e-6, "log10": -5.60, "per_task_ratio": "not logged"},
+    {"lever": "retune-2", "label": "Learning rate, second retune", "what_varied": "lr=3e-5, warmup 2000",
+     "var_pf_band_ratio": 6.9e-7, "log10": -6.16, "per_task_ratio": "20,807"},
+    {"lever": "retune-3", "label": "Per-task gradient clipping", "what_varied": "per-task clip (dead lever)",
+     "var_pf_band_ratio": 1.75e-6, "log10": -5.76, "per_task_ratio": "15,599"},
+    {"lever": "L2", "label": "Loss reduction operator", "what_varied": "sum -> mean reduction",
+     "var_pf_band_ratio": 2.93e-6, "log10": -5.53, "per_task_ratio": "1,429"},
+    {"lever": "k-norm", "label": "The supervision target itself, k-normalized", "what_varied": "per-mode-normalized flux-power target",
+     "var_pf_band_ratio": 7.46e-7, "log10": -6.13, "per_task_ratio": "1.008"},
+    {"lever": "diag-mb", "label": "Microbatch size", "what_varied": "microbatch=1024",
+     "var_pf_band_ratio": 7.63e-7, "log10": -6.12, "per_task_ratio": "1.010"},
+    {"lever": "diag-P2", "label": "Physics variant", "what_varied": "P2 instead of P1",
+     "var_pf_band_ratio": 3.74e-7, "log10": -6.43, "per_task_ratio": "1.008"},
+]
+
+
+def export_d60_direct_target_arc(out_dir: str) -> Dict[str, Any]:
+    """ep08 fig1: the direct-target opening movement (BANKED)."""
+    rows = list(D60_ARC_ROWS)
+    _validate_rows("d60-direct-target-arc", rows)
+    caveat = (
+        "The opening movement of the supervision-target campaign: the network "
+        "scored directly on the log flux power spectrum, balanced against the "
+        "production data loss by a published two-task balancing method -- run "
+        "in a SIMPLIFIED variant on the first dispatch because the full method "
+        "segfaulted on the local development host; the full method ran on the "
+        "cluster in the later pilot chain. Licensed status language is per-run and "
+        "binding: the first dispatch falsified the simplified balancing "
+        "INSTRUMENT and narrowed the hypothesis -- 'the direct-target idea "
+        "was falsified' is BARRED at this beat (and stays barred until the "
+        "retune cap exhausted, and then only at the scope of this campaign). "
+        "The wiring-bug chain is narratable as an honesty beat: the first "
+        "apparent null was a silent bug, caught by deliberately breaking the "
+        "code to prove the test could see anything at all. Single realization "
+        "/ fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": "[D-60] + gate-8/pilot/retune addenda; Juno 201587 (retire step 2271, R-g w_ratio ~1154:1); pilot chain 201602/201607/201669/201712 (clean pilot R-b step 200, var_pf_band_ratio 0.0063); GradNorm = Chen et al. 2018 (simplified proxy G_i = w_i|L_i|, alpha=0.12; full second-order path unit-tested but segfaulted on the dispatch host)"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig1-direct-target-arc.csv",
+        fieldnames=["beat", "label", "what_happened", "licensed_status"],
+        rows=rows, producing_fn="src.export.export_d60_direct_target_arc",
+        source_data_path="decision record (banked arc; see internal_lineage)",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d63_collapsed_basin_cluster(out_dir: str) -> Dict[str, Any]:
+    """ep08 fig2: the seven-lever collapsed-basin cluster (BANKED from the
+    decision-record tables), with the healthy reference carried in the
+    sidecar UNDER its mandatory two-part caveat."""
+    rows = list(D63_CLUSTER_ROWS)
+    _validate_rows("d63-collapsed-basin-cluster", rows)
+    vals = [r["var_pf_band_ratio"] for r in rows]
+    band_decades = float(np.log10(max(vals)) - np.log10(min(vals)))
+    if not 0.85 < band_decades < 0.95:
+        raise AssertionError(f"cluster band {band_decades:.2f} decades != banked ~0.89.")
+    caveat = (
+        "The seven-lever collapsed-basin cluster: seven runs, each varying a "
+        "different lever -- learning rate (twice), per-task clipping, the "
+        "loss reduction operator, a re-normalized supervision target, "
+        "microbatch size, and the physics variant -- and every one retired at "
+        "the same step-200 stop gate with the predicted flux-power variance "
+        "collapsed to between 3.7e-7 and 2.9e-6 of truth: a 0.89-decade band "
+        "across every lever pulled. The sharpest single datum: the "
+        "re-normalized target fixed the two-task gradient imbalance from "
+        "~20,800:1 to 1.008 -- more than four decades -- and the collapse did "
+        "not move. MANDATORY two-part caveat on every citation of this "
+        "figure: healthy production runs hold this ratio near 1.0 from step "
+        "5,000 onward, and the retired runs were read at step 200 with NO "
+        "matched step-200 healthy reading banked -- a collapsed floor against "
+        "a healthy plateau, not a matched-step comparison. Inference of "
+        "record: per-task balance is NECESSARY BUT NOT SUFFICIENT; the "
+        "pathology lives upstream of loss construction, in the structure of "
+        "the supervision target itself. NOT licensed: 'the loss-construction "
+        "class was exhausted' -- one named alternative was never tested, only "
+        "de-prioritized on this evidence. Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "band_decades_rederived": band_decades,
+        "healthy_reference": {
+            "value": "var_pf_band_ratio ~ 1.0 from step 5000 (production run, recomputed control)",
+            "two_part_caveat": "healthy runs hold ~1.0 from step 5000; retirements were read at step 200; no matched step-200 healthy control exists",
+            "source": "experiments/nerf/artifacts/d73_a7_control/a7a_var_pf_control.json",
+        },
+        "knorm_datum": "per-task gradient ratio 20,807 -> 1.008 (~4.3 decades) with variance collapse unchanged (step-200 same-run pair from the authoritative seven-attempt table; the cut's '~22,000 -> 0.98' is a different, banked step-100 pair from the first, instrumentation-blocked dispatch, welded there to a variance outcome that belongs to the re-dispatch -- flagged for amendment)",
+        "internal_lineage": "[D-63] 5-attempt table (201734/201814/201856/202109/202289) + [D-65] diagnostics (202291/202292); R8 re-verbed form binding",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig2-collapsed-basin-cluster.csv",
+        fieldnames=["lever", "label", "what_varied", "var_pf_band_ratio", "log10", "per_task_ratio"],
+        rows=rows, producing_fn="src.export.export_d63_collapsed_basin_cluster",
+        source_data_path=D63_CLUSTER_JSON_SOURCES,
+        physics_id=[1, 2], caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "band_decades": band_decades}
+
+
+def export_d69_closing_probes(
+    out_dir: str,
+    fgpa_json: str = D69_FGPA_VERDICT_JSON,
+    lrprobe_json: str = D69_LRPROBE_SUMMARY_JSON,
+    skiprich_json: str = D71_SKIPRICH_VERDICT_JSON,
+) -> Dict[str, Any]:
+    """ep08 fig3: the three closing probes (RE-READ from the on-disk verdict
+    artifacts, cross-checked against the banked record; skip-rich rows carry
+    the record's AMENDED readings)."""
+    fgpa = _read_banked_json(fgpa_json)
+    if fgpa["verdict"] != "FAIL" or abs(fgpa["R_feas"] - 8.334e-3) > 1e-5:
+        raise AssertionError("fGPA-residual verdict JSON disagrees with the banked record.")
+    lr = _read_banked_json(lrprobe_json)
+    verdicts = lr["per_cell_verdicts"]
+    if verdicts.count("FAIL_SINKING") != 1 or len(verdicts) != 3:
+        raise AssertionError("lr-probe verdicts disagree with the banked 1-of-3 record.")
+    sk = _read_banked_json(skiprich_json)
+    deltas = [sk["per_seed"][str(i)]["delta"] for i in range(10)]
+    if not all(d < 0 for d in deltas):
+        raise AssertionError("skip-rich deltas disagree with the banked 10/10-negative record.")
+    var_ratios = [sk["per_seed"][str(i)]["var_pred"] / sk["per_seed"][str(i)]["var_truth"]
+                  for i in range(10)]
+
+    rows: List[Dict[str, Any]] = [
+        {"probe": "feasibility", "label": "Could a physics-residual target even see the structure? (feasibility gate, no training run)",
+         "headline_value": f"discrimination ratio {fgpa['R_feas']:.2e} vs a FAIL boundary of 1.0 (~120x below)",
+         "verdict": "FALSIFIED before any training",
+         "licensed_reading": "the physics-residual candidate target cannot tell structured truth from structureless noise in the band that matters; it was retired on a computed feasibility check -- no training run"},
+        {"probe": "pretraining-lr", "label": "Direct density pretraining, three learning rates (the probe behind the mandatory 1-of-3 caveat)",
+         "headline_value": "1 of 3 cells actively shrinking; 2 of 3 non-monotonic and unreadable",
+         "verdict": "FROZEN by the pre-committed matrix (no cell passed)",
+         "licensed_reading": "every citation carries the count: one cell of three showed active shrinkage; the project's own first 'all cells failing' framing was convicted in review and corrected"},
+        {"probe": "skip-rich-body", "label": "A skip-rich network body under density pretraining, ten seeds (the architecture probe)",
+         "headline_value": f"predicted-to-true variance ratio ~{np.median(var_ratios):.0e} at every seed (a ~3-decade deficit); all 10 per-seed deltas negative",
+         "verdict": "FALSIFIED (narrow scope)",
+         "licensed_reading": "primary observable is the ~3-decade variance deficit at step 500 (the per-seed deltas are init-confounded and demoted to a direction indicator); the improvement test returned p=1.0 -- maximally unsupported improvement, NOT a statistical test of regression; scope-locked to this architecture, this supervision, P1 z=0.3, 500 steps, an inherited learning rate -- it does NOT say the architecture axis fails"},
+    ]
+    _validate_rows("d69-closing-probes", rows)
+    caveat = (
+        "The three probes that closed the campaign, each read from its "
+        "on-disk verdict artifact. The feasibility gate retired a candidate "
+        "target on a computed feasibility check, before any training. The "
+        "pretraining probe carries its "
+        "MANDATORY count on every citation: 1 of 3 cells actively shrinking, "
+        "2 of 3 unreadable -- and the corrected-in-review history of its own "
+        "over-framing is narratable as an honesty beat. The skip-rich probe "
+        "carries the record's amended readings: the primary observable is the "
+        "~3-decade variance deficit (per-seed deltas init-confounded, "
+        "demoted); the p=1.0 tests improvement, never regression; and the "
+        "falsification is scope-locked -- one architecture under one "
+        "supervision is not the architecture axis. Single realization / "
+        "fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "skiprich_var_ratios_per_seed": var_ratios,
+        "skiprich_deltas_per_seed": deltas,
+        "skiprich_bin_ratio": "strong-absorption bins mis-fit 10-13x worse than moderate bins (void-floor-saturation pathology)",
+        "lrprobe_cell_verdicts": verdicts,
+        "internal_lineage": (
+            f"[D-69] base + am-7 ({lrprobe_json}); {fgpa_json}; [D-71] §A-§H + "
+            f"AMENDMENT BLOCK ({skiprich_json}); [D-70] am-2 K1 (the 1-of-3 correction)"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig3-closing-probes.csv",
+        fieldnames=["probe", "label", "headline_value", "verdict", "licensed_reading"],
+        rows=rows, producing_fn="src.export.export_d69_closing_probes",
+        source_data_path=f"{fgpa_json} + {lrprobe_json} + {skiprich_json}",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+D60_CAMPAIGN_CONFIG: List[Tuple[str, Any]] = [
+    ("what_changed", "the supervision TARGET: score the network directly on the log flux power spectrum (later: on a re-normalized version; later still: on the density field itself via pretraining)"),
+    ("balancing", "the two-task weighting used a published gradient-balancing method, run in a SIMPLIFIED variant on the first dispatch (the full method segfaulted on the local development host; unit-tested in isolation, it ran on the cluster in the later pilot chain)"),
+    ("stop_discipline", "every paid run carried a pre-committed step-200 variance stop gate and a hard step cap; most runs retired at step 200 -- minutes into budgets of hours"),
+    ("where_it_ran", "paid runs on the compute cluster; the feasibility gate and the pretraining probe on the host machine (minutes, no paid dispatch)"),
+    ("cost_framing", "NO campaign-total dollar figure is banked for this group -- do not quote one; per-run budgets were small and capped, and most runs retired at tiny fractions of budget; the licensed form is qualitative: a sequence of small capped runs, each stopped by a pre-committed gate"),
+    ("what_the_campaign_established", "a collapsed basin robust to every lever pulled on the loss side; per-task balance necessary but not sufficient; the pathology upstream, in the supervision-target structure"),
+    ("what_it_did_not_establish", "that the direct-target idea is impossible (the first falsification was of a simplified instrument); that the loss-construction class is exhausted (one named alternative was de-prioritized, never tested); that the architecture axis fails (one architecture was falsified, narrowly)"),
+]
+
+
+def export_d60_campaign_config(out_dir: str) -> Dict[str, Any]:
+    """ep08 spec readout (BANKED): what changing-the-target meant, the
+    discipline, the honest cost framing."""
+    rows = [{"key": k, "value": str(v)} for k, v in D60_CAMPAIGN_CONFIG]
+    _validate_rows("d60-campaign-config", rows)
+    caveat = (
+        "Campaign spec of record for the grouped supervision-target epic. "
+        "Two premise corrections are binding: (1) there is NO banked "
+        "campaign-total dollar figure -- do not quote one; the licensed cost "
+        "framing is qualitative (small capped runs, pre-committed stops, most "
+        "retired minutes into their budgets). (2) The healthy variance "
+        "reference (~1.0 from step 5000) comes from the production-run "
+        "control artifact, NOT from the frozen-init calibration file -- and "
+        "it always travels with its two-part caveat. Single realization / "
+        "fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": "[D-60]/[D-62]/[D-63]/[D-64]/[D-65]/[D-67]/[D-68]/[D-69]/[D-70]/[D-71] governance chain; healthy ref = d73_a7_control/a7a_var_pf_control.json (NOT d70_m0_baseline/baseline.json, which is the frozen-init M0 calibration)"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="spec-campaign-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows, producing_fn="src.export.export_d60_campaign_config",
+        source_data_path="decision record (banked campaign spec; see internal_lineage)",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

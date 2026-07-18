@@ -1,0 +1,19 @@
+{
+  "artifact": "spec-campaign-config.csv",
+  "producing_function": "src.export.export_d60_campaign_config",
+  "source_data_path": "decision record (banked campaign spec; see internal_lineage)",
+  "git": {
+    "commit": "7fa1c0e",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T10:09:14"
+  },
+  "export_timestamp_utc": "2026-07-18T15:09:14.342692+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Campaign spec of record for the grouped supervision-target epic. Two premise corrections are binding: (1) there is NO banked campaign-total dollar figure -- do not quote one; the licensed cost framing is qualitative (small capped runs, pre-committed stops, most retired minutes into their budgets). (2) The healthy variance reference (~1.0 from step 5000) comes from the production-run control artifact, NOT from the frozen-init calibration file -- and it always travels with its two-part caveat. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-60]/[D-62]/[D-63]/[D-64]/[D-65]/[D-67]/[D-68]/[D-69]/[D-70]/[D-71] governance chain; healthy ref = d73_a7_control/a7a_var_pf_control.json (NOT d70_m0_baseline/baseline.json, which is the frozen-init M0 calibration)"
+}

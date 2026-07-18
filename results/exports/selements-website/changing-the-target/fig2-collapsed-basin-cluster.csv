@@ -1,0 +1,8 @@
+lever,label,what_varied,var_pf_band_ratio,log10,per_task_ratio
+retune-1,"Learning rate, first retune","lr=1e-4, warmup 1000",2.51e-06,-5.6,not logged
+retune-2,"Learning rate, second retune","lr=3e-5, warmup 2000",6.9e-07,-6.16,"20,807"
+retune-3,Per-task gradient clipping,per-task clip (dead lever),1.75e-06,-5.76,"15,599"
+L2,Loss reduction operator,sum -> mean reduction,2.93e-06,-5.53,"1,429"
+k-norm,"The supervision target itself, k-normalized",per-mode-normalized flux-power target,7.46e-07,-6.13,1.008
+diag-mb,Microbatch size,microbatch=1024,7.63e-07,-6.12,1.010
+diag-P2,Physics variant,P2 instead of P1,3.74e-07,-6.43,1.008

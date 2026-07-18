@@ -1,0 +1,19 @@
+{
+  "artifact": "fig1-direct-target-arc.csv",
+  "producing_function": "src.export.export_d60_direct_target_arc",
+  "source_data_path": "decision record (banked arc; see internal_lineage)",
+  "git": {
+    "commit": "7fa1c0e",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T10:09:14"
+  },
+  "export_timestamp_utc": "2026-07-18T15:09:14.085141+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The opening movement of the supervision-target campaign: the network scored directly on the log flux power spectrum, balanced against the production data loss by a published two-task balancing method -- run in a SIMPLIFIED variant on the first dispatch because the full method segfaulted on the local development host; the full method ran on the cluster in the later pilot chain. Licensed status language is per-run and binding: the first dispatch falsified the simplified balancing INSTRUMENT and narrowed the hypothesis -- 'the direct-target idea was falsified' is BARRED at this beat (and stays barred until the retune cap exhausted, and then only at the scope of this campaign). The wiring-bug chain is narratable as an honesty beat: the first apparent null was a silent bug, caught by deliberately breaking the code to prove the test could see anything at all. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-60] + gate-8/pilot/retune addenda; Juno 201587 (retire step 2271, R-g w_ratio ~1154:1); pilot chain 201602/201607/201669/201712 (clean pilot R-b step 200, var_pf_band_ratio 0.0063); GradNorm = Chen et al. 2018 (simplified proxy G_i = w_i|L_i|, alpha=0.12; full second-order path unit-tested but segfaulted on the dispatch host)"
+}

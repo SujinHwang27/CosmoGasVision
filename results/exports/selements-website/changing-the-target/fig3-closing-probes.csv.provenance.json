@@ -1,0 +1,49 @@
+{
+  "artifact": "fig3-closing-probes.csv",
+  "producing_function": "src.export.export_d69_closing_probes",
+  "source_data_path": "experiments/nerf/artifacts/d62_3_stage1_verdict.json + experiments/nerf/artifacts/d69_lr_probe/summary.json + cloud_runs/stage1a-1b-skiprich-203337-verdict.json",
+  "git": {
+    "commit": "7fa1c0e",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T10:09:14"
+  },
+  "export_timestamp_utc": "2026-07-18T15:09:14.259415+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The three probes that closed the campaign, each read from its on-disk verdict artifact. The feasibility gate retired a candidate target on a computed feasibility check, before any training. The pretraining probe carries its MANDATORY count on every citation: 1 of 3 cells actively shrinking, 2 of 3 unreadable -- and the corrected-in-review history of its own over-framing is narratable as an honesty beat. The skip-rich probe carries the record's amended readings: the primary observable is the ~3-decade variance deficit (per-seed deltas init-confounded, demoted); the p=1.0 tests improvement, never regression; and the falsification is scope-locked -- one architecture under one supervision is not the architecture axis. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "skiprich_var_ratios_per_seed": [
+    0.0006004941634923965,
+    0.0005697182289040938,
+    0.0006127468234617876,
+    0.0006826969179640936,
+    0.000570768953371989,
+    0.0007170453424096176,
+    0.000818874179865591,
+    0.0005998222575689605,
+    0.0005486339786420186,
+    0.0006319708064627862
+  ],
+  "skiprich_deltas_per_seed": [
+    -8.927527978699202e-06,
+    -2.511787803896688e-06,
+    -9.860085853052847e-06,
+    -5.654092232424681e-06,
+    -7.101155063679445e-06,
+    -9.418894102059697e-06,
+    -1.7394706939022518e-06,
+    -2.435906067610139e-06,
+    -1.9113894089791832e-05,
+    -1.2748724699107023e-06
+  ],
+  "skiprich_bin_ratio": "strong-absorption bins mis-fit 10-13x worse than moderate bins (void-floor-saturation pathology)",
+  "lrprobe_cell_verdicts": [
+    "FAIL_SINKING",
+    "UNKNOWN_NON_MONOTONIC",
+    "UNKNOWN_NON_MONOTONIC"
+  ],
+  "internal_lineage": "[D-69] base + am-7 (experiments/nerf/artifacts/d69_lr_probe/summary.json); experiments/nerf/artifacts/d62_3_stage1_verdict.json; [D-71] \u00a7A-\u00a7H + AMENDMENT BLOCK (cloud_runs/stage1a-1b-skiprich-203337-verdict.json); [D-70] am-2 K1 (the 1-of-3 correction)"
+}

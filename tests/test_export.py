@@ -762,3 +762,113 @@ def test_export_d46_scrub_gate_on_consumer_surfaces(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep08 "changing-the-target" batch (grouped epic). Synthetic fixtures for the
+# three RE-READ verdict artifacts; banked-table honesty asserts.
+# --------------------------------------------------------------------------- #
+def _synthetic_d69_fgpa(tmp_path: Path, flip: bool = False) -> str:
+    p = tmp_path / "fgpa_verdict.json"
+    p.write_text(json.dumps({"R_feas": 0.008333558686192037,
+                             "verdict": "PASS" if flip else "FAIL"}))
+    return str(p)
+
+
+def _synthetic_d69_lrprobe(tmp_path: Path) -> str:
+    p = tmp_path / "lrprobe_summary.json"
+    p.write_text(json.dumps({"per_cell_verdicts": ["FAIL_SINKING",
+                                                   "UNKNOWN_NON_MONOTONIC",
+                                                   "UNKNOWN_NON_MONOTONIC"]}))
+    return str(p)
+
+
+def _synthetic_d71_skiprich(tmp_path: Path, flip_seed: bool = False) -> str:
+    per_seed = {}
+    for i in range(10):
+        d = -(1.3e-6 + i * 1.9e-6)
+        if flip_seed and i == 4:
+            d = 2e-6
+        per_seed[str(i)] = {"delta": d, "var_pred": 9.5e-4, "var_truth": 1.59}
+    p = tmp_path / "skiprich_verdict.json"
+    p.write_text(json.dumps({"per_seed": per_seed}))
+    return str(p)
+
+
+def test_export_d63_cluster_band_rederives(tmp_path):
+    res = X.export_d63_collapsed_basin_cluster(out_dir=str(tmp_path))
+    assert res["n_rows"] == 7
+    assert res["band_decades"] == pytest.approx(0.89, abs=0.02)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    # Honesty: the mandatory two-part caveat + the NSI inference + the not-exhausted bar.
+    assert "NO matched step-200 healthy reading" in meta["caveat"]
+    assert "NECESSARY BUT NOT SUFFICIENT" in meta["caveat"]
+    assert "never tested" in meta["caveat"]
+    assert "20,807 -> 1.008" in meta["knorm_datum"]
+
+
+def test_export_d60_arc_bars_l1_falsified(tmp_path):
+    res = X.export_d60_direct_target_arc(out_dir=str(tmp_path))
+    rows = _read_csv(Path(res["artifact"]))
+    assert "NOT the direct-target idea" in rows[0]["licensed_status"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "BARRED" in meta["caveat"]
+
+
+def test_export_d69_closing_probes(tmp_path):
+    fg = _synthetic_d69_fgpa(tmp_path)
+    lr = _synthetic_d69_lrprobe(tmp_path)
+    sk = _synthetic_d71_skiprich(tmp_path)
+    res = X.export_d69_closing_probes(out_dir=str(tmp_path), fgpa_json=fg,
+                                      lrprobe_json=lr, skiprich_json=sk)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 3
+    assert "1 of 3" in rows[1]["headline_value"]
+    # Skip-rich amended readings must ride the licensed_reading cell.
+    assert "init-confounded" in rows[2]["licensed_reading"]
+    assert "NOT a statistical test of regression" in rows[2]["licensed_reading"]
+    assert "does NOT say the architecture axis fails" in rows[2]["licensed_reading"]
+
+
+def test_export_d69_closing_probes_rejects_drift(tmp_path):
+    lr = _synthetic_d69_lrprobe(tmp_path)
+    sk = _synthetic_d71_skiprich(tmp_path)
+    with pytest.raises(AssertionError, match="fGPA-residual"):
+        X.export_d69_closing_probes(out_dir=str(tmp_path),
+                                    fgpa_json=_synthetic_d69_fgpa(tmp_path, flip=True),
+                                    lrprobe_json=lr, skiprich_json=sk)
+    with pytest.raises(AssertionError, match="10/10-negative"):
+        X.export_d69_closing_probes(out_dir=str(tmp_path),
+                                    fgpa_json=_synthetic_d69_fgpa(tmp_path),
+                                    lrprobe_json=lr,
+                                    skiprich_json=_synthetic_d71_skiprich(tmp_path, flip_seed=True))
+
+
+def test_export_d60_campaign_config_cost_honesty(tmp_path):
+    res = X.export_d60_campaign_config(out_dir=str(tmp_path))
+    rows = {r["key"]: r["value"] for r in _read_csv(Path(res["artifact"]))}
+    assert "NO campaign-total dollar figure" in rows["cost_framing"]
+    assert "never tested" in rows["what_it_did_not_establish"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "do not quote one" in meta["caveat"]
+
+
+def test_export_ep08_scrub_gate(tmp_path):
+    fg = _synthetic_d69_fgpa(tmp_path)
+    lr = _synthetic_d69_lrprobe(tmp_path)
+    sk = _synthetic_d71_skiprich(tmp_path)
+    outs = [
+        X.export_d60_direct_target_arc(out_dir=str(tmp_path)),
+        X.export_d63_collapsed_basin_cluster(out_dir=str(tmp_path)),
+        X.export_d69_closing_probes(out_dir=str(tmp_path), fgpa_json=fg,
+                                    lrprobe_json=lr, skiprich_json=sk),
+        X.export_d60_campaign_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Juno", "Sprint", "GradNorm", "Wilcoxon",
+              "R-b", "R26", "201587", "203337", "SIREN", "skip-rich-mlp")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)
