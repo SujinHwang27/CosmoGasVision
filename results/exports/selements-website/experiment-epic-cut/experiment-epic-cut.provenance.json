@@ -39,6 +39,11 @@
       "date": "2026-07-17",
       "summary": "Amendment 4 (PI): ep08 corrections \u2014 skip-rich readings updated to the [D-71] AMENDMENT BLOCK (primary observable = ~3-OOM variance deficit; Delta_seed demoted init-confounded; Wilcoxon H1=greater direction; lr-inherited scope tag); k-norm sharpest-datum corrected to the step-200 same-run pair 20,807->1.008 (the ~22,000->0.98 pair is step-100 from the blocked first dispatch, welded to the re-dispatch outcome).",
       "ratified_during": "the changing-the-target courier gate (ep08)"
+    },
+    {
+      "date": "2026-07-18",
+      "summary": "Amendment 5 (PI): ep09 correlation-numeral precision \u2014 the record/cut \"|median r| < 0.05 at every step\" is contradicted by the artifact at one point (max |median r| = 0.0505); operative wording is noise-floor-relative (null 95% ~0.06; structure bar 0.2). COLLAPSE verdict unaffected. Record-side micro-erratum flagged for the next LEDGER hygiene pass.",
+      "ratified_during": "the removing-the-clamp courier gate (ep09)"
     }
   ]
 }
