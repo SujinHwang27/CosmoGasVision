@@ -1,0 +1,19 @@
+{
+  "artifact": "fig2-median-trajectories.csv",
+  "producing_function": "src.export.export_d73a1_median_trajectories",
+  "source_data_path": "experiments/nerf/artifacts/d73_a1_head_probe/d73_summary.json",
+  "git": {
+    "commit": "1ff70fc",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T11:18:32"
+  },
+  "export_timestamp_utc": "2026-07-18T16:18:32.777336+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Median-across-seeds trajectories for the unclamped cells at the six recorded steps (0 to 1,000), variance ratio and correlation together -- the two conditions the pre-registered gate tests jointly at the same step. No trajectory approaches either bar (ratio 0.1; correlation 0.2): the highest median variance ratio ever recorded is ~6e-5 at step 100, decaying afterward, and the median correlation never leaves the noise floor (null 95% bound ~0.06). A real per-step trace survived for this probe -- draw it; endpoints-only rules do not apply here. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-73] \u00a7E gate computed from these trajectories; experiments/nerf/artifacts/d73_a1_head_probe/d73_summary.json"
+}

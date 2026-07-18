@@ -872,3 +872,99 @@ def test_export_ep08_scrub_gate(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep09 "removing-the-clamp" batch ([D-73] §E A1 head probe re-reads).
+# Synthetic fixture mirrors the real cell/summary schema.
+# --------------------------------------------------------------------------- #
+def _synthetic_a1_dir(tmp_path: Path, escape_cell: bool = False) -> str:
+    d = tmp_path / "a1"
+    d.mkdir(exist_ok=True)
+    lrs = [1e-4, 5e-4, 1e-3]
+    for head, seeds in (("linear-log", [0, 1, 2]), ("softplus", [1, 2])):
+        for lr in lrs:
+            for seed in seeds:
+                ratio = 3.5e-6 + seed * 1e-6
+                r = 0.02
+                if escape_cell and head == "linear-log" and lr == 1e-3 and seed == 0:
+                    ratio, r = 0.5, 0.5
+                tr = [{"step": s, "var_rho_theta": ratio * 10, "var_rho_truth": 10.0,
+                       "ratio": ratio, "pearson_r": r} for s in (0, 100, 250, 500, 750, 1000)]
+                suffix = "_linlog" if head == "linear-log" else ""
+                (d / f"cell_lr{lr:.0e}_seed{seed}{suffix}.json").write_text(json.dumps({
+                    "lr_max": lr, "seed": seed, "head": head,
+                    "var_ratio_trajectory": tr, "verdict": "PASS"}))
+    # 6 softplus controls only need 2 seeds x 3 lrs = 6 files (above); 9 linlog OK.
+    return str(d)
+
+
+def _synthetic_a1_summary(tmp_path: Path) -> str:
+    traj = [{"step": s, "median_ratio": 5e-6 if s != 100 else 6e-5,
+             "median_pearson_r": 0.01, "n_seeds": 3} for s in (0, 100, 250, 500, 750, 1000)]
+    p = tmp_path / "a1_summary.json"
+    p.write_text(json.dumps({
+        "verdict": "COLLAPSE", "escape_hits": [],
+        "median_trajectories_by_lr_cell": {"lr=1e-04": traj, "lr=5e-04": traj, "lr=1e-03": traj},
+    }))
+    return str(p)
+
+
+def test_export_d73a1_per_cell_verdicts(tmp_path):
+    a1 = _synthetic_a1_dir(tmp_path)
+    res = X.export_d73a1_per_cell_verdicts(out_dir=str(tmp_path), a1_dir=a1)
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 15
+    assert sum(1 for r in rows if r["head"].startswith("unclamped")) == 9
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "ACQUITTED at probe scope" in meta["caveat"]
+    assert "does NOT test the flux-supervised regime" in meta["caveat"]
+    assert "VOIDED" in meta["legacy_verdict_field_warning"]
+    # The voided legacy verdict field must NOT ship in the CSV.
+    assert "verdict" not in rows[0]
+
+
+def test_export_d73a1_rejects_escape_contradiction(tmp_path):
+    a1 = _synthetic_a1_dir(tmp_path, escape_cell=True)
+    with pytest.raises(AssertionError):
+        X.export_d73a1_per_cell_verdicts(out_dir=str(tmp_path), a1_dir=a1)
+
+
+def test_export_d73a1_median_trajectories(tmp_path):
+    s = _synthetic_a1_summary(tmp_path)
+    res = X.export_d73a1_median_trajectories(out_dir=str(tmp_path), summary_json=s)
+    assert res["n_rows"] == 18
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "draw it" in meta["caveat"]
+
+
+def test_export_d73a1_gate_and_config_honesty(tmp_path):
+    r3 = X.export_d73a1_gate_spec(out_dir=str(tmp_path))
+    rows3 = _read_csv(Path(r3["artifact"]))
+    assert any("VOID for this gate" in r["spec"] for r in rows3)
+    meta3 = json.loads(Path(r3["sidecar"]).read_text())
+    assert "Both outcomes were declared informative in advance" in meta3["caveat"]
+    r4 = X.export_d73a1_probe_config(out_dir=str(tmp_path))
+    rows4 = {r["key"]: r["value"] for r in _read_csv(Path(r4["artifact"]))}
+    assert "no sentence about the flux lesson may cite this probe" in rows4["what_it_does_not_test"]
+    meta4 = json.loads(Path(r4["sidecar"]).read_text())
+    assert "never 'the head plays no role anywhere.'" in meta4["caveat"]
+
+
+def test_export_ep09_scrub_gate(tmp_path):
+    a1 = _synthetic_a1_dir(tmp_path)
+    s = _synthetic_a1_summary(tmp_path)
+    outs = [
+        X.export_d73a1_per_cell_verdicts(out_dir=str(tmp_path), a1_dir=a1),
+        X.export_d73a1_median_trajectories(out_dir=str(tmp_path), summary_json=s),
+        X.export_d73a1_gate_spec(out_dir=str(tmp_path)),
+        X.export_d73a1_probe_config(out_dir=str(tmp_path)),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Juno", "Sprint", "Softplus", "linlog",
+              "Mode A", "Mode B", "AM-1", "AM-2", "d69", "d73")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)

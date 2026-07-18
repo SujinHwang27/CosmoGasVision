@@ -1,0 +1,19 @@
+{
+  "artifact": "fig3-gate-spec.csv",
+  "producing_function": "src.export.export_d73a1_gate_spec",
+  "source_data_path": "decision record (banked pre-registration; see internal_lineage)",
+  "git": {
+    "commit": "1ff70fc",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T11:18:32"
+  },
+  "export_timestamp_utc": "2026-07-18T16:18:32.892794+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The pre-registered gate, written and panel-amended before the run. Both outcomes were declared informative in advance -- an escape would convict the clamp, a collapse acquits it -- so the probe could not produce a spin-dependent result. The spurious-fire guard is the arc's checks-that-learn motif continued: the gate names, in advance, two specific ways a naive threshold could false-fire, and requires variance AND structure at the same recorded step. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-73] \u00a7E rule verbatim + amendment-1 AM-1 (voiding), AM-2 (guard + null bound), AM-4 (frame correction)"
+}

@@ -1,0 +1,19 @@
+{
+  "artifact": "spec-probe-config.csv",
+  "producing_function": "src.export.export_d73a1_probe_config",
+  "source_data_path": "decision record (banked probe spec; see internal_lineage)",
+  "git": {
+    "commit": "1ff70fc",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T11:18:32"
+  },
+  "export_timestamp_utc": "2026-07-18T16:18:32.973700+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Probe spec of record. The scope-lock is the hardest-working line in this episode: this probe supervises the density DIRECTLY, at a reduced grid, for a bounded step count -- it does not touch the flux-supervised regime, and the acquittal it delivers is an acquittal of the clamp AS THE CAUSE OF THIS COLLAPSE, at this scope; never 'the head plays no role anywhere.' Cost is stated as-spent (host-only, $0 paid, always host-scale by design -- there was no paid stage to save here). Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-73] \u00a7E pre-registration + Pulse close-out row (root-cause sentence scope); harness scripts/d69_lr_sensitivity_probe.py --head linear-log; head site src/models/nerf.py:180"
+}

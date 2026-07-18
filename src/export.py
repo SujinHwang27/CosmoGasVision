@@ -2229,3 +2229,218 @@ def export_d60_campaign_config(out_dir: str) -> Dict[str, Any]:
         source_data_path="decision record (banked campaign spec; see internal_lineage)",
         physics_id=1, caveat=caveat, extra_sidecar=extra)
     return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep09 "removing-the-clamp" batch — the [D-73] §E A1 head probe: remove the
+# bounded density head, supervise log10(rho) directly, read the
+# pre-registered ESCAPE/COLLAPSE verdict. Small and clean: one experiment,
+# one pre-registered gate, verdict COLLAPSE head-invariantly. All figure
+# artifacts RE-READ from experiments/nerf/artifacts/d73_a1_head_probe/.
+# HAZARD (shipped as a premise correction): the per-cell JSONs carry a
+# legacy harness `verdict` field from a VOIDED verdict matrix (AM-1) — the
+# gate verdict is computed SOLELY from the variance/correlation trajectories;
+# the exports below exclude that field.
+# =========================================================================== #
+
+D73_A1_DIR: str = "experiments/nerf/artifacts/d73_a1_head_probe"
+D73_A1_SUMMARY: str = f"{D73_A1_DIR}/d73_summary.json"
+D73_A1_ESCAPE_BAR: float = 0.1
+D73_A1_PEARSON_BAR: float = 0.2
+
+
+def _read_a1_cells(a1_dir: str) -> List[Dict[str, Any]]:
+    import glob as _glob
+    cells = []
+    for path in sorted(_glob.glob(f"{a1_dir}/cell_*.json")):
+        name = Path(path).name
+        if name.startswith("._"):
+            continue
+        c = _read_banked_json(path)
+        tr = c["var_ratio_trajectory"]
+        final = tr[-1]
+        cells.append({
+            "head": c.get("head", "softplus"),
+            "lr": float(c["lr_max"]), "seed": int(c["seed"]),
+            "final_step": int(final["step"]),
+            "final_var_ratio": float(final["ratio"]),
+            "final_pearson_r": float(final["pearson_r"]),
+        })
+    return cells
+
+
+def export_d73a1_per_cell_verdicts(out_dir: str, a1_dir: str = D73_A1_DIR) -> Dict[str, Any]:
+    """ep09 fig1: all 15 in-directory cells (9 unclamped + 6 clamped
+    controls), final variance ratio + correlation vs the ESCAPE bar."""
+    cells = _read_a1_cells(a1_dir)
+    linlog = [c for c in cells if c["head"] == "linear-log"]
+    ctrl = [c for c in cells if c["head"] != "linear-log"]
+    if len(linlog) != 9 or len(ctrl) != 6:
+        raise AssertionError(f"expected 9 unclamped + 6 control cells; got {len(linlog)}+{len(ctrl)}.")
+    lo = min(c["final_var_ratio"] for c in linlog)
+    hi = max(c["final_var_ratio"] for c in linlog)
+    if not (2.0e-6 < lo and hi < 7.0e-6):
+        raise AssertionError(f"unclamped final ratios [{lo:.2e}, {hi:.2e}] outside the banked 2.5e-6-6.6e-6 record.")
+    if any(abs(c["final_pearson_r"]) >= 0.2 for c in cells):
+        raise AssertionError("a cell shows |pearson| >= 0.2 at the final step, contradicting the banked readout.")
+
+    rows = [{
+        "head": ("unclamped (linear on log density)" if c["head"] == "linear-log"
+                 else "clamped control (bounded head)"),
+        "lr": c["lr"], "seed": c["seed"],
+        "final_var_ratio": c["final_var_ratio"],
+        "final_pearson_r": c["final_pearson_r"],
+        "escape_bar": D73_A1_ESCAPE_BAR,
+        "distance_below_bar": f"{D73_A1_ESCAPE_BAR / c['final_var_ratio']:,.0f}x",
+    } for c in sorted(cells, key=lambda c: (c["head"] != "linear-log", c["lr"], c["seed"]))]
+    _validate_rows("d73a1-per-cell-verdicts", rows)
+    caveat = (
+        "All fifteen probe cells at the final recorded step: nine unclamped "
+        "(the bounded density head replaced by a linear head on the log of "
+        "the raw quantity) and six clamped controls. Every unclamped cell "
+        "sits ~10,000x-100,000x below the 0.1 escape bar (finals 2.5e-6 to "
+        "6.6e-6), correlations never leave the noise floor, and the clamped "
+        "controls are statistically indistinguishable -- the two populations "
+        "are the same population. The verdict of record is COLLAPSE, "
+        "head-invariantly; the clamp is ACQUITTED at probe scope. Three "
+        "additional legacy clamped seed-0 cells exist in the older probe "
+        "directory (cite-only) and are not re-shipped. SCOPE-LOCK on every "
+        "use: direct density supervision, reduced grid, 1,000 steps -- this "
+        "probe does NOT test the flux-supervised regime. Single realization "
+        "/ fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "legacy_verdict_field_warning": (
+            "per-cell JSONs carry a harness-legacy 'verdict' field from a "
+            "VOIDED verdict matrix -- it is NOT the probe verdict and is "
+            "excluded from this export; the gate verdict is computed solely "
+            "from the variance/correlation trajectories"
+        ),
+        "internal_lineage": f"[D-73] §E + am-1 (AM-1 artifact isolation/voiding, AM-3 read-only control) + am-2 readout; {a1_dir}/cell_*.json; legacy seed-0 controls in d69_lr_probe/ (cite-only)",
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig1-per-cell-verdicts.csv",
+        fieldnames=["head", "lr", "seed", "final_var_ratio", "final_pearson_r",
+                    "escape_bar", "distance_below_bar"],
+        rows=rows, producing_fn="src.export.export_d73a1_per_cell_verdicts",
+        source_data_path=f"{a1_dir}/cell_*.json",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d73a1_median_trajectories(out_dir: str, summary_json: str = D73_A1_SUMMARY) -> Dict[str, Any]:
+    """ep09 fig2: the median-across-seeds trajectories per learning-rate cell
+    (six recorded steps, 0..1000) -- variance ratio and correlation together,
+    the two conditions the pre-registered gate tests jointly."""
+    d = _read_banked_json(summary_json)
+    if d["verdict"] != "COLLAPSE" or d["escape_hits"]:
+        raise AssertionError("summary verdict disagrees with the banked COLLAPSE record.")
+    rows: List[Dict[str, Any]] = []
+    for lr_label, traj in d["median_trajectories_by_lr_cell"].items():
+        for pt in traj:
+            rows.append({
+                "lr_cell": lr_label, "step": int(pt["step"]),
+                "median_var_ratio": float(pt["median_ratio"]),
+                "median_pearson_r": float(pt["median_pearson_r"]),
+                "n_seeds": int(pt["n_seeds"]),
+            })
+    _validate_rows("d73a1-median-trajectories", rows)
+    if max(r["median_var_ratio"] for r in rows) >= D73_A1_ESCAPE_BAR:
+        raise AssertionError("a median trajectory point clears the escape bar, contradicting COLLAPSE.")
+    caveat = (
+        "Median-across-seeds trajectories for the unclamped cells at the six "
+        "recorded steps (0 to 1,000), variance ratio and correlation "
+        "together -- the two conditions the pre-registered gate tests "
+        "jointly at the same step. No trajectory approaches either bar "
+        "(ratio 0.1; correlation 0.2): the highest median variance ratio "
+        "ever recorded is ~6e-5 at step 100, decaying afterward, and the "
+        "median correlation never leaves the noise floor (null 95% bound "
+        "~0.06). A real per-step trace survived for this probe -- draw it; "
+        "endpoints-only rules do not apply here. Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": f"[D-73] §E gate computed from these trajectories; {summary_json}"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig2-median-trajectories.csv",
+        fieldnames=["lr_cell", "step", "median_var_ratio", "median_pearson_r", "n_seeds"],
+        rows=rows, producing_fn="src.export.export_d73a1_median_trajectories",
+        source_data_path=summary_json,
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+D73_A1_GATE_SPEC: List[Dict[str, Any]] = [
+    {"element": "the disjunct", "label": "ESCAPE or COLLAPSE, both informative",
+     "spec": "ESCAPE iff, in at least one learning-rate cell, some recorded step has median variance ratio > 0.1 AND median correlation >= 0.2 at the SAME step; otherwise COLLAPSE",
+     "why": "either outcome decides something: ESCAPE convicts the clamp; COLLAPSE acquits it and points upstream"},
+    {"element": "the spurious-fire guard", "label": "Ratio and structure must fire together",
+     "spec": "a ratio pass with a correlation fail at every such step is logged ESCAPE-UNSTABLE and routed as COLLAPSE",
+     "why": "guards two false-fire channels named in advance: an unclamped head at initialization can clear the ratio bar with zero structure, and a few extreme voxels can dominate the variance"},
+    {"element": "the null anchor", "label": "The correlation bar sits above chance",
+     "spec": "correlation bar 0.2 vs a null 95% bound of ~0.06 on the fixed probe sample",
+     "why": "an escape must show structure a random field cannot"},
+    {"element": "the voided legacy verdict", "label": "The reused harness's old verdict matrix does not rule",
+     "spec": "per-cell files carry a legacy 'verdict' field from the older probe harness; it is VOID for this gate -- the verdict is computed solely from the recorded trajectories",
+     "why": "reusing an instrument must not mean inheriting its old rules"},
+]
+
+
+def export_d73a1_gate_spec(out_dir: str) -> Dict[str, Any]:
+    """ep09 fig3: the pre-registered gate, as quotable spec rows (BANKED)."""
+    rows = list(D73_A1_GATE_SPEC)
+    _validate_rows("d73a1-gate-spec", rows)
+    caveat = (
+        "The pre-registered gate, written and panel-amended before the run. "
+        "Both outcomes were declared informative in advance -- an escape "
+        "would convict the clamp, a collapse acquits it -- so the probe "
+        "could not produce a spin-dependent result. The spurious-fire guard "
+        "is the arc's checks-that-learn motif continued: the gate names, in "
+        "advance, two specific ways a naive threshold could false-fire, and "
+        "requires variance AND structure at the same recorded step. Single "
+        "realization / fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": "[D-73] §E rule verbatim + amendment-1 AM-1 (voiding), AM-2 (guard + null bound), AM-4 (frame correction)"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig3-gate-spec.csv",
+        fieldnames=["element", "label", "spec", "why"],
+        rows=rows, producing_fn="src.export.export_d73a1_gate_spec",
+        source_data_path="decision record (banked pre-registration; see internal_lineage)",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+D73_A1_PROBE_CONFIG: List[Tuple[str, Any]] = [
+    ("what_removing_the_clamp_means", "the bounded (always-positive) density head is replaced by a plain linear head whose output IS the log of the raw density -- no clamp, no floor, nothing for the optimizer to hide behind"),
+    ("supervision", "direct density supervision (the probe regime): the network is scored on the density field itself, not on the flux"),
+    ("config", "reduced grid (64 per side), fiducial variant P1, z=0.3, 1,000 steps per cell, 3 learning rates x 3 seeds unclamped + 6 clamped controls"),
+    ("where_it_ran", "the host machine, ~5-6 seconds per cell (one first-run outlier ~2.5 minutes); the whole probe fits far inside its pre-committed 1 CPU-hour cap"),
+    ("cost", "spent: about four minutes of host compute across all fifteen cells, $0 paid; nothing was saved or skipped -- this probe was always host-scale by design"),
+    ("verdict", "COLLAPSE, head-invariantly: all nine unclamped cells ~10,000x-100,000x below the escape bar; the six clamped controls indistinguishable"),
+    ("what_it_unlocks", "the root-cause sentence, at exactly this scope: the collapse is upstream of the output clamp, in the optimization/loss landscape -- under direct density supervision, at this grid, for this step count"),
+    ("what_it_does_not_test", "the flux-supervised regime (the production lesson); no sentence about the flux lesson may cite this probe"),
+]
+
+
+def export_d73a1_probe_config(out_dir: str) -> Dict[str, Any]:
+    """ep09 spec readout (BANKED)."""
+    rows = [{"key": k, "value": str(v)} for k, v in D73_A1_PROBE_CONFIG]
+    _validate_rows("d73a1-probe-config", rows)
+    caveat = (
+        "Probe spec of record. The scope-lock is the hardest-working line in "
+        "this episode: this probe supervises the density DIRECTLY, at a "
+        "reduced grid, for a bounded step count -- it does not touch the "
+        "flux-supervised regime, and the acquittal it delivers is an "
+        "acquittal of the clamp AS THE CAUSE OF THIS COLLAPSE, at this "
+        "scope; never 'the head plays no role anywhere.' Cost is stated "
+        "as-spent (host-only, $0 paid, always host-scale by design -- there "
+        "was no paid stage to save here). Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {"internal_lineage": "[D-73] §E pre-registration + Pulse close-out row (root-cause sentence scope); harness scripts/d69_lr_sensitivity_probe.py --head linear-log; head site src/models/nerf.py:180"}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="spec-probe-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows, producing_fn="src.export.export_d73a1_probe_config",
+        source_data_path="decision record (banked probe spec; see internal_lineage)",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

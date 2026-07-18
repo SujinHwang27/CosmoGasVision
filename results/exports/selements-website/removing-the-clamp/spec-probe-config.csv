@@ -1,0 +1,9 @@
+key,value
+what_removing_the_clamp_means,"the bounded (always-positive) density head is replaced by a plain linear head whose output IS the log of the raw density -- no clamp, no floor, nothing for the optimizer to hide behind"
+supervision,"direct density supervision (the probe regime): the network is scored on the density field itself, not on the flux"
+config,"reduced grid (64 per side), fiducial variant P1, z=0.3, 1,000 steps per cell, 3 learning rates x 3 seeds unclamped + 6 clamped controls"
+where_it_ran,"the host machine, ~5-6 seconds per cell (one first-run outlier ~2.5 minutes); the whole probe fits far inside its pre-committed 1 CPU-hour cap"
+cost,"spent: about four minutes of host compute across all fifteen cells, $0 paid; nothing was saved or skipped -- this probe was always host-scale by design"
+verdict,"COLLAPSE, head-invariantly: all nine unclamped cells ~10,000x-100,000x below the escape bar; the six clamped controls indistinguishable"
+what_it_unlocks,"the root-cause sentence, at exactly this scope: the collapse is upstream of the output clamp, in the optimization/loss landscape -- under direct density supervision, at this grid, for this step count"
+what_it_does_not_test,the flux-supervised regime (the production lesson); no sentence about the flux lesson may cite this probe

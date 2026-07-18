@@ -1,0 +1,20 @@
+{
+  "artifact": "fig1-per-cell-verdicts.csv",
+  "producing_function": "src.export.export_d73a1_per_cell_verdicts",
+  "source_data_path": "experiments/nerf/artifacts/d73_a1_head_probe/cell_*.json",
+  "git": {
+    "commit": "1ff70fc",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T11:18:32"
+  },
+  "export_timestamp_utc": "2026-07-18T16:18:32.659728+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "All fifteen probe cells at the final recorded step: nine unclamped (the bounded density head replaced by a linear head on the log of the raw quantity) and six clamped controls. Every unclamped cell sits ~10,000x-100,000x below the 0.1 escape bar (finals 2.5e-6 to 6.6e-6), correlations never leave the noise floor, and the clamped controls are statistically indistinguishable -- the two populations are the same population. The verdict of record is COLLAPSE, head-invariantly; the clamp is ACQUITTED at probe scope. Three additional legacy clamped seed-0 cells exist in the older probe directory (cite-only) and are not re-shipped. SCOPE-LOCK on every use: direct density supervision, reduced grid, 1,000 steps -- this probe does NOT test the flux-supervised regime. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "legacy_verdict_field_warning": "per-cell JSONs carry a harness-legacy 'verdict' field from a VOIDED verdict matrix -- it is NOT the probe verdict and is excluded from this export; the gate verdict is computed solely from the variance/correlation trajectories",
+  "internal_lineage": "[D-73] \u00a7E + am-1 (AM-1 artifact isolation/voiding, AM-3 read-only control) + am-2 readout; experiments/nerf/artifacts/d73_a1_head_probe/cell_*.json; legacy seed-0 controls in d69_lr_probe/ (cite-only)"
+}
