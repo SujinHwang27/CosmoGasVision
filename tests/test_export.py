@@ -968,3 +968,184 @@ def test_export_ep09_scrub_gate(tmp_path):
         for tok in barred:
             assert tok not in meta["caveat"], (res["artifact"], tok)
             assert tok not in csv_text, (res["artifact"], tok)
+
+
+# --------------------------------------------------------------------------- #
+# ep10 "the-grid-probe" batch ([D-73] (1d') grid close-out re-reads).
+# Synthetic fixtures mirror the real sharpener/battery/xi/metric-store schemas.
+# --------------------------------------------------------------------------- #
+def _synthetic_grid_fixtures(tmp_path: Path, **overrides) -> dict:
+    d = tmp_path / "grid"
+    d.mkdir(exist_ok=True)
+    sharpener = {
+        "tau_amp": 1.5263, "step": 50000, "n_rays": 1024, "n_kbins_in_band": 10,
+        "mean_abs_rel_diff_in_band": 0.03519294922440018, "gate": 0.1, "PASS": True,
+        "mlp_pubt1_baseline": 0.4155,
+        "F_pred_mean": 0.9282814781448931, "F_truth_mean": 0.9790409615110334,
+    }
+    sharpener.update(overrides.get("sharpener", {}))
+    (d / "pf_sharpener.json").write_text(json.dumps(sharpener))
+
+    battery = {
+        "K2": {"truth_loss_best": 0.01009826734662056, "best_tau_amp": 4.0,
+               "truth_loss_at_amp1": 0.010102685540914536,
+               "truth_loss_at_grid_amp": 0.010101907886564732,
+               "grid_loss_data": 0.0026},
+        "S5": {"xi_truth_vs_truth_at_r2": 0.02984362130732243,
+               "xi_perturbed_at_r2": {"noise_std_0.25x": 0.028961618166114783,
+                                      "noise_std_0.5x": 0.026685626545986683,
+                                      "noise_std_1.0x": 0.02107787189304586},
+               "grid_xi_at_r2": 0.0075},
+    }
+    battery.update(overrides.get("battery", {}))
+    (d / "battery.json").write_text(json.dumps(battery))
+
+    r_centers = [0.25 + 0.5 * i for i in range(20)]
+    xi_vals = [0.0126, 0.0102, 0.0086, 0.007549217750406617] + [
+        0.006 * (0.9 ** i) for i in range(16)]
+    (d / "xi_injob.json").write_text(json.dumps({
+        "r_centers_mpc_h": r_centers, "xi": xi_vals,
+        "gate_r_mpc_h": 2.0, "xi_at_gate_r": 0.007549217750406617,
+        "gate_threshold": 0.6, "gate_pass": False}))
+
+    final_val = overrides.get("final_metric", 1.0959)
+    with open(d / "metric_file", "w") as fh:
+        for s in range(1, 50001):
+            if s < 250:
+                v = 4.6e-6
+            elif s < 5000:
+                v = 4.6e-6 + (1.0965 - 4.6e-6) * (s - 250) / 4750.0
+            else:
+                v = 1.0965 if s != 50000 else final_val
+            fh.write(f"1781758891234 {v} {s}\n")
+
+    (d / "meta.yaml").write_text(
+        "run_id: synthetic\nstart_time: 1781758891234\nend_time: 1781784814388\n")
+
+    (d / "a7.json").write_text(json.dumps({
+        "var_pf_trajectory": [
+            {"step": s, "var_pf_band_ratio": 1.0} for s in range(5000, 50001, 5000)]}))
+
+    (d / "wiener.json").write_text(json.dumps({
+        "L_sweep": [{"L_mpc_h": 2.0, "xi_at_r2_interp": 0.03647806079361093},
+                    {"L_mpc_h": 2.5, "xi_at_r2_interp": 0.05295911053853344},
+                    {"L_mpc_h": 3.0, "xi_at_r2_interp": 0.07893166038457622}],
+        "peak": {"xi_3d_peak_at_r2": 0.07893166038457622,
+                 "peak_at_window_boundary": True}}))
+    return {"sharpener": str(d / "pf_sharpener.json"), "battery": str(d / "battery.json"),
+            "xi": str(d / "xi_injob.json"), "metric": str(d / "metric_file"),
+            "meta": str(d / "meta.yaml"), "a7": str(d / "a7.json"),
+            "wiener": str(d / "wiener.json")}
+
+
+def test_export_d73grid_flux_gates(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    res = X.export_d73grid_flux_gates(out_dir=str(tmp_path), sharpener_json=fx["sharpener"])
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 2
+    assert {r["verdict"] for r in rows} == {"PASS", "FAIL"}
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "never quote a ratio" in rows[1]["note"]
+    assert "enumerated claim" in meta["caveat"]
+    assert "do not narrate these two numbers as a pass or a fail" in \
+        meta["grid_mean_flux_context"]["bar"]
+
+
+def test_export_d73grid_flux_gates_rejects_baseline_drift(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path, sharpener={"mlp_pubt1_baseline": 0.30})
+    with pytest.raises(AssertionError):
+        X.export_d73grid_flux_gates(out_dir=str(tmp_path), sharpener_json=fx["sharpener"])
+
+
+def test_export_d73grid_trainability(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    res = X.export_d73grid_trainability(out_dir=str(tmp_path), metric_file=fx["metric"],
+                                        a7_control_json=fx["a7"])
+    rows = _read_csv(Path(res["artifact"]))
+    series = {r["series"] for r in rows}
+    assert len(series) == 3
+    grid_rows = [r for r in rows if r["series"].startswith("free voxel grid")]
+    assert len(grid_rows) == 21
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "not a matched-step comparison" in meta["caveat"]
+    assert "started in the basin" in meta["caveat"]
+
+
+def test_export_d73grid_trainability_rejects_band_drift(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path, final_metric=0.9)
+    with pytest.raises(AssertionError):
+        X.export_d73grid_trainability(out_dir=str(tmp_path), metric_file=fx["metric"],
+                                      a7_control_json=fx["a7"])
+
+
+def test_export_d73grid_k2(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    res = X.export_d73grid_k2(out_dir=str(tmp_path), battery_json=fx["battery"])
+    assert 3.7 < res["margin"] < 4.0
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 4
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "OUR OWN forward model's error floor" in meta["caveat"]
+    assert "argmin" in meta["caveat"]
+    assert "NOT licensed: that the flux intrinsically cannot" in meta["caveat"]
+
+
+def test_export_d73grid_k2_rejects_margin_drift(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path, battery={
+        "K2": {"truth_loss_best": 0.0101, "best_tau_amp": 4.0,
+               "truth_loss_at_amp1": 0.0101, "truth_loss_at_grid_amp": 0.0101,
+               "grid_loss_data": 0.0011}})
+    with pytest.raises(AssertionError):
+        X.export_d73grid_k2(out_dir=str(tmp_path), battery_json=fx["battery"])
+
+
+def test_export_d73grid_xi(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    res = X.export_d73grid_xi(out_dir=str(tmp_path), xi_injob_json=fx["xi"],
+                              battery_json=fx["battery"], wiener_lsweep_json=fx["wiener"])
+    rows = _read_csv(Path(res["artifact"]))
+    assert len(rows) == 28
+    grid_rows = [r for r in rows if r["series"] == "free voxel grid vs truth"]
+    assert len(grid_rows) == 20
+    assert any("LOWER BOUND" in r["label"] for r in rows)
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "SUPPORTING" in meta["caveat"]
+    assert "unreachable as implemented" in meta["caveat"]
+    assert "the classical reference included" in meta["caveat"]
+
+
+def test_export_d73grid_probe_config_cost_honesty(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    res = X.export_d73grid_probe_config(out_dir=str(tmp_path), sharpener_json=fx["sharpener"],
+                                        run_meta_yaml=fx["meta"])
+    rows = {r["key"]: r["value"] for r in _read_csv(Path(res["artifact"]))}
+    assert "no dollar figure is banked" in rows["cost"]
+    assert "NO verdict is banked" in rows["mean_flux_context"]
+    assert "under-constrained" in rows["what_it_settles"]
+    assert "not separated" in rows["what_it_does_not_settle"] or \
+        "not separated" in json.loads(Path(res["sidecar"]).read_text())["caveat"]
+    meta = json.loads(Path(res["sidecar"]).read_text())
+    assert "192 cells per side" in meta["caveat"]
+
+
+def test_export_ep10_scrub_gate(tmp_path):
+    fx = _synthetic_grid_fixtures(tmp_path)
+    outs = [
+        X.export_d73grid_flux_gates(out_dir=str(tmp_path), sharpener_json=fx["sharpener"]),
+        X.export_d73grid_trainability(out_dir=str(tmp_path), metric_file=fx["metric"],
+                                      a7_control_json=fx["a7"]),
+        X.export_d73grid_k2(out_dir=str(tmp_path), battery_json=fx["battery"]),
+        X.export_d73grid_xi(out_dir=str(tmp_path), xi_injob_json=fx["xi"],
+                            battery_json=fx["battery"], wiener_lsweep_json=fx["wiener"]),
+        X.export_d73grid_probe_config(out_dir=str(tmp_path), sharpener_json=fx["sharpener"],
+                                      run_meta_yaml=fx["meta"]),
+    ]
+    barred = ("[D-", "LEDGER", "pub-t1", "Juno", "221335", "c6f3aed", "Sprint",
+              "Mode A", "Mode B", "Branch A", "K2", "S5", "S7", "am-9", "am-10",
+              "Wiener", "d73", "1d'", "A30")
+    for res in outs:
+        meta = json.loads(Path(res["sidecar"]).read_text())
+        csv_text = Path(res["artifact"]).read_text()
+        for tok in barred:
+            assert tok not in meta["caveat"], (res["artifact"], tok)
+            assert tok not in csv_text, (res["artifact"], tok)

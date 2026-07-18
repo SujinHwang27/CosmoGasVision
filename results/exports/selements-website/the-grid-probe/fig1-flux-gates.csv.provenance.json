@@ -1,0 +1,24 @@
+{
+  "artifact": "fig1-flux-gates.csv",
+  "producing_function": "src.export.export_d73grid_flux_gates",
+  "source_data_path": "experiments/nerf/artifacts/d73_1dprime/pf_sharpener.json",
+  "git": {
+    "commit": "31b5fb6",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T15:38:21"
+  },
+  "export_timestamp_utc": "2026-07-18T20:38:21.753487+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The gate finally opens: the free voxel grid's band-mean flux-power residual is 0.0352 against the 0.10 gate \u2014 PASS \u2014 where the production network failed at 0.4155. BINDING config caveat: the grid trained on 1,024 sightlines (the gate-definition evaluation density); the production network trained on 64. Same evaluation convention and same bar, so the PASS/FAIL VERDICTS are directly comparable; the residual MAGNITUDES are not a controlled same-configuration contrast and no ratio between them may be quoted ('the grid passed where the network failed', never 'the grid's error was N times smaller'). 'Closes both flux gates' is an enumerated claim: the trainability check and this flux-power gate, and only those \u2014 no verdict is banked for this run on the mean-flux or pixel-distribution gates. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "grid_mean_flux_context": {
+    "F_pred_mean": 0.9282814781448931,
+    "F_truth_mean": 0.9790409615110334,
+    "bar": "context only \u2014 NO gate verdict is banked on the mean flux for this run; do not narrate these two numbers as a pass or a fail; stating the gap as unscored context ('the grid's mean transmitted flux sits at 0.928 against the truth's 0.979') is licensed \u2014 only a pass/fail reading is barred"
+  },
+  "internal_lineage": "[D-73] am-10 \u00a710a/\u00a710e; scripts/d73_pf_sharpener.py on step_050000.pt (Juno job 221335, commit c6f3aed); baseline = \\PFresidPone pub-t1 P1 (eval n_rays=1024/eval_seed=42 on a net TRAINED at n_rays=64)"
+}

@@ -1,0 +1,21 @@
+{
+  "artifact": "fig4-xi-ceiling-relative.csv",
+  "producing_function": "src.export.export_d73grid_xi",
+  "source_data_path": "cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90/eval/xi_3d_injob.json + experiments/nerf/artifacts/d73_1dprime/verification_battery.json + experiments/nerf/artifacts/wiener_baseline/a4prime_wiener_lsweep.json",
+  "git": {
+    "commit": "31b5fb6",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T15:38:22"
+  },
+  "export_timestamp_utc": "2026-07-18T20:38:22.290475+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The structure the grid actually holds \u2014 stated ONCE, neutrally, ceiling-relative. The estimator returns a correlation FUNCTION (decays with distance), not the per-distance coefficient its old 0.6 acceptance bar assumed, so even truth-vs-itself scores 0.0298 at the gate scale: the bar is unreachable as implemented and is retired as a headline. Against the achievable ceiling the grid recovers ~25% (0.0075 of 0.0298) and sits below the truth-plus-100%-noise reference (0.0211): 3D structure recovery is genuinely WEAK \u2014 but 'catastrophic fail vs 0.6' is a retired framing and must not appear. A real-space-versus-redshift-space frame mismatch (line-of-sight displacement ~1.3\u20132.5 Mpc/h, comparable to the 2 Mpc/h gate scale) depresses EVERY number on this figure's family \u2014 the classical reference included \u2014 independent of reconstruction error. The classical linear reconstruction's 0.079 is a self-anchored LOWER BOUND (still rising at the compute wall): 'a classical method's best case we could reach', never 'the floor any method must beat', and NOT configuration-matched to the grid (different reconstruction support and smoothing) \u2014 no 'classical beats neural by N times' reading is licensed. This whole figure is SUPPORTING evidence; the flux-loss comparison carries the verdict. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "ceiling_fraction_rederived": 0.25295917250345024,
+  "gate_scale_note": "the grid profile's gate-scale reading is the shell centered at r=1.75 Mpc/h (bin nearest the 2 Mpc/h gate radius), as banked in the run's own eval",
+  "internal_lineage": "[D-73] am-9 \u00a79c (S5 unreachable-as-implemented + S7 frame confound; 0.6-gate DEMOTED; [D-36] correction note); grid profile = in-job eval xi_3d_injob.json (job 221335); ceiling/noise = verification_battery.json S5; classical = A4' Wiener L-sweep (R14 self-anchored, L\u22653.5 RAM-bound)"
+}

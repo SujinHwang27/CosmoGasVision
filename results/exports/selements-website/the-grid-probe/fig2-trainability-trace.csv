@@ -1,0 +1,39 @@
+series,step,var_pf_band_ratio,label
+free voxel grid (this run),1,4.601698443082619e-06,"near-zero start = the pre-committed spatially-uniform initialization, not a collapse verdict"
+free voxel grid (this run),100,3.5812290932253502e-06,
+free voxel grid (this run),250,4.239899969721869e-05,
+free voxel grid (this run),500,0.008034196090120703,
+free voxel grid (this run),1000,0.08402306441755084,
+free voxel grid (this run),1500,0.7881726588424348,
+free voxel grid (this run),2000,1.0455699045229057,
+free voxel grid (this run),2500,1.0881763554607842,
+free voxel grid (this run),3000,1.0948651849973132,
+free voxel grid (this run),4000,1.0964053913945,
+free voxel grid (this run),5000,1.0969602311173923,
+free voxel grid (this run),7500,1.096671215851322,
+free voxel grid (this run),10000,1.0966605731846937,
+free voxel grid (this run),15000,1.0965531028956164,
+free voxel grid (this run),20000,1.0962107006467021,
+free voxel grid (this run),25000,1.0960849801247299,
+free voxel grid (this run),30000,1.0960081220265816,
+free voxel grid (this run),35000,1.0959854914613172,
+free voxel grid (this run),40000,1.0959464464450257,
+free voxel grid (this run),45000,1.0959135676258176,
+free voxel grid (this run),50000,1.0958677810020139,"flat from step 5,000 to 50,000 (band 1.0959–1.0970)"
+healthy production reference,5000,1.068200768788562,
+healthy production reference,10000,0.9870347178807647,
+healthy production reference,15000,0.9971683972642027,
+healthy production reference,20000,1.0035093847023189,
+healthy production reference,25000,0.9973623345925365,
+healthy production reference,30000,0.9875604883000502,
+healthy production reference,35000,1.000400990372908,
+healthy production reference,40000,1.0005367137672692,
+healthy production reference,45000,1.0007006055042904,
+healthy production reference,50000,1.0008171497716976,
+"collapsed floor, prior campaign (read at step 200)",200,2.51e-06,"Learning rate, first retune"
+"collapsed floor, prior campaign (read at step 200)",200,6.9e-07,"Learning rate, second retune"
+"collapsed floor, prior campaign (read at step 200)",200,1.75e-06,Per-task gradient clipping
+"collapsed floor, prior campaign (read at step 200)",200,2.93e-06,Loss reduction operator
+"collapsed floor, prior campaign (read at step 200)",200,7.46e-07,"The supervision target itself, k-normalized"
+"collapsed floor, prior campaign (read at step 200)",200,7.63e-07,Microbatch size
+"collapsed floor, prior campaign (read at step 200)",200,3.74e-07,Physics variant

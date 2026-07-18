@@ -1,0 +1,10 @@
+key,value
+what_the_probe_is,"replace the network entirely with the most expressive field this study allows: four free voxel grids, one per physical field (log density, temperature, neutral fraction, velocity) — a value free at every one of 192-cubed cells, about 28 million free parameters, nothing shared between locations"
+the_lesson,"the production flux objective, byte-identical: it was proven before dispatch that the sequence of numbers the optimizer sees is bit-for-bit identical to the production loss (the trainability readout is a detached diagnostic that touches no gradient)"
+initialization,pre-committed before the run: an absorption-rich start with initial mean transmitted flux 0.9270 — no post-hoc initialization tuning
+sightlines,"1,024 sightlines from the same simulated survey — the density the study's gates are defined at; the production network TRAINED on 64, which is one reason grid-vs-network residual magnitudes are never a controlled contrast"
+run_scale,"50,000 steps, one job, one datacenter GPU; about 7.2 recorded wall-clock hours (run start to end, in-job evaluation included)"
+cost,"one GPU job inside a pre-committed 30-GPU-hour budget, about a quarter of it used; no dollar figure is banked for this dispatch — print the budget shape, not a price"
+mean_flux_context,the run's evaluated mean transmitted flux is 0.9283 vs truth 0.9790; context only — NO verdict is banked on the mean-flux or pixel-distribution gates for this run
+what_it_settles,"at z=0.3, the most expressive field this study allows closes both flux gates the study defines and fits the observed flux better than the true field does through the same instrument — yet recovers only weak 3D structure: the z=0.3 flux inverse problem, under this forward model, is under-constrained; escaping the collapse was necessary but not sufficient"
+what_it_does_not_settle,"whether the wall is the universe's information content or our own approximate forward model (not separated at 98% mean transmission); anything beyond z=0.3 (where the forest is dense, at z≈2–3, tomography demonstrably works); denser-sightline tiers (not run — the study rests on the 1,024-sightline probe)"

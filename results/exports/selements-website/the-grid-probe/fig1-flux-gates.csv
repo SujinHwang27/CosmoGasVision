@@ -1,0 +1,3 @@
+label,band_mean_flux_power_residual,gate,verdict,training_sightlines,note
+free voxel grid (this episode's run),0.03519294922440018,0.1,PASS,1024,scored under the same convention and the same 10% bar as the production network; band-mean over the ten measured wavenumber bins
+production network (the arc's baseline),0.4155,0.1,FAIL,64,"verdicts are directly comparable (same convention, same bar); the residual magnitudes are NOT a controlled same-configuration contrast — never quote a ratio between these two numbers"

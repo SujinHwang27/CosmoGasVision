@@ -1,0 +1,29 @@
+series,r_mpc_h,xi,label
+free voxel grid vs truth,0.25,0.012649365973308818,
+free voxel grid vs truth,0.75,0.010207197603712838,
+free voxel grid vs truth,1.25,0.008612627161794492,
+free voxel grid vs truth,1.75,0.007549217750406617,"the gate-scale reading: ~25% of the achievable ceiling, below the truth-plus-noise reference"
+free voxel grid vs truth,2.25,0.006148900305144856,"adjacent shell, shown for the profile only — the banked gate-scale reading is the 1.75-centred shell"
+free voxel grid vs truth,2.75,0.005396959209684047,
+free voxel grid vs truth,3.25,0.004841153202715822,
+free voxel grid vs truth,3.75,0.004383929566898535,
+free voxel grid vs truth,4.25,0.003977920380994677,
+free voxel grid vs truth,4.75,0.0035028473798654515,
+free voxel grid vs truth,5.25,0.003008492870618902,
+free voxel grid vs truth,5.75,0.002545942471529455,
+free voxel grid vs truth,6.25,0.0022408775362589874,
+free voxel grid vs truth,6.75,0.001970161340238929,
+free voxel grid vs truth,7.25,0.001672055497737515,
+free voxel grid vs truth,7.75,0.0014790033826232883,
+free voxel grid vs truth,8.25,0.001333401954450693,
+free voxel grid vs truth,8.75,0.0011060556349823832,
+free voxel grid vs truth,9.25,0.0009036390058619059,
+free voxel grid vs truth,9.75,0.0007532733160861411,
+truth vs itself (the achievable ceiling),2.0,0.02984362130732243,even a PERFECT reconstruction scores only this under the estimator as implemented — the old 0.6 bar is unreachable
+truth + 25% noise,2.0,0.028961618166114783,
+truth + 50% noise,2.0,0.026685626545986683,
+truth + 100% noise,2.0,0.02107787189304586,the grid sits below this reference
+classical linear reconstruction (smoothing-length sweep),2.0,0.03647806079361093,smoothing length 2 Mpc/h
+classical linear reconstruction (smoothing-length sweep),2.0,0.05295911053853344,smoothing length 2.5 Mpc/h
+classical linear reconstruction (smoothing-length sweep),2.0,0.07893166038457622,"smoothing length 3 Mpc/h; still RISING at the compute wall — the best case is a LOWER BOUND, never an information floor"
+the demoted acceptance bar,2.0,0.6,"unreachable as implemented: no field, even truth vs itself, can pass it — retired as a headline, shown only to explain the demotion"

@@ -1,0 +1,5 @@
+label,field_through_integrator,amplitude_setting,flux_data_loss,note
+"the true fields, best free amplitude in the sweep","truth (density, temperature, neutral fraction, velocity at the exact ray points)",4.0,0.01009826734662056,"'best' lands at the sweep edge; the three banked points agree to ~5e-6 and the recorded sweep verdict is flat across [0.2, 4] — amplitude calibration cannot close the gap"
+"the true fields, amplitude fixed at 1",truth,1.0,0.010102685540914536,
+"the true fields, at the grid's own learned amplitude",truth,1.526,0.010101907886564732,
+"the free voxel grid, as trained",the grid's four fields,1.526,0.0026,about four times better than the true field through the same instrument

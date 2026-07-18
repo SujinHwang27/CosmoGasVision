@@ -2444,3 +2444,503 @@ def export_d73a1_probe_config(out_dir: str) -> Dict[str, Any]:
         source_data_path="decision record (banked probe spec; see internal_lineage)",
         physics_id=1, caveat=caveat, extra_sidecar=extra)
     return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+# =========================================================================== #
+# ep10 "the-grid-probe" batch ([D-73] (1d') free-voxel-grid close-out).
+# fig1/fig3/fig4/spec RE-READ from banked run artifacts (P_F sharpener,
+# verification battery, in-job xi profile, Wiener L-sweep, healthy control,
+# and the run's own DVC-preserved metric store); nothing recomputed from
+# checkpoints. The heaviest verb-ceiling in the arc rides these caveats:
+# under-constraint verbs are licensed HERE and only here (K2), always with
+# "under this FGPA forward model" + z=0.3 + the integrator-slack caveat.
+# =========================================================================== #
+
+D73_GRID_RUN_DIR: str = (
+    "cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90"
+)
+D73_GRID_SHARPENER: str = "experiments/nerf/artifacts/d73_1dprime/pf_sharpener.json"
+D73_GRID_BATTERY: str = "experiments/nerf/artifacts/d73_1dprime/verification_battery.json"
+D73_GRID_XI_INJOB: str = f"{D73_GRID_RUN_DIR}/eval/xi_3d_injob.json"
+D73_GRID_METRIC_FILE: str = (
+    f"{D73_GRID_RUN_DIR}/mlflow/254171605862827701/"
+    "257cb3e536244eeea4c7e6fdf41a3432/metrics/l1_var_pf_band_ratio"
+)
+D73_GRID_RUN_META: str = (
+    f"{D73_GRID_RUN_DIR}/mlflow/254171605862827701/"
+    "257cb3e536244eeea4c7e6fdf41a3432/meta.yaml"
+)
+D73_A7_CONTROL: str = "experiments/nerf/artifacts/d73_a7_control/a7a_var_pf_control.json"
+D73_WIENER_LSWEEP: str = "experiments/nerf/artifacts/wiener_baseline/a4prime_wiener_lsweep.json"
+
+D73_GRID_PF_GATE: float = 0.10
+D73_GRID_MLP_PF_BASELINE: float = 0.4155  # == \PFresidGridBaseline (eval n_rays=1024 on a net TRAINED at 64).
+D73_GRID_TRAJ_SAMPLE_STEPS: Tuple[int, ...] = (
+    1, 100, 250, 500, 1000, 1500, 2000, 2500, 3000, 4000, 5000,
+    7500, 10000, 15000, 20000, 25000, 30000, 35000, 40000, 45000, 50000,
+)
+
+
+def export_d73grid_flux_gates(
+    out_dir: str, sharpener_json: str = D73_GRID_SHARPENER
+) -> Dict[str, Any]:
+    """ep10 fig1: the flux-power gate verdicts — the grid PASSES the gate the
+    production network failed. Verdicts comparable; magnitudes NOT."""
+    d = _read_banked_json(sharpener_json)
+    resid = float(d["mean_abs_rel_diff_in_band"])
+    if not (0.034 < resid < 0.036 and bool(d["PASS"])):
+        raise AssertionError(f"sharpener residual {resid} / PASS flag disagree with the banked 0.0352 PASS.")
+    if abs(float(d["gate"]) - D73_GRID_PF_GATE) > 1e-12:
+        raise AssertionError("sharpener gate != banked 0.10.")
+    if abs(float(d["mlp_pubt1_baseline"]) - D73_GRID_MLP_PF_BASELINE) > 1e-6:
+        raise AssertionError("baseline in sharpener artifact drifted from the banked 0.4155.")
+    if int(d["n_rays"]) != 1024 or int(d["n_kbins_in_band"]) != 10:
+        raise AssertionError("sharpener eval geometry drifted from the banked n_rays=1024 / 10-bin band.")
+
+    rows = [
+        {"label": "free voxel grid (this episode's run)",
+         "band_mean_flux_power_residual": resid,
+         "gate": D73_GRID_PF_GATE, "verdict": "PASS",
+         "training_sightlines": 1024,
+         "note": ("scored under the same convention and the same 10% bar as the "
+                  "production network; band-mean over the ten measured "
+                  "wavenumber bins")},
+        {"label": "production network (the arc's baseline)",
+         "band_mean_flux_power_residual": D73_GRID_MLP_PF_BASELINE,
+         "gate": D73_GRID_PF_GATE, "verdict": "FAIL",
+         "training_sightlines": 64,
+         "note": ("verdicts are directly comparable (same convention, same bar); "
+                  "the residual magnitudes are NOT a controlled same-configuration "
+                  "contrast — never quote a ratio between these two numbers")},
+    ]
+    _validate_rows("d73grid-flux-gates", rows)
+    caveat = (
+        "The gate finally opens: the free voxel grid's band-mean flux-power "
+        "residual is 0.0352 against the 0.10 gate — PASS — where the "
+        "production network failed at 0.4155. BINDING config caveat: the "
+        "grid trained on 1,024 sightlines (the gate-definition evaluation "
+        "density); the production network trained on 64. Same evaluation "
+        "convention and same bar, so the PASS/FAIL VERDICTS are directly "
+        "comparable; the residual MAGNITUDES are not a controlled "
+        "same-configuration contrast and no ratio between them may be "
+        "quoted ('the grid passed where the network failed', never 'the "
+        "grid's error was N times smaller'). 'Closes both flux gates' is an "
+        "enumerated claim: the trainability check and this flux-power gate, "
+        "and only those — no verdict is banked for this run on the "
+        "mean-flux or pixel-distribution gates. Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "grid_mean_flux_context": {
+            "F_pred_mean": float(d["F_pred_mean"]), "F_truth_mean": float(d["F_truth_mean"]),
+            "bar": ("context only — NO gate verdict is banked on the mean flux for this "
+                    "run; do not narrate these two numbers as a pass or a fail; stating "
+                    "the gap as unscored context ('the grid's mean transmitted flux sits "
+                    "at 0.928 against the truth's 0.979') is licensed — only a pass/fail "
+                    "reading is barred"),
+        },
+        "internal_lineage": (
+            "[D-73] am-10 §10a/§10e; scripts/d73_pf_sharpener.py on step_050000.pt "
+            "(Juno job 221335, commit c6f3aed); baseline = \\PFresidPone pub-t1 P1 "
+            "(eval n_rays=1024/eval_seed=42 on a net TRAINED at n_rays=64)"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig1-flux-gates.csv",
+        fieldnames=["label", "band_mean_flux_power_residual", "gate", "verdict",
+                    "training_sightlines", "note"],
+        rows=rows, producing_fn="src.export.export_d73grid_flux_gates",
+        source_data_path=sharpener_json,
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d73grid_trainability(
+    out_dir: str,
+    metric_file: str = D73_GRID_METRIC_FILE,
+    a7_control_json: str = D73_A7_CONTROL,
+) -> Dict[str, Any]:
+    """ep10 fig2: the trainability trace — the grid's per-step variance ratio
+    (full 50k-step store, downsampled), the healthy production reference at
+    its checkpoint cadence, and the prior campaign's collapsed floor."""
+    series: Dict[int, float] = {}
+    with open(metric_file, "r", encoding="utf-8") as fh:
+        for line in fh:
+            _ts, val, step = line.split()
+            series[int(step)] = float(val)
+    if len(series) != 50000:
+        raise AssertionError(f"metric store has {len(series)} points, not the banked 50,000.")
+    tail = [v for s, v in series.items() if s >= 5000]
+    if not (1.0958 <= min(tail) and max(tail) <= 1.0971):
+        raise AssertionError(
+            f"from-5k band [{min(tail):.4f}, {max(tail):.4f}] drifted from the banked flat 1.0959–1.0970.")
+    if abs(series[50000] - 1.0959) > 5e-4:
+        raise AssertionError("final var_pf_band_ratio drifted from the banked 1.0959.")
+
+    rows: List[Dict[str, Any]] = []
+    for s in D73_GRID_TRAJ_SAMPLE_STEPS:
+        label = ""
+        if s == 1:
+            label = ("near-zero start = the pre-committed spatially-uniform "
+                     "initialization, not a collapse verdict")
+        elif s == 50000:
+            label = "flat from step 5,000 to 50,000 (band 1.0959–1.0970)"
+        rows.append({"series": "free voxel grid (this run)", "step": s,
+                     "var_pf_band_ratio": series[s], "label": label})
+
+    a7 = _read_banked_json(a7_control_json)
+    for pt in a7["var_pf_trajectory"]:
+        v = float(pt["var_pf_band_ratio"])
+        if not 0.97 < v < 1.08:
+            raise AssertionError(f"healthy control point {v} outside the banked ~1.0 plateau.")
+        rows.append({"series": "healthy production reference", "step": int(pt["step"]),
+                     "var_pf_band_ratio": v, "label": ""})
+
+    for r in D63_CLUSTER_ROWS:
+        rows.append({"series": "collapsed floor, prior campaign (read at step 200)",
+                     "step": 200, "var_pf_band_ratio": float(r["var_pf_band_ratio"]),
+                     "label": str(r["label"])})
+    _validate_rows("d73grid-trainability", rows)
+    caveat = (
+        "The trainability verdict: the grid's predicted-to-true flux-power "
+        "band-variance ratio rises from its (spatially uniform, "
+        "pre-committed) initialization to ~1.096 and holds FLAT from step "
+        "5,000 to 50,000 (recorded band 1.0959–1.0970) — the grid trains "
+        "where the previous campaign's runs collapsed, and 'escaping the "
+        "collapse' is licensed language for exactly this observable. TWO "
+        "mandatory caveats. (1) Cadence: the collapsed-floor rows were read "
+        "at their step-200 stop gate; the healthy reference exists only from "
+        "step 5,000 (checkpoint cadence) — a collapsed floor against later "
+        "plateaus, not a matched-step comparison. (2) The near-zero early "
+        "steps reflect the smooth initialization, NOT a visit to the prior "
+        "campaign's basin — the configurations differ (different "
+        "representation, different sightline density, and a different "
+        "training objective: the collapsed-floor runs were trained to match "
+        "the flux power spectrum directly, while the grid was trained on the "
+        "production flux lesson with this variance ratio recorded as a "
+        "passive readout); do not narrate 'it started in the basin and "
+        "climbed out'. Single realization / fixed cosmology; z=0.3 "
+        "scope-lock."
+    )
+    extra = {"internal_lineage": (
+        "[D-73] am-9 §9a (var_pf_band_ratio=1.0959 flat 5k→50k); metric "
+        "l1_var_pf_band_ratio from the run's DVC-preserved MLflow file-store "
+        "(run 257cb3e5, Juno job 221335); healthy ref = A7(a) control "
+        "recompute (pub-t1 P1 seed-0 checkpoints); floor rows = [D-63]/[D-65] "
+        "seven-lever table"
+    )}
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig2-trainability-trace.csv",
+        fieldnames=["series", "step", "var_pf_band_ratio", "label"],
+        rows=rows, producing_fn="src.export.export_d73grid_trainability",
+        source_data_path=f"{metric_file} + {a7_control_json}",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d73grid_k2(
+    out_dir: str, battery_json: str = D73_GRID_BATTERY
+) -> Dict[str, Any]:
+    """ep10 fig3: the decisive datum — the TRUE fields, forward-modeled
+    through the SAME integrator, fit the observed flux ~4x WORSE than the
+    grid does. Under-constraint verbs are licensed by this row set only."""
+    d = _read_banked_json(battery_json)
+    k2 = d["K2"]
+    grid_loss = float(k2["grid_loss_data"])
+    truth_best = float(k2["truth_loss_best"])
+    truth_amp1 = float(k2["truth_loss_at_amp1"])
+    truth_gridamp = float(k2["truth_loss_at_grid_amp"])
+    if abs(grid_loss - 0.0026) > 1e-6:
+        raise AssertionError("grid loss drifted from the banked 0.0026.")
+    if not (0.0100 < truth_best <= truth_gridamp <= truth_amp1 < 0.0102):
+        raise AssertionError("truth-loss sweep values drifted from the banked ~0.0101 flat band.")
+    margin = truth_best / grid_loss
+    if not 3.7 < margin < 4.0:
+        raise AssertionError(f"margin quotient {margin:.2f} outside the banked '~4x'.")
+    amp_spread = truth_amp1 - truth_best
+    if amp_spread > 1e-5:
+        raise AssertionError("amplitude sweep no longer flat (spread > 1e-5).")
+
+    rows = [
+        {"label": "the true fields, best free amplitude in the sweep",
+         "field_through_integrator": "truth (density, temperature, neutral fraction, velocity at the exact ray points)",
+         "amplitude_setting": float(k2["best_tau_amp"]),
+         "flux_data_loss": truth_best,
+         "note": ("'best' lands at the sweep edge; the three banked points "
+                  "agree to ~5e-6 and the recorded sweep verdict is flat "
+                  "across [0.2, 4] — amplitude calibration cannot close the "
+                  "gap")},
+        {"label": "the true fields, amplitude fixed at 1",
+         "field_through_integrator": "truth", "amplitude_setting": 1.0,
+         "flux_data_loss": truth_amp1, "note": ""},
+        {"label": "the true fields, at the grid's own learned amplitude",
+         "field_through_integrator": "truth", "amplitude_setting": 1.526,
+         "flux_data_loss": truth_gridamp, "note": ""},
+        {"label": "the free voxel grid, as trained",
+         "field_through_integrator": "the grid's four fields",
+         "amplitude_setting": 1.526, "flux_data_loss": grid_loss,
+         "note": "about four times better than the true field through the same instrument"},
+    ]
+    _validate_rows("d73grid-k2", rows)
+    caveat = (
+        "The decisive datum, and the arc's heaviest caveat set rides it. "
+        "The TRUE fields, forward-modeled through the SAME integrator under "
+        "the SAME loss with a free amplitude, score 0.0101 — flat across the "
+        "swept amplitude range [0.2, 4] — while the grid achieved 0.0026: "
+        "the grid fits the observed flux about four times better than the "
+        "truth does ('about four times', never a more precise multiple). "
+        "What this LICENSES, exactly: minimizing this flux loss does not "
+        "identify the true 3D field — the z=0.3 flux inverse problem, under "
+        "this forward model, is under-constrained. THE quotable caveat "
+        "(mandatory beside the 4x): the truth's 0.0101 residual is OUR OWN "
+        "forward model's error floor, not nature's — the margin includes "
+        "slack the grid can exploit and the truth cannot, so 'four times "
+        "better than truth' must never be read as 'four times closer to "
+        "reality'. The non-trivial content is the MARGIN plus the "
+        "amplitude-FLATNESS (which rules out the amplitude-calibration "
+        "escape), not bare 'grid beats truth' — the grid is the argmin of "
+        "this loss, so beating any single field is near-guaranteed by "
+        "construction. NOT licensed: that the flux intrinsically cannot "
+        "determine the field; any claim beyond z=0.3; separating "
+        "problem-intrinsic from forward-model-induced under-determination "
+        "(entangled at 98% mean transmission). Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "margin_quotient_rederived": margin,
+        "internal_lineage": (
+            "[D-73] am-9 §9b (K2, panel-discharged); "
+            "scripts/d73_k2_verification_battery.py variant (a) truth-sightline "
+            "fields at exact ray points; loss matched to pipeline.py:2617-2646; "
+            "RSD applied identically on both sides (no frame mismatch enters K2)"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig3-truth-vs-grid.csv",
+        fieldnames=["label", "field_through_integrator", "amplitude_setting",
+                    "flux_data_loss", "note"],
+        rows=rows, producing_fn="src.export.export_d73grid_k2",
+        source_data_path=battery_json,
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows),
+            "margin": margin}
+
+
+def export_d73grid_xi(
+    out_dir: str,
+    xi_injob_json: str = D73_GRID_XI_INJOB,
+    battery_json: str = D73_GRID_BATTERY,
+    wiener_lsweep_json: str = D73_WIENER_LSWEEP,
+) -> Dict[str, Any]:
+    """ep10 fig4: the structure it actually holds — the grid's 3D correlation
+    profile, ceiling-relative, with the demoted bar and the classical
+    lower-bound reference."""
+    xi = _read_banked_json(xi_injob_json)
+    bat = _read_banked_json(battery_json)
+    ws = _read_banked_json(wiener_lsweep_json)
+
+    ceiling = float(bat["S5"]["xi_truth_vs_truth_at_r2"])
+    noise = bat["S5"]["xi_perturbed_at_r2"]
+    grid_at_gate = float(xi["xi_at_gate_r"])
+    if abs(ceiling - 0.0298) > 5e-4 or abs(grid_at_gate - 0.0075) > 5e-4:
+        raise AssertionError("ceiling / grid gate-scale xi drifted from the banked 0.0298 / 0.0075.")
+    frac = grid_at_gate / ceiling
+    if not 0.23 < frac < 0.27:
+        raise AssertionError(f"ceiling fraction {frac:.3f} outside the banked ~25%.")
+    if not grid_at_gate < float(noise["noise_std_1.0x"]):
+        raise AssertionError("grid no longer sits below the truth+100%-noise reference.")
+    peak = ws["peak"]
+    if abs(float(peak["xi_3d_peak_at_r2"]) - 0.0789) > 5e-4 or not peak["peak_at_window_boundary"]:
+        raise AssertionError("Wiener lower bound drifted from the banked ≥0.079 (rising at the wall).")
+
+    rows: List[Dict[str, Any]] = []
+    r_centers = [float(r) for r in xi["r_centers_mpc_h"]]
+    xi_vals = [float(v) for v in xi["xi"]]
+    # The banked gate-scale reading is SOLELY the shell whose value the run's
+    # own eval banked as xi_at_gate_r (the 1.75-centred shell); the equidistant
+    # 2.25 shell carries no banked gate status (PI gate B1).
+    gate_idx = min(range(len(xi_vals)), key=lambda i: abs(xi_vals[i] - grid_at_gate))
+    for i, (rc, val) in enumerate(zip(r_centers, xi_vals)):
+        label = ""
+        if i == gate_idx:
+            label = ("the gate-scale reading: ~25% of the achievable ceiling, "
+                     "below the truth-plus-noise reference")
+        elif abs(rc - float(xi["gate_r_mpc_h"])) <= abs(r_centers[gate_idx] - float(xi["gate_r_mpc_h"])):
+            label = ("adjacent shell, shown for the profile only — the banked "
+                     "gate-scale reading is the 1.75-centred shell")
+        rows.append({"series": "free voxel grid vs truth", "r_mpc_h": rc,
+                     "xi": val, "label": label})
+    rows += [
+        {"series": "truth vs itself (the achievable ceiling)", "r_mpc_h": 2.0,
+         "xi": ceiling,
+         "label": ("even a PERFECT reconstruction scores only this under the "
+                   "estimator as implemented — the old 0.6 bar is unreachable")},
+        {"series": "truth + 25% noise", "r_mpc_h": 2.0,
+         "xi": float(noise["noise_std_0.25x"]), "label": ""},
+        {"series": "truth + 50% noise", "r_mpc_h": 2.0,
+         "xi": float(noise["noise_std_0.5x"]), "label": ""},
+        {"series": "truth + 100% noise", "r_mpc_h": 2.0,
+         "xi": float(noise["noise_std_1.0x"]),
+         "label": "the grid sits below this reference"},
+    ]
+    for pt in ws["L_sweep"]:
+        rows.append({
+            "series": "classical linear reconstruction (smoothing-length sweep)",
+            "r_mpc_h": 2.0, "xi": float(pt["xi_at_r2_interp"]),
+            "label": (f"smoothing length {pt['L_mpc_h']:g} Mpc/h"
+                      + ("; still RISING at the compute wall — the best case is a "
+                         "LOWER BOUND, never an information floor"
+                         if float(pt["L_mpc_h"]) == 3.0 else "")),
+        })
+    rows.append({"series": "the demoted acceptance bar", "r_mpc_h": 2.0, "xi": 0.6,
+                 "label": ("unreachable as implemented: no field, even truth vs "
+                           "itself, can pass it — retired as a headline, shown "
+                           "only to explain the demotion")})
+    _validate_rows("d73grid-xi", rows)
+    caveat = (
+        "The structure the grid actually holds — stated ONCE, neutrally, "
+        "ceiling-relative. The estimator returns a correlation FUNCTION "
+        "(decays with distance), not the per-distance coefficient its old "
+        "0.6 acceptance bar assumed, so even truth-vs-itself scores 0.0298 "
+        "at the gate scale: the bar is unreachable as implemented and is "
+        "retired as a headline. Against the achievable ceiling the grid "
+        "recovers ~25% (0.0075 of 0.0298) and sits below the "
+        "truth-plus-100%-noise reference (0.0211): 3D structure recovery is "
+        "genuinely WEAK — but 'catastrophic fail vs 0.6' is a retired "
+        "framing and must not appear. A real-space-versus-redshift-space "
+        "frame mismatch (line-of-sight displacement ~1.3–2.5 Mpc/h, "
+        "comparable to the 2 Mpc/h gate scale) depresses EVERY number on "
+        "this figure's family — the classical reference included — "
+        "independent of reconstruction error. The classical linear "
+        "reconstruction's 0.079 is a self-anchored LOWER BOUND (still "
+        "rising at the compute wall): 'a classical method's best case we "
+        "could reach', never 'the floor any method must beat', and NOT "
+        "configuration-matched to the grid (different reconstruction "
+        "support and smoothing) — no 'classical beats neural by N times' "
+        "reading is licensed. This whole figure is SUPPORTING evidence; "
+        "the flux-loss comparison carries the verdict. Single realization "
+        "/ fixed cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "ceiling_fraction_rederived": frac,
+        "gate_scale_note": ("the grid profile's gate-scale reading is the shell "
+                            "centered at r=1.75 Mpc/h (bin nearest the 2 Mpc/h "
+                            "gate radius), as banked in the run's own eval"),
+        "internal_lineage": (
+            "[D-73] am-9 §9c (S5 unreachable-as-implemented + S7 frame confound; "
+            "0.6-gate DEMOTED; [D-36] correction note); grid profile = in-job "
+            "eval xi_3d_injob.json (job 221335); ceiling/noise = "
+            "verification_battery.json S5; classical = A4' Wiener L-sweep "
+            "(R14 self-anchored, L≥3.5 RAM-bound)"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="fig4-xi-ceiling-relative.csv",
+        fieldnames=["series", "r_mpc_h", "xi", "label"],
+        rows=rows, producing_fn="src.export.export_d73grid_xi",
+        source_data_path=f"{xi_injob_json} + {battery_json} + {wiener_lsweep_json}",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}
+
+
+def export_d73grid_probe_config(
+    out_dir: str,
+    sharpener_json: str = D73_GRID_SHARPENER,
+    run_meta_yaml: str = D73_GRID_RUN_META,
+) -> Dict[str, Any]:
+    """ep10 spec readout: what the grid probe is, its pre-commitments, scale,
+    and the as-banked cost shape (no dollar figure is banked for this run)."""
+    d = _read_banked_json(sharpener_json)
+    start_ms = end_ms = None
+    with open(run_meta_yaml, "r", encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("start_time:"):
+                start_ms = int(line.split(":", 1)[1].strip())
+            elif line.startswith("end_time:"):
+                end_ms = int(line.split(":", 1)[1].strip())
+    if start_ms is None or end_ms is None:
+        raise AssertionError("run meta lacks start/end timestamps.")
+    wall_h = (end_ms - start_ms) / 3.6e6
+    if not 6.5 < wall_h < 8.0:
+        raise AssertionError(f"recorded wall {wall_h:.2f} h drifted from the banked ~7.2 h.")
+
+    rows_kv: List[Tuple[str, str]] = [
+        ("what_the_probe_is",
+         "replace the network entirely with the most expressive field this study "
+         "allows: four free voxel grids, one per physical field (log density, "
+         "temperature, neutral fraction, velocity) — a value free at every one of "
+         "192-cubed cells, about 28 million free parameters, nothing shared "
+         "between locations"),
+        ("the_lesson",
+         "the production flux objective, byte-identical: it was proven before "
+         "dispatch that the sequence of numbers the optimizer sees is "
+         "bit-for-bit identical to the production loss (the trainability "
+         "readout is a detached diagnostic that touches no gradient)"),
+        ("initialization",
+         "pre-committed before the run: an absorption-rich start with initial "
+         "mean transmitted flux 0.9270 — no post-hoc initialization tuning"),
+        ("sightlines",
+         "1,024 sightlines from the same simulated survey — the density the "
+         "study's gates are defined at; the production network TRAINED on 64, "
+         "which is one reason grid-vs-network residual magnitudes are never a "
+         "controlled contrast"),
+        ("run_scale",
+         f"50,000 steps, one job, one datacenter GPU; about "
+         f"{wall_h:.1f} recorded wall-clock hours (run start to end, in-job "
+         "evaluation included)"),
+        ("cost",
+         "one GPU job inside a pre-committed 30-GPU-hour budget, about a "
+         "quarter of it used; no dollar figure is banked for this dispatch — "
+         "print the budget shape, not a price"),
+        ("mean_flux_context",
+         f"the run's evaluated mean transmitted flux is "
+         f"{float(d['F_pred_mean']):.4f} vs truth {float(d['F_truth_mean']):.4f}; "
+         "context only — NO verdict is banked on the mean-flux or "
+         "pixel-distribution gates for this run"),
+        ("what_it_settles",
+         "at z=0.3, the most expressive field this study allows closes both "
+         "flux gates the study defines and fits the observed flux better than "
+         "the true field does through the same instrument — yet recovers only "
+         "weak 3D structure: the z=0.3 flux inverse problem, under this "
+         "forward model, is under-constrained; escaping the collapse was "
+         "necessary but not sufficient"),
+        ("what_it_does_not_settle",
+         "whether the wall is the universe's information content or our own "
+         "approximate forward model (not separated at 98% mean transmission); "
+         "anything beyond z=0.3 (where the forest is dense, at z≈2–3, "
+         "tomography demonstrably works); denser-sightline tiers (not run — "
+         "the study rests on the 1,024-sightline probe)"),
+    ]
+    rows = [{"key": k, "value": v} for k, v in rows_kv]
+    _validate_rows("d73grid-probe-config", rows)
+    caveat = (
+        "Probe spec of record for the arc's final experiment. The triple "
+        "hedge is mandatory on every under-constraint sentence: under this "
+        "forward model, at this redshift (z=0.3), on one simulated "
+        "universe. The licensed claim boundary: minimizing this flux loss "
+        "does not identify the true field — NEVER that the flux "
+        "intrinsically cannot determine it, and the problem-intrinsic vs "
+        "forward-model-induced split is explicitly NOT separated. Cost is "
+        "stated as the banked budget shape (a pre-committed 30-GPU-hour "
+        "cap, about a quarter used); no dollar figure is banked for this "
+        "run and none may be printed. The grid is 192 cells per side — "
+        "never any other mesh number. Single realization / fixed "
+        "cosmology; z=0.3 scope-lock."
+    )
+    extra = {
+        "recorded_wall_hours": wall_h,
+        "internal_lineage": (
+            "[D-73] (1d') option (a) four free grids (am-4 K6 discharge); G=192 "
+            "angular-k ruling + init_xhi=0.2 pre-commit (am-5/am-7, tol-0 "
+            "one-lever proof); Juno a30 job 221335 (commit c6f3aed), cap ≤30 "
+            "A30-hr; wall from the run's MLflow meta start/end; F means from "
+            "pf_sharpener.json"
+        ),
+    }
+    artifact, sidecar = write_export(
+        out_dir=Path(out_dir), filename="spec-probe-config.csv",
+        fieldnames=["key", "value"],
+        rows=rows, producing_fn="src.export.export_d73grid_probe_config",
+        source_data_path=f"{sharpener_json} + {run_meta_yaml}",
+        physics_id=1, caveat=caveat, extra_sidecar=extra)
+    return {"artifact": str(artifact), "sidecar": str(sidecar), "n_rows": len(rows)}

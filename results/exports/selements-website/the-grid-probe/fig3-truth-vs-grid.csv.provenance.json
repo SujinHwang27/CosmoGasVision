@@ -1,0 +1,20 @@
+{
+  "artifact": "fig3-truth-vs-grid.csv",
+  "producing_function": "src.export.export_d73grid_k2",
+  "source_data_path": "experiments/nerf/artifacts/d73_1dprime/verification_battery.json",
+  "git": {
+    "commit": "31b5fb6",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T15:38:22"
+  },
+  "export_timestamp_utc": "2026-07-18T20:38:22.154931+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The decisive datum, and the arc's heaviest caveat set rides it. The TRUE fields, forward-modeled through the SAME integrator under the SAME loss with a free amplitude, score 0.0101 \u2014 flat across the swept amplitude range [0.2, 4] \u2014 while the grid achieved 0.0026: the grid fits the observed flux about four times better than the truth does ('about four times', never a more precise multiple). What this LICENSES, exactly: minimizing this flux loss does not identify the true 3D field \u2014 the z=0.3 flux inverse problem, under this forward model, is under-constrained. THE quotable caveat (mandatory beside the 4x): the truth's 0.0101 residual is OUR OWN forward model's error floor, not nature's \u2014 the margin includes slack the grid can exploit and the truth cannot, so 'four times better than truth' must never be read as 'four times closer to reality'. The non-trivial content is the MARGIN plus the amplitude-FLATNESS (which rules out the amplitude-calibration escape), not bare 'grid beats truth' \u2014 the grid is the argmin of this loss, so beating any single field is near-guaranteed by construction. NOT licensed: that the flux intrinsically cannot determine the field; any claim beyond z=0.3; separating problem-intrinsic from forward-model-induced under-determination (entangled at 98% mean transmission). Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "margin_quotient_rederived": 3.883948979469446,
+  "internal_lineage": "[D-73] am-9 \u00a79b (K2, panel-discharged); scripts/d73_k2_verification_battery.py variant (a) truth-sightline fields at exact ray points; loss matched to pipeline.py:2617-2646; RSD applied identically on both sides (no frame mismatch enters K2)"
+}

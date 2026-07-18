@@ -1,0 +1,20 @@
+{
+  "artifact": "spec-probe-config.csv",
+  "producing_function": "src.export.export_d73grid_probe_config",
+  "source_data_path": "experiments/nerf/artifacts/d73_1dprime/pf_sharpener.json + cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90/mlflow/254171605862827701/257cb3e536244eeea4c7e6fdf41a3432/meta.yaml",
+  "git": {
+    "commit": "31b5fb6",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T15:38:22"
+  },
+  "export_timestamp_utc": "2026-07-18T20:38:22.427610+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "Probe spec of record for the arc's final experiment. The triple hedge is mandatory on every under-constraint sentence: under this forward model, at this redshift (z=0.3), on one simulated universe. The licensed claim boundary: minimizing this flux loss does not identify the true field \u2014 NEVER that the flux intrinsically cannot determine it, and the problem-intrinsic vs forward-model-induced split is explicitly NOT separated. Cost is stated as the banked budget shape (a pre-committed 30-GPU-hour cap, about a quarter used); no dollar figure is banked for this run and none may be printed. The grid is 192 cells per side \u2014 never any other mesh number. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "recorded_wall_hours": 7.2008761111111115,
+  "internal_lineage": "[D-73] (1d') option (a) four free grids (am-4 K6 discharge); G=192 angular-k ruling + init_xhi=0.2 pre-commit (am-5/am-7, tol-0 one-lever proof); Juno a30 job 221335 (commit c6f3aed), cap \u226430 A30-hr; wall from the run's MLflow meta start/end; F means from pf_sharpener.json"
+}

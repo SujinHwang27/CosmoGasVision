@@ -1,0 +1,19 @@
+{
+  "artifact": "fig2-trainability-trace.csv",
+  "producing_function": "src.export.export_d73grid_trainability",
+  "source_data_path": "cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90/mlflow/254171605862827701/257cb3e536244eeea4c7e6fdf41a3432/metrics/l1_var_pf_band_ratio + experiments/nerf/artifacts/d73_a7_control/a7a_var_pf_control.json",
+  "git": {
+    "commit": "31b5fb6",
+    "branch": "service/data-export",
+    "dirty": "True",
+    "timestamp": "2026-07-18T15:38:22"
+  },
+  "export_timestamp_utc": "2026-07-18T20:38:22.004022+00:00",
+  "n_rays_eval": 1024,
+  "eval_seed": 42,
+  "physics_id": 1,
+  "redshift": 0.3,
+  "box_kpc_h": 60000.0,
+  "caveat": "The trainability verdict: the grid's predicted-to-true flux-power band-variance ratio rises from its (spatially uniform, pre-committed) initialization to ~1.096 and holds FLAT from step 5,000 to 50,000 (recorded band 1.0959\u20131.0970) \u2014 the grid trains where the previous campaign's runs collapsed, and 'escaping the collapse' is licensed language for exactly this observable. TWO mandatory caveats. (1) Cadence: the collapsed-floor rows were read at their step-200 stop gate; the healthy reference exists only from step 5,000 (checkpoint cadence) \u2014 a collapsed floor against later plateaus, not a matched-step comparison. (2) The near-zero early steps reflect the smooth initialization, NOT a visit to the prior campaign's basin \u2014 the configurations differ (different representation, different sightline density, and a different training objective: the collapsed-floor runs were trained to match the flux power spectrum directly, while the grid was trained on the production flux lesson with this variance ratio recorded as a passive readout); do not narrate 'it started in the basin and climbed out'. Single realization / fixed cosmology; z=0.3 scope-lock.",
+  "internal_lineage": "[D-73] am-9 \u00a79a (var_pf_band_ratio=1.0959 flat 5k\u219250k); metric l1_var_pf_band_ratio from the run's DVC-preserved MLflow file-store (run 257cb3e5, Juno job 221335); healthy ref = A7(a) control recompute (pub-t1 P1 seed-0 checkpoints); floor rows = [D-63]/[D-65] seven-lever table"
+}
