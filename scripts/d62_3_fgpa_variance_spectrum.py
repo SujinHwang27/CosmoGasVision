@@ -59,11 +59,9 @@ PASS_MULTIPLIER = 30.0  # fGPA must be >= 30x L1_CLUSTER_HI
 # Becker+ 2013 mean-flux anchor at z=0.3 (production [D-10] convention)
 MEAN_FLUX_TARGET = 0.979
 
-# Boera+ 2019 (arXiv:1809.06980) Table 2 z=0.3 P_F variance physical band
-# (truth-side P_F at inertial scales): O(1e-2 to 1e-1) in (km/s)^-1 units
-# of P_F. Conservative gate per task spec Fix B.
-BOERA_PF_VAR_LO = 1e-3
-BOERA_PF_VAR_HI = 1e-1
+# [D-68] amendment 2026-05-24: Boera+ 2019 absolute-variance anchor REMOVED.
+# Gating moved to dimensionless R_feas = var_fgpa_td / var_fgpa_nd (see verdict
+# block below). Truth-side var_mean_truth is retained as record-only diagnostic.
 
 
 def _render_tau_unscaled_chunk(
@@ -194,6 +192,10 @@ def main() -> int:
     parser.add_argument("--out_recon_json", type=str,
                         default=str(_REPO_ROOT / "experiments/nerf/artifacts/"
                                     "d62_3_fgpa_prior_reconstruction_error.json"))
+    parser.add_argument("--out_verdict_json", type=str,
+                        default=str(_REPO_ROOT / "experiments/nerf/artifacts/"
+                                    "d62_3_stage1_verdict.json"),
+                        help="[D-68] R_feas verdict capsule for PI hand-off.")
     args = parser.parse_args()
 
     Path(args.out_png).parent.mkdir(parents=True, exist_ok=True)
@@ -289,58 +291,76 @@ def main() -> int:
     _, var_per_k_fgpa_nd, var_mean_fgpa_nd = compute_inertial_band_variance_per_kbin(
         F_fgpa_nd, dv=dv_kms)
 
-    # ================ Fix B: K2 SMOKE ASSERT BEFORE VERDICT ===============
+    # ================ [D-68] amendment 2026-05-24: record-only var_truth =====
+    # K2 Boera absolute-variance assertion REMOVED per PI re-spec. The
+    # truth-side P_F band-mean variance is reported for record only; no
+    # PASS/FAIL gate sits on its absolute value. Gating moves to R_feas
+    # below (dimensionless td/nd ratio).
     print("", flush=True)
-    print(f"[D-62/3 REDO] var_truth_band_mean = {var_mean_truth:.4e} "
-          f"(Boera+2019 z=0.3 range [{BOERA_PF_VAR_LO:.1e}, "
-          f"{BOERA_PF_VAR_HI:.1e}])", flush=True)
-    assert BOERA_PF_VAR_LO <= var_mean_truth <= BOERA_PF_VAR_HI, (
-        f"K2 SMOKE FAIL: var_truth_band_mean={var_mean_truth:.3e} is "
-        f"outside Boera+ 2019 published range [{BOERA_PF_VAR_LO:.0e}, "
-        f"{BOERA_PF_VAR_HI:.0e}] for z=0.3 P_F. Renderer is mis-instrumented; "
-        f"PASS verdict invalidated. (Per PI v9 / panel killer K2.)"
-    )
-    print("[D-62/3 REDO] K2 smoke assert PASSED (truth variance physical).",
+    print(f"[D-62/3 REDO] var_truth_band_mean = {var_mean_truth:.4e}  "
+          f"(record-only; no absolute-variance gate per [D-68] re-spec)",
           flush=True)
 
-    # ================ Verdict gates ===================
-    # Gate A (legacy, truth-delta fGPA): kept for continuity; informational.
+    # ================ [D-68] R_feas gate (replaces L1_CLUSTER_HI denom) =====
+    # R29 frame-audit: R_feas mirrors production dimensionless-ratio gate at pipeline.py:2086-2088
+    # (Var[P_pred_band] / Var[P_truth_band]). Here numerator = truth-delta fGPA prior signal,
+    # denominator = noise-delta fGPA noise-floor signal — the (3)-vs-(2) feasibility question.
+    R_feas = var_mean_fgpa_td / max(var_mean_fgpa_nd, 1e-300)
+    log10_R_feas = float(np.log10(max(R_feas, 1e-30)))
+
+    if R_feas >= 3.0:
+        verdict = "PASS"
+        escalation_target = "none"
+        verdict_note = "predicted signal >= 3x noise-floor signal in inertial band"
+    elif R_feas >= 1.0:
+        verdict = "MARGINAL"
+        escalation_target = "(2)"
+        verdict_note = ("marginal info above noise floor; (3) feasibility "
+                        "unresolved; escalate to (2) per [D-68] pre-commit")
+    else:
+        verdict = "FAIL"
+        escalation_target = "(2)"
+        verdict_note = "automatic (2) escalation per [D-68] / [D-62] ladder binding"
+
+    # Legacy gates retained as informational only (no longer drive verdict).
     ratio_td_vs_L1hi = var_mean_fgpa_td / L1_CLUSTER_HI
     pass_A = bool(ratio_td_vs_L1hi >= PASS_MULTIPLIER)
-
-    # Gate C (Fix C, noise-delta fGPA): the (3)-vs-(2) feasibility falsifier.
     ratio_nd_vs_L1hi = var_mean_fgpa_nd / L1_CLUSTER_HI
     pass_C = bool(ratio_nd_vs_L1hi >= PASS_MULTIPLIER)
     log10_dec_nd = float(np.log10(max(ratio_nd_vs_L1hi, 1e-30)))
     log10_dec_td = float(np.log10(max(ratio_td_vs_L1hi, 1e-30)))
 
-    # Overall Stage 1 PASS: K2 already asserted; require both gates.
-    overall_pass = pass_A and pass_C
+    overall_pass = (verdict == "PASS")
 
     print("", flush=True)
-    print("============== [D-62/3 REDO] Stage 1 verdict ===============",
+    print("============== [D-62/3 / D-68] Stage 1 verdict =============",
           flush=True)
     print(f"  Fix A tau_amp (calibrated)        = {tau_amp:.4e}", flush=True)
-    print(f"  Fix B var_truth                   = {var_mean_truth:.4e}  "
-          f"PASS  (in Boera band)", flush=True)
-    print(f"  Gate A var_fgpa(truth-delta)      = {var_mean_fgpa_td:.4e}  "
-          f"ratio={ratio_td_vs_L1hi:.2f}x  "
+    print(f"  var_mean_truth (record-only)      = {var_mean_truth:.4e}",
+          flush=True)
+    print(f"  var_mean_fgpa(truth-delta)        = {var_mean_fgpa_td:.4e}",
+          flush=True)
+    print(f"  var_mean_fgpa(noise-delta)        = {var_mean_fgpa_nd:.4e}",
+          flush=True)
+    print(f"  R_feas = var_td / var_nd          = {R_feas:.4e}  "
+          f"({log10_R_feas:+.2f} dec)", flush=True)
+    print(f"  Gate thresholds                   = "
+          f"PASS>=3.0  MARGINAL[1.0,3.0)  FAIL<1.0", flush=True)
+    print(f"  VERDICT                           = {verdict}", flush=True)
+    print(f"  escalation_target                 = {escalation_target}",
+          flush=True)
+    print(f"  note                              = {verdict_note}", flush=True)
+    print(f"  [informational] ratio_td/L1_HI    = {ratio_td_vs_L1hi:.2f}x  "
           f"({log10_dec_td:+.2f} dec)  "
-          f"{'PASS' if pass_A else 'FAIL'}", flush=True)
-    print(f"  Gate C var_fgpa(noise-delta)      = {var_mean_fgpa_nd:.4e}  "
-          f"ratio={ratio_nd_vs_L1hi:.2f}x  "
+          f"{'PASS' if pass_A else 'FAIL'} (legacy gate, non-binding)",
+          flush=True)
+    print(f"  [informational] ratio_nd/L1_HI    = {ratio_nd_vs_L1hi:.2f}x  "
           f"({log10_dec_nd:+.2f} dec)  "
-          f"{'PASS' if pass_C else 'FAIL'}  <-- (3)-vs-(2) feasibility falsifier",
+          f"{'PASS' if pass_C else 'FAIL'} (legacy gate, non-binding)",
           flush=True)
-    print(f"  L1 cluster anchor                 = "
-          f"[{L1_CLUSTER_LO:.2e}, {L1_CLUSTER_HI:.2e}]  "
-          f"(>= {PASS_MULTIPLIER}x L1_HI = {PASS_MULTIPLIER*L1_CLUSTER_HI:.2e})",
-          flush=True)
-    print(f"  OVERALL STAGE 1                   = "
-          f"{'PASS' if overall_pass else 'FAIL'}", flush=True)
-    if not pass_C:
-        print("  >>> Gate C FAIL: (3) architectural-rescue claim FALSIFIED "
-              "ex ante.  Stages 2-5 ABORT per PI v9.  Escalate to (2).",
+    if verdict != "PASS":
+        print(f"  >>> Verdict {verdict}: escalation to {escalation_target} "
+              f"per [D-68] pre-commit.  Stages 2-5 ABORT; PI handles (2).",
               flush=True)
     print("============================================================",
           flush=True)
@@ -388,15 +408,16 @@ def main() -> int:
     ax.axhline(PASS_MULTIPLIER * L1_CLUSTER_HI, color="tab:red", ls="--",
                alpha=0.7,
                label=f"PASS = 30x L1_HI = {PASS_MULTIPLIER*L1_CLUSTER_HI:.1e}")
-    ax.axhspan(BOERA_PF_VAR_LO, BOERA_PF_VAR_HI, alpha=0.08, color="tab:green",
-               label=f"Boera+2019 z=0.3 band [{BOERA_PF_VAR_LO:.0e}, "
-                     f"{BOERA_PF_VAR_HI:.0e}]")
+    # [D-68]: Boera absolute-variance band removed from overlay; R_feas annotated instead.
+    ax.text(0.02, 0.02,
+            f"R_feas = var_td/var_nd = {R_feas:.2e}  -->  {verdict}",
+            transform=ax.transAxes, fontsize=8,
+            bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.85))
     ax.set_xlabel(r"$k_\parallel$ [s/km]")
     ax.set_ylabel(r"$\mathrm{Var}_{\mathrm{sightlines}}[P_F(k_\parallel)]$")
-    ax.set_title(f"[D-62/3 REDO] fGPA flux-power variance vs L1 collapse basin\n"
+    ax.set_title(f"[D-62/3 / D-68] fGPA flux-power variance — R_feas gate\n"
                  f"P{args.physics_id} z={args.redshift:.3f}, n_rays={n_rays}, "
-                 f"tau_amp={tau_amp:.2e}, verdict="
-                 f"{'PASS' if overall_pass else 'FAIL'}")
+                 f"tau_amp={tau_amp:.2e}, verdict={verdict}")
     ax.legend(fontsize=7, loc="best")
     ax.grid(True, which="both", alpha=0.3)
     fig.tight_layout()
@@ -432,8 +453,15 @@ def main() -> int:
         "var_band_mean_truth": var_mean_truth,
         "var_band_mean_fgpa_truth_delta": var_mean_fgpa_td,
         "var_band_mean_fgpa_noise_delta": var_mean_fgpa_nd,
-        "boera2019_z03_PF_band_lo": BOERA_PF_VAR_LO,
-        "boera2019_z03_PF_band_hi": BOERA_PF_VAR_HI,
+        # [D-68] R_feas dimensionless gate (replaces L1_CLUSTER_HI denom + Boera absolute anchor)
+        "R_feas": float(R_feas),
+        "log10_R_feas": log10_R_feas,
+        "R_feas_threshold_PASS": 3.0,
+        "R_feas_threshold_MARGINAL_lo": 1.0,
+        "verdict": verdict,
+        "escalation_target": escalation_target,
+        "verdict_note": verdict_note,
+        # Legacy fields retained for continuity / archival diff (non-binding):
         "L1_cluster_lo": L1_CLUSTER_LO,
         "L1_cluster_hi": L1_CLUSTER_HI,
         "pass_multiplier": PASS_MULTIPLIER,
@@ -441,21 +469,50 @@ def main() -> int:
         "ratio_fgpa_nd_over_L1hi": float(ratio_nd_vs_L1hi),
         "log10_decades_above_L1hi_td": log10_dec_td,
         "log10_decades_above_L1hi_nd": log10_dec_nd,
-        "gate_A_truth_delta_pass": pass_A,
-        "gate_C_noise_delta_pass": pass_C,
-        "gate_K2_boera_pass": True,  # would have raised AssertionError otherwise
-        "verdict_overall": "PASS" if overall_pass else "FAIL",
+        "gate_A_truth_delta_pass_LEGACY": pass_A,
+        "gate_C_noise_delta_pass_LEGACY": pass_C,
+        "verdict_overall": verdict,
         "stages_2_5_routing": (
-            "PROCEED to Stage 2" if overall_pass
-            else ("ABORT Stages 2-5; escalate to (2) per [D-62] ladder"
-                  if not pass_C else "FAIL but Gate C passed (anomaly)")
+            "PROCEED to Stage 2" if verdict == "PASS"
+            else f"ABORT Stages 2-5; escalate to {escalation_target} per [D-68]"
         ),
     }
     with open(args.out_json, "w") as f:
         json.dump(payload, f, indent=2)
     print(f"[D-62/3 REDO] Wrote numeric artifact: {args.out_json}", flush=True)
 
-    return 0 if overall_pass else 1
+    # ============ [D-68] verdict capsule for PI hand-off ============
+    import subprocess
+    try:
+        script_commit_sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=str(_REPO_ROOT)
+        ).decode().strip()
+    except Exception:
+        script_commit_sha = "unknown"
+    verdict_payload = {
+        "d_decision": "D-68 amendment 2026-05-24: R_feas dimensionless gate "
+                      "replaces K2 Boera absolute-variance assertion",
+        "R_feas": float(R_feas),
+        "var_mean_fgpa_td": float(var_mean_fgpa_td),
+        "var_mean_fgpa_nd": float(var_mean_fgpa_nd),
+        "var_mean_truth": float(var_mean_truth),  # record-only
+        "verdict": verdict,
+        "escalation_target": escalation_target,
+        "verdict_note": verdict_note,
+        "script_commit_sha": script_commit_sha,
+        "physics_id": args.physics_id,
+        "redshift": args.redshift,
+        "n_rays": n_rays,
+        "fgpa_beta": beta,
+        "fgpa_gamma": gamma,
+        "noise_seed": args.noise_seed,
+    }
+    with open(args.out_verdict_json, "w") as f:
+        json.dump(verdict_payload, f, indent=2)
+    print(f"[D-62/3 / D-68] Wrote verdict capsule: {args.out_verdict_json}",
+          flush=True)
+
+    return 0 if verdict == "PASS" else 1
 
 
 if __name__ == "__main__":
