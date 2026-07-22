@@ -170,9 +170,19 @@ class SherwoodIGMGalLoader:
                     f"CIC-deposited grid has non-positive mean ({mean}); "
                     "check that Coordinates and Masses are populated."
                 )
-            rho_over_mean = grid / mean
-            self._validate_data("rho", rho_over_mean)
-            return rho_over_mean
+            # In-place divide on the float64 `grid` buffer. The naive
+            # `rho_over_mean = grid / mean` form allocates a fresh float64
+            # array of equal size as an intermediate (3.38 GiB at n_grid=768)
+            # which OOMs on modest hosts; the downstream caller cast to
+            # float32 cannot avoid that allocation because the division
+            # already produced a full float64 array. `grid /= mean` writes
+            # the result back into the existing buffer (zero new allocation).
+            # `grid` is locally owned (allocated at line 152) so in-place
+            # mutation is safe. Output dtype unchanged (float64); the
+            # `loader.py:1014` consumer continues to cast to float32.
+            grid /= mean
+            self._validate_data("rho", grid)
+            return grid
 
         if field in ("T", "xHI", "vlos"):
             raise NotImplementedError(
