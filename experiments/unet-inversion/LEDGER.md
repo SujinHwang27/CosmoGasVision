@@ -67,6 +67,15 @@ flowchart LR
   **Pre-enumerated outcome cells:** (a) beats both baselines → quantifiable methods win, paper track re-licensed; (b) beats grid, not Wiener → learned prior helps but stays under the linear-optimal bar → diagnostic follow-up, no win claim; (c) ≈ grid → the z=0.3 information budget dominates even with a learned prior → strengthens the exp/nerf under-constraint characterization (publishable as its extension, not as a win); (d) wins only at large smoothing σ ≥ 4 → scoped large-scale-only claim, verb-ceiling accordingly; (e) FAIL trainability/overfit → process finding, disclose symmetrically.
   **Compute posture:** local smoke at small crops first; Juno A30/H100 per juno-hpc skill only after twin-gate behavioral tests (exp/nerf R20 discipline).
 
+- **[U-02] Prior-art absorption from the 2026-07-23 defense-panel novelty audit (binding on all claims).**
+  Provenance: defense-panel prior-art audit, dispatched from the exp/nerf close-out session 2026-07-23.
+  **Closest prior work: DeepCHART (Maitra, Viel & Kulkarni, MNRAS 2026, arXiv:2507.00135)** — supervised deep-learning inference of 3D density from survey-realistic Lyα sightlines at z=2.5, voxel Pearson ρ ≈ 0.77. This IS the method template of this track (amortized, simulation-pair-trained inversion). Consequences:
+  1. **Method-template novelty claim BARRED** for this track. The template exists and succeeded at z=2.5. Any novelty verb must attach to the residue, not the recipe.
+  2. **Defensible novelty axes (verb-ceiling for each):** (a) the information-sparse ⟨F⟩≈0.98 / z=0.3 regime, where no learned-inversion result exists and where the sibling exp/nerf track measured likelihood-domain under-constraint (K2); (b) the controlled likelihood-only vs learned-prior CONTRAST on one common corrected-metric table (per-scene NeRF + free grid + Wiener + this track — nobody has published that four-way in any regime); (c) the cross-physics generalization axis (train 3 feedback variants, test the 4th) — DeepCHART does not test prior-robustness across sub-grid physics.
+  3. **Related precedent to cite, not compete with:** Porqueres+ 2019/2020 (Bayesian field-level sparse-Lyα inference, z≈2.5); Huang+ 2021 Deep Forest (1D); TARDIS I/II (differentiable-forward inversion). Several sit annotated-but-uncited in `papers/shared/main.bib` — the bib is ahead of the prose repo-wide; do not repeat that failure in this track's write-ups.
+  4. **Pre-work obligation before any novelty claim ships:** full scan of the Chaves-Montero 2026 ML-Lyα review (arXiv:2605.22489), whose field-level-inference section the panel could not extract; if it names learned-inversion work at low z, this entry re-opens.
+  5. **External reference point for gates:** DeepCHART's ρ ≈ 0.77 at z=2.5 is the literature anchor the corrected-metric table positions against (with the regime caveat stated both ways). G2 remains a *benefit* gate vs our own baselines; U-02 adds no numeric bar, only claim discipline.
+
 ---
 
 ## 4. The Data (Lineage & Governance)
