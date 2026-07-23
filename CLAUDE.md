@@ -66,6 +66,9 @@ Lead with the empirical observation as observed. Framing-for-paper is a separate
 - `AttributeError: _DIR_MARK` → upgrade DVC to 3.x or pin `pathspec<1.0.0`.
 - Silent script exit (code 0, no output) → usually `import mlflow` hang. Test imports sequentially with `print` diagnostics; run with `python -u`; verify `MLFLOW_TRACKING_URI` is reachable; ensure script falls back to `nullcontext` when MLflow is unavailable.
 
+## Answer style (user directive 2026-07-22)
+Answer the user with a **few-liner mental model**: simplify as if explaining to a 10-year-old, **no analogies**. Short declarative sentences; name the real technical term once, then explain it plainly. This governs explanations and Q&A; precision numbers and record citations stay exact underneath the simple wording.
+
 ## Remote services
 - MLflow tracking URI: `http://127.0.0.1:5000` — **served locally by this machine**. Launch with `pwsh scripts/start_mlflow.ps1`. Backend: SQLite (`mlflow.db`, gitignored). Artifacts: `s3://cosmo-gas-vision-storage/mlflow-artifacts`. Override with `MLFLOW_TRACKING_URI` env var; loaded from `.env`.
 - DVC remote: `s3://cosmo-gas-vision-storage/dvc-data`.
