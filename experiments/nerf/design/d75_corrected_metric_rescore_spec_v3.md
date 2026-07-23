@@ -1,0 +1,118 @@
+# [D-75] Spec v3 — Corrected-Metric Re-Scoring of Banked Artifacts (benefit-gate probe)
+
+> **Pre-registration anchor.** PI-authored v3 (2026-07-23), committed verbatim by the session coordinator per panel KILLER-5: the commit hash of this file is the pre-registration of record. Science scoring is licensed only AFTER this commit exists. Committed on the session working branch (`service/data-export`) to avoid disturbing the in-flight implementation working tree; cherry-pick to `exp/nerf` owed at [D-75] LEDGER absorption.
+
+**Supersedes**: spec v2 in full, including Part E v2 (folded in as §9). Self-contained.
+**Status**: PI-authored v3 discharging defense-panel NEEDS-WORK (5 KILLER / 6 SERIOUS / PROBE batch). **Not a pre-registration until committed**: coordinator executes the repo commit of this text BEFORE any science scoring (panel K5; the commit hash is the pre-registration anchor). Implementer science readouts remain FROZEN until that commit lands; infrastructure builds may continue.
+**Review provenance (R6)**: gate-construction panel cycle CONSUMED (returned NEEDS-WORK; this v3 is the discharge). PI sign-off on v3 is R15-PROVISIONAL until the coordinator's commit; no further pre-review cycle owed under [D-73] §F item 7 unless v3 deviates from the panel's discharge items, which it does not knowingly do.
+**Compute**: CPU-only, local preferred, hard ceiling half a day; **Juno CPU partitions pre-committed as the overflow route** (per juno-hpc skill) if added arms bust the ceiling — reachability re-verification by infrastructure-manager required BEFORE any overflow dispatch; overflow election recorded in the artifact; **no arm is ever silently dropped** (fail-closed BLOCKED instead, §8).
+
+## §0 — Verb level, prior-failure ledger, honesty clauses
+
+First test of the corrected-metric axis. A metric correction can only reveal structure recovery already present in banked fields; it cannot create it. Modal expected outcome remains B-iii (characterization-only). Symmetric pre-commit: weak corrected numbers are banked, replace the defective-ξ numerals in all future paper text, and fail the benefit gate — a valid end state ([D-37]-ext rule 7).
+
+Prior-failure ledger (rule 4): [D-40], [D-41], [D-42], [D-46], [D-71] skip-rich, [D-73] A1, [D-73] am-4 A4-scrutiny demote, am-10 retraction of am-9 §9a, **and this spec's own v2 (panel-falsified on 5 counts: RSD convention, powerless acceptance suite, estimator misnaming, Wiener-tilted choices, uncommitted pre-registration)**. Per rule 2 the v3 verb level is downgraded accordingly: v3 is "the panel-discharged re-spec," not "the correct instrument."
+
+Rule-3 analogue: Gaussian smoothing at σ discards k ≳ 1/σ; any B-i pass licenses quasi-linear-scale claims only. r(k) is reported to localize where correlation dies. Mandatory disclosure in every downstream citation.
+
+## §1 — Scope
+
+**In**: re-scoring of banked fields (P1, z=0.3 only) under the corrected estimators, dual-frame, plus community-convention smoothed correlation, stochasticity, and the flux-domain truth-loss-floor decomposition (§9). No new training, no new levers.
+**Out**: P2–P4; z ≠ 0.3; Tier-4; any modification of legacy `compute_xi_pearson` (record preservation — new functions live alongside); paper edits of any kind (benefit-gated).
+
+## §2 — A0: empirical convention discriminators (RUN FIRST; gates §4) [K1]
+
+The v2 hardcoded RSD divisor (H = 117 km/s/(h⁻¹Mpc)) is WITHDRAWN. It conflicts with the standard comoving displacement v/(aH) (divisor ≈ 90.4 at z = 0.3) and with the project's own unit handling at `scripts/d71_I_angled_feasibility_preflight.py:66-85`. v3 hardcodes NOTHING:
+
+- **A0-i (divisor pin)**: read the P1 z=0.3 los file header; compute `vel_axis[-1] / pos_axis[-1]` (km/s per kpc/h). ≈ 0.0904 ⇒ aH comoving convention (divisor ≈ 90.4); ≈ 0.117 ⇒ H convention. **The file's own ratio, to < 1%, IS the divisor of record** (`divisor_kms_per_hMpc` in `a0_convention.json`, with the header cosmology values recorded). The redshift-space deposit (§4) must reproduce this ratio: redeposit check `|deposited-conversion / file-ratio − 1| < 0.01`.
+- **A0-ii (end-to-end frame check)**: on ONE pinned sightline (ray index 0), compute FGPA-τ from the redshift-space-remapped truth and cross-correlate with the native `tauH1` block for the same sightline; assert the correlation peak sits at zero lag ± 1 bin. (Reuse the existing FGPA machinery lineage, `scripts/d62_3_fgpa_variance_spectrum.py`.)
+- **Conditional erratum pre-registration**: if A0-i returns the aH convention, the banked am-9 §9c numbers (Δχ_rms = 1.30, p95 = 2.53 h⁻¹Mpc) understate the S7 frame confound by ×(1+z) ≈ 1.30 (→ ≈ 1.69 / 3.29) and an **am-9 erratum is OWED at [D-75] absorption** — direction disclosed now: the frame confound gets LARGER, which strengthens, not weakens, the S7 caveat. If A0-i returns H, the banked numbers stand and this clause is void. Either way the ruling is recorded.
+
+A0 failure (ratio matches neither convention within 5%, or A0-ii peak off zero) ⇒ redshift-space arm BLOCKED (fail-closed), real-space arm proceeds.
+
+## §3 — Part A: estimators + acceptance suite [K2, K3]
+
+**Naming ruling [K3]**: the shell statistic C_xy(r)/√(C_xx(r)·C_yy(r)) is **NOT a lagged Pearson coefficient** and will not be called one anywhere (LEDGER, artifact, paper) — doing so re-runs the [D-36]/am-9-S4 misattribution class. Name of record: **normalized cross-correlation function (NCCF)**, a configuration-space coherence/stochasticity ratio (Dekel & Lahav 1999 lineage). It is unbounded (|NCCF| > 1 reachable) and its denominator can vanish inside the box. The zero-lag Pearson of smoothed fields, **r_s(σ)**, IS a true Pearson coefficient and keeps that name.
+
+**Estimator definitions**:
+- NCCF(r): FFT-based, periodic, mean-subtracted fields, **ratio-of-shell-means** (shell-mean C_xy, C_xx, C_yy computed first, then the ratio — pre-registered against mean-of-ratios). **Validity domain**: report only shells with min(C_xx(r), C_yy(r)) > ε_d·C_xx(0), **ε_d = 0.01 pinned**; masked NaN otherwise. **Implementer measures the truth field's C_xx zero-crossing radius r_zc FIRST (both frames) and records the valid r-domain in the artifact before any other object is scored.** Bins: log-spaced, starting at 2Δx = 0.625 h⁻¹Mpc [P], upper edge 15 h⁻¹Mpc, per-bin mode counts published [P].
+- r_s(σ): Pearson over all voxels of Gaussian-smoothed (periodic FFT kernel) x-fields; σ ∈ {1, 2, 4} h⁻¹Mpc; **σ = 2 is the sole gated scale; σ = 1 and σ = 4 descriptive** [S6].
+- Scoring variable, ALL objects [K4b]: **x = log10(max(ρ/⟨ρ⟩, 1e-3))** (unified hard floor; the v2 double-floor is withdrawn; clamped-voxel fraction disclosed per object). **Spearman rank correlation reported beside every r_s** (mandatory robustness column); Pearson-vs-Spearman divergence > 0.15 raises an outlier-leverage flag.
+- Precision: float64 end-to-end [P]. Degenerate-variance policy: std(x) < 1e-12 ⇒ statistic UNDEFINED (recorded as such, never 0) [P].
+- r(k) = P_xy/√(P_xx·P_yy) per k-bin, lowest bin at k_f = 2π/60 ≈ 0.105 h/Mpc (box-limited, descriptive) [P]; k ∈ [k_f, 3] h/Mpc; **k > 1 descriptive-only** [S6].
+
+**Acceptance suite (replaces v2 A1–A4 in full; all must PASS pre-scoring; any FAIL ⇒ cell 0)** [K2]:
+- **T-A (constant-coherence GRF pair — the load-bearing test)**: X = GRF with the truth field's measured P(k); Z = independent GRF, same P(k); Y = cX + √(1−c²)Z. Two coherence points, c ∈ {0.6, 0.2}, seeds pinned {20260731, 20260801}. Assert NCCF(r) ≡ c ± 0.02 at every valid-domain shell AND r_s(σ) = c ± 0.02 at all three σ. Validates normalization, shell binning, and smoothing invariance in one construction.
+- **T-B (known lag)**: Y(x) = X(x + 5Δx·ê_LOS) (5 cells = 1.5625 h⁻¹Mpc). Assert the unnormalized cross-correlation peak along the LOS axis at exactly 5 cells; NCCF/r_s behavior recorded descriptively.
+- **T-C (null distribution, empirically calibrated)**: ≥ 10 independent GRF realizations vs truth; publish the measured null SD of r_s(σ=2) (expected O(0.02–0.04) in this box); assert each |r_s| < 3 × SD_null(measured). The v2 fixed 0.01 tolerance is withdrawn (it was below the null SD — a correct implementation would have failed it).
+- **T-D (white-noise blindness, converted into a test)**: Y = X + white noise (on x), ≥ 3 seeds: assert NCCF(r > 0) ≡ 1 ± 0.02 over the valid domain (additive white noise is invisible to NCCF at r > 0 — exactly why white noise CANNOT calibrate recovery, see §6 controls) while r_s degrades as measured.
+
+## §4 — Part B: frames [K1, S4]
+
+Two truth targets at 192³, both from the verified 768³ ρ cache (`Sherwood/.rho_field_cache/rho_field_p1_z0.300_n768.npy`; **sha256 recorded and required to match the am-9 truth_192 provenance chain** [P]):
+- **Real-space truth**: 768³ → 192³ mean-pool (am-6 §S rule; never upsample models).
+- **Redshift-space truth**: particle-level redshift-space CIC deposit, s = x + v_los/divisor_of_record (§2 A0-i), periodic wrap, LOS axis confirmed from `src/data/loader.py` (never assumed), then 768³ → 192³ mean-pool.
+- **Truth v_los** (not on disk; `igm_gal_loader.load_3d_field('vlos')` is NotImplementedError — verified): mass-weighted CIC velocity from `SherwoodIGM_gal/extracted/planck1_60_768_z0.300/snapdir_012/` (16 HDF5 files verified). **Validation gate moves to PARTICLE level, pre-deposit [S4]**: after unit handling, particle v_los RMS must match the los-file v_pec RMS to **± 3%** (the ±10% v2 band could not separate the 12.3% √a error from few-% deposit smoothing); artifact records **"sqrt(a) applied: yes/no"** explicitly, per-axis RMS, a sign-convention check against the los file, and the re-derived los-file v_pec RMS with its provenance (the banked 151.8 km/s is am-9 §9c; both values recorded). Gate FAIL ⇒ redshift-space arm BLOCKED fail-closed.
+
+**Frame ruling (unchanged in substance, amended in consequence [K4a])**: real-space is the primary frame (the models are real-space-parameterized; the [D-13]-class claim is about comoving ρ). Redshift-space is the mandatory secondary frame. **Frame-straddle membership rule [S5]: the primary frame decides cell membership; the frame flag (|Δr_s| > 0.15) annotates and mandates co-citation but never re-routes a cell.** However, per K4a: **any B-ii separation involving Wiener fires only if sign-consistent in BOTH frames** — this is the anti-tilt correction for Wiener's S7 misregistration exposure.
+
+## §5 — Resolution adequacy (inscribed; coordinator note of record, PI-annotated)
+
+Lattice 60/192 = 0.3125 h⁻¹Mpc; k_Nyq ≈ 10 h/Mpc; σ=2 = 6.4 cells (σ=1 = 3.2 cells, the binding margin case); LOS thermal floor 0.3–0.5 h⁻¹Mpc (FWHM basis, ≈1.665b for b = 25–40 km/s); transverse data spacing 1.875 h⁻¹Mpc (grid, n_rays=1024) / 7.5 h⁻¹Mpc (MLP, n_rays=64); ~27,000 independent σ=2 volumes; 8-octant jackknife well-posed. The lattice out-resolves the data everywhere ⇒ recovery failures are attributable to method/data, not the scoreboard — with the rider that the MLP's 7.5 h⁻¹Mpc transverse floor exceeds the σ=2 scale, so MLP failures are method-OR-data-sparsity jointly. Scope limits: single-realization box ⇒ method-comparison claims only; NCCF bins near 0.625 h⁻¹Mpc carry no claims; lowest r(k) bin descriptive.
+
+## §6 — Part D: objects and controls [K4, S3, S6, P]
+
+Scored objects (all at 192³, both frames, provenance hashes recorded):
+- **(a) Grid**: `cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90/checkpoints/step_050000.pt` (md5 of record 9ceb25bc1061379874a21e9d7fad1322, re-verified at load). Robustness readout [P]: r_s over all voxels (headline) + near-ray shell (≤ 1 cell from any ray) + far-field complement, descriptive.
+- **(b) Wiener [K4c]**: cube re-emitted from `scripts/d73_a4prime_wiener_baseline.py` config of record (noise_rel = 1e-3, unit-variance tracer, 74 px/ray CG) — **CPU L-sweep L ∈ {1, 2, 3}, re-scored under the corrected metric, Wiener takes its best L per frame** (best-of-sweep by r_s(σ=2) in that frame; chosen L disclosed). The v2 inheritance of L=3 (selected by the defective estimator, which rewards over-smoothing) is withdrawn.
+- **(c) MLP**: `cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe/checkpoints/step_050000.pt` (**md5 pinned at load and recorded** [P]; arch cross-checked against MLflow run `31acdf9d` params), density head rendered at 192³ cell centers, chunked, float64 accumulation.
+
+Controls (calibration + null, not competitors):
+- **(d) Phase-randomized truth [S3]**: truth |FFT| amplitudes, randomized phases, seed 20260726 — the exact null for "right two-point statistics, wrong structure." Expected r_s ≈ 0; this, not white noise, is the primary null anchor.
+- **(e) Low-pass-truth ladder [S3, S1]**: truth retaining k ≤ k_c, k_c ∈ {0.25, 0.5, 1.0, 2.0} h/Mpc. Calibrates r_s ↔ physical-scale content; the artifact reports **k_c*(0.50)** = the interpolated cutoff at which low-pass truth scores r_s = 0.50, giving the B-i bar its derived physical meaning.
+- **(f) Noise ladder**: truth x + white noise at {0.25, 0.5, 1.0}×std(x), noise on x not ρ [P], seeds {20260723, 20260724, 20260725} — retained ONLY as estimator-behavior diagnostics (NCCF blindness, r_s degradation curve); **explicitly NOT recovery calibration** (K2 lesson).
+- **(g) Sampling-operator control [S6]**: truth-768³-mean-pooled-to-192³ vs truth-point-sampled-at-cell-centers — bounds the pool-vs-point-sample operator penalty that the MLP comparison inherits; co-cited with any MLP verdict.
+
+Config-comparability disclosure rides every cross-object table (grid n_rays=1024 / MLP n_rays=64 / Wiener 74 px/ray): verdict-level comparisons licensed; magnitudes are not a controlled contrast.
+
+## §7 — Bands and inference [S1, S2, K4a]
+
+Primary readout: **r_s(σ=2, real-space, 192³)** per object.
+- **B-i "meaningful large-scale recovery"**: r_s ≥ 0.50. Justification of record [S1]: a presentability floor (≥ 25% of smoothed log-density variance explained), with its physical meaning DERIVED from control (e) via k_c*(0.50) rather than asserted from literature. The v2 "65% of CLAMATO r≈0.77" justification is WITHDRAWN: published CLAMATO/TARDIS values are δ_F-map statistics at z≈2.3, not log-density at z=0.3, and are demoted to qualitative context; DeepCHART ρ≈0.77 (z=2.5, voxel Pearson on density per the novelty panel) enters as an R14 context row only, citation-verified before it appears anywhere.
+- **B-ii "quantifiable win of X over Y"** [S2]: ALL of — (1) Δr_s ≥ 0.10 point estimate; (2) paired 8-octant test on Fisher-z-transformed per-octant r_s: t ≥ t₇(0.975) = 2.365 (the v2 "2σ_jk" is withdrawn — it is p ≈ 0.086, not 0.05); (3) one block-bootstrap cross-check (≥ 1000 resamples over sub-cube blocks; 95% CI excludes 0); (4) **for any pair involving Wiener: sign-consistent in both frames** [K4a]; (5) no frame sign-reversal (reversal ⇒ B-ii does not fire; frame-artifact flag raised) [S5].
+- **B-iii**: no neural object clears B-i in the primary readout.
+
+## §8 — Outcome cells (complete enumeration; supersedes v2 §6) [K5, S5]
+
+**Blanket clauses, binding over all cells**: (α) **ANY object clearing B-i — neural, Wiener, or control anomaly — triggers the same mandatory re-audit of the am-9 §9d headline, the "~25%-of-ceiling" sentence, and the am-11 title** before any further paper work (symmetry; not just the Wiener cell). (β) **Cells outside {1, 2} produce NO new positive publishable claim.** (γ) **Fail-closed**: a BLOCKED object (A0/S4 gate failure, budget bust) cannot enable re-license; any cell referencing it cannot fire; BLOCKED status is reported, never silently absorbed. (δ) Primary frame decides membership; frame flags annotate.
+
+| Cell | Condition (primary readout) | Ruling / benefit gate |
+|---|---|---|
+| 0 | Any §3 acceptance test FAILs (per-test disposition recorded) | No science readout; implementation iteration only |
+| 1 | Neural object clears B-i AND B-ii over Wiener (all five B-ii conditions) | **RE-LICENSE**; recovery + neural-win language (with §6 caveats + §0 smoothing scope + clause α re-audit) |
+| 2 | Neural object clears B-i; no B-ii over Wiener | **RE-LICENSE** recovery framing only; no neural-win claim; clause α re-audit |
+| 2b | Neural AND Wiener clear B-i; Wiener wins B-ii over neural | NOT cells 1/2 [S5]. "Recovery real; classical leads." **Benefit gate FAILS for neural**; clause α re-audit |
+| 3 | No B-i anywhere; grid clears B-ii over Wiener | Gate FAILS; footnote-grade comparative datum; explicitly not a re-license |
+| 4 | Wiener clears B-i; no neural object does | Gate FAILS for neural; clause α re-audit (under-constraint headline narrowed to the scales/statistics where it survives) |
+| 5 | Nothing clears B-i; no B-ii separations | **B-iii confirmed, quantified.** Gate FAILS; halt persists; truth-maintenance edit (defective-ξ numeral retirement) remains owed whenever writing resumes, outcome-independent |
+| 6 | MLP beats grid on r_s (either B-ii direction (MLP, grid)) | Anomaly: instrument-suspect first. **Pre-registered audit checklist** [P]: (i) per-object mean-subtraction/normalization re-check; (ii) MLP render chunk-boundary artifact scan; (iii) nearest-vs-trilinear sampling re-run; (iv) checkpoint md5 + arch vs MLflow 31acdf9d; (v) frame-target mix-up check. Then bank what survives, observation-first |
+| 7 | Frame flag fires anywhere | Annotation + mandatory co-citation; S7 confound upgraded "named" → "measured"; no re-routing |
+| 8 | Control anomaly (phase-randomized truth or noise ladder clears B-i) | Estimator-suspect: return to cell 0 disposition regardless of other cells |
+
+**Explicit benefit gate**: paper-fixing re-licensed iff **cell 1 or cell 2** fires. Everything else confirms characterization-only. No post-hoc re-verbing of which cell counts (R13).
+
+## §9 — Part E: truth-loss-floor decomposition (flux-domain; folded from Part E v2, unchanged in substance)
+
+At the exact K2 configuration (P1, z=0.3, n_rays=1024, plain-[D-24] loss, free tau_amp, same `volume_render_physics`; machinery from `scripts/d73_k2_verification_battery.py`): **T0** truth-native vs τ_GT (must reproduce 0.0101 ± 5% or halt); **T1** truth vs τ_self(truth) ≡ 0 (wiring); **T2** τ_self(truth) vs τ_GT (total forward-model mismatch in loss units); **T3** grid τ_pred vs τ_self(truth), co-reported with banked L_grid(τ_GT) = 0.0026; **T4** capacity-matched truth floor — truth degraded to the grid's representation and sampled at ray points via the **exact `VoxelGridField` interpolation scheme** (implementer confirms from `src/models/voxel_grid_field.py`), rendered, tau_amp-minimized, scored vs τ_GT. Routes (data-reality: only the ρ cube exists at 768³): route 1 — all four fields pooled to 192³ (ρ mean-pool; T/X_HI/v_pec mass-weighted) then sampled per the grid scheme; route 2 (fallback) — per-ray projection of truth sightline fields onto the grid's 1D LOS basis at each ray's transverse coordinate, disclosed approximation, sign-of-bias unknown; executed route disclosed. Bands (symmetric, committed now; do not assume T4 ≥ T0): **E1** T4 ≤ 1.5×L_grid ⇒ margin substantially resolution-representation; K2 headline REVISED. **E2** T4 ≥ 0.8×T0 AND L_grid ≤ 0.5×T4 ⇒ K2 HARDENED (a 192³-capacity field out-fits resolution-matched truth). **E3** 0.5 < T4/T0 < 0.8 with L_grid ≤ 0.5×T4 ⇒ mixed; headline number changes. **E4** T4 > T0 ⇒ T0 stays binding comparator; T4 co-reported. T2/T0 bands: ≥ 0.8 integrator-dominated (K2 re-verbed to "predominantly integrator slack, measured"); 0.2–0.8 mixed co-citation; ≤ 0.2 K2-strengthening. **Anti-comparator-shopping pre-commit: the K2 margin of record becomes min(T0, T4)/L_grid.** Part E is flux-domain, independent of §§3–8, and modifies only the verb level / margin-of-record of K2 citations — never the §8 benefit-gate routing (R10).
+
+## §10 — Deliverables, budget, §R28-CHECK
+
+Artifacts → `experiments/nerf/artifacts/d75_rescore/`: `a0_convention.json`; acceptance-suite results; frame cubes + S4 particle-gate record; object/control cube set + Wiener L-sweep record; `d75_scores.json` (every §8 cell evaluated mechanically) + figures; `d75_truth_floor_decomposition.json` (T0–T4 + route + fired cells). Budget: ~3–4 hr CPU estimate; hard local ceiling half a day; Juno CPU overflow per §1 preamble.
+
+**§R28-CHECK**: rungs = 8 — (1) coordinator commit of v3 [pre-registration]; (2) A0 discriminators; (3) estimator + acceptance suite; (4) frame/data build incl. S4 gate; (5) object + control emissions incl. Wiener sweep; (6) scoring + inference + report; (7) Part E (T0–T4); (8) PI absorption + conditional-erratum ruling. Landing artifacts = 8 — committed spec; `a0_convention.json`; estimator module + acceptance artifacts; frame cubes + gate record; emitted cube set + sweep record; `d75_scores.json` + figures; decomposition JSON; [D-75] LEDGER entry + erratum ruling. 8 ≥ 8 ✓.
+
+## §11 — Out-of-scope flags carried to the [D-75] LEDGER absorption
+
+(i) Conditional am-9 §9c S7 erratum (KILLER-1-dependent, §2). (ii) Wiener "idealized-yet-handicapped" framing owes R8/R9 verb care at paper time (noise_rel = 1e-3 is idealized; sparse-geometry and frame handicaps are real). (iii) MLflow 403 → infrastructure-manager, independent. (iv) The numbers.tex/atoms cascade plan for the "~25%-of-ceiling" sentence and dependent macros must be drafted BEFORE numbers exist (latex-author, pre-staged, benefit-gated for execution). (v) Novelty-panel absorption batch (TARDIS under-crediting; bib-ahead-of-prose entries ~lines 598/673/733/750; MedNeRF entry conflict line 80 vs 809; TensoRF miscite at `5_related_work.tex:8`; Porqueres+ 2019/2020 + Nusser & Haehnelt 1999 + Pichon+ 2001 credits; "first-to-reconstruct" BARRED, surviving claim = "first likelihood-domain quantification of under-constraint in the ⟨F⟩≈0.98 / z=0.3 regime under an explicit Voigt/FGPA forward model"; CSST low-z hook; Chaves-Montero 2026 scan) — absorbs at the [D-75] LEDGER write, none of it gates this spec's execution.
+
+— End of spec v3.
