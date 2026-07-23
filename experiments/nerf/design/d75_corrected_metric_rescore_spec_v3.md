@@ -134,3 +134,18 @@ Artifacts → `experiments/nerf/artifacts/d75_rescore/`: `a0_convention.json`; a
 **Micro-cycle ruling, of record**: owed for Amendment 2 ONLY (panel-specified numeric gate modified). NOT owed for Amendment 1 (executes the panel's own derived-tolerance instruction; derivation now empirical), Amendment 3 (voiding a vacuous band is claim-narrowing, not claim-making), or Amendment 4 (bookkeeping + pre-registered clause firings). All four amendments are disclosed as a batch in the [D-75] absorption entry with this provenance trail.
 
 — End of v4 amendment block. On commit: re-run T-A under Amendment 1; dispatch the narrow S4 micro-cycle; real-space scoring proceeds on T-A PASS; z-arm awaits the micro-cycle verdict.
+
+---
+
+# [D-75] Amendment-2 micro-cycle verdict of record (2026-07-23, appended by coordinator)
+
+**Verdict: APPROVE-WITH-AMENDMENTS** (three, minimal, text-only; recorded here, which discharges them; no recomputation owed). Panel rationale highlights: slope band arithmetically sufficient vs the √a class (no-√a slope ≥ 0.95 × 1.140 = 1.083 > 1.05 whenever clause (i) passes; measured no-√a 1.113 fails by 6.3 points); no named error class lives in the 3–5% window, so no power forfeited vs the original ±3% band; the Pearson ≥ 0.98 clause is net-new power (catches axis-swap — particle x-RMS 188.0 vs z-RMS 179.3 differ < 5%, invisible to the old RMS gate — and sign errors, r → −0.985); clause (v) is per-run and self-protecting against attenuation drift; retroactive discharge is safe while artifact identity holds.
+
+**Recorded amendments (binding):**
+1. **Post-hoc-threshold disclosure.** Clause (i)'s numerals ([0.95, 1.05], r ≥ 0.98) were set after observing slope 0.9756 / r 0.9853. Thresholds are calibration-informed; the justification of record is rejection margins (smallest named error class fails clause (i) by ≥ 6.3 points; sign/axis errors fail the Pearson clause catastrophically), not the passing values.
+2. **Discharge bound to artifact identity.** The retroactive discharge is valid ONLY for the exact deposit that produced the diagnostics: `cubes/truth_zspace_192.npy` md5 `3a7af286ddff91f26f00459c11577d29`; `cubes/vlos_z_192.npy` md5 `198a7e8fcf260f5ffd3359d2d61f916d`. Any re-emission of the z-space deposit (different axis, resolution, ray subset) VOIDS the discharge and re-runs clauses (i)–(v), including (v) recomputed under the new configuration's attenuation.
+3. **Inherited common-mode residual, named.** The gate (v3 and v4 alike) is blind to a velocity-unit error applied identically upstream of both the snapshot-read chain and the los extractor; A0-i pins the Hubble axis only, not the los-file v_pec block; A0-ii's zero-lag check is the sole (weak) residual coverage. Inherited limitation, disclosed, not fixed here.
+
+PROBE note (no amendment owed): clause (ii) reads as the particle-level per-axis mean (< 0.3 km/s recorded), not a deposited-cube mean.
+
+**Effect on freeze rules:** with this verdict recorded, the recorded diagnostics discharge the S4 gate and the **redshift-space arm UNBLOCKS**. Real-space arm unchanged (gated on Amendment-1 T-A PASS). Mixed-axis disclosure from Amendment 2 rides every z-space citation.
