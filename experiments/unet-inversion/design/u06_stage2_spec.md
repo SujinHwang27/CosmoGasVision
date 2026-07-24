@@ -94,6 +94,14 @@ Rungs (9): R1=A1 → R2=A2 → R3=A3 → R4=A6 → R5=A7 (core-implementer, sequ
 
 **Framing guard (binding on all citations of the s3 read).** 0.8824 is: VAL-slab, trained-physics (P1+P2), 1024-ray file-order pattern, 500 steps, seed 42, suite-common-structure-scoped (Δ_phys ≈ 0), variance-compressed in the tails. It is first smoke evidence that cross-example prior injection recovers structure at z=0.3 — a candidate; no outcome verb until G2. **No VAL-vs-TEST or unet-vs-grid comparison is licensed** (0.8824 and 0.5758 live on different slabs); the G2 read stays sealed.
 
+**Micro-cycle verdict of record (2026-07-24): Q1 APPROVE; Q2 APPROVE-WITH-AMENDMENTS → the pre-stated mechanical re-evaluation EXECUTED: U-G = f(z1,z2,z3) = clean; actual 0.8824 > GREEN floor 0.2338 → CELL GREEN — Juno planning authorized; B2 remains the final pre-dispatch gate (A10 outstanding).** Panel mechanics verified independently (edge 0.22225 n1000-block provenance, floor arithmetic, all-σ control clearance). Q1 rationale banked: no pathology exists that passes z1–z3 at ≈null and is caught only by z4-high; z3's derangement kills the flux-as-generic-texture family outright (0.033 ≈ null); z4-in-trigger tested the suite design, not the network. Riders + amendments, binding:
+- **R1**: Δ_phys is two-sided — Δ_phys < −2×block-SE (swap significantly beating actual) is an anomaly flag routing to audit. Banked s3 values ≈ ±0.002 across σ; no flag.
+- **R2**: at the first read where P3/P4 flux is rasterized, add an untrained-physics swap column (diagnostic, not trigger); optionally one P1-vs-P2 δ_F divergence statistic on the eval pattern to calibrate Δ_phys ≈ 0.
+- **A1**: on this ratification the Hann-tapered column governs ALL subsequent gate reads exclusively and irreversibly; uniform demotes to diagnostic co-report; no per-read reversion — only a new micro-cycle.
+- **A2**: the seam-diagnostic column (interior-vs-full, 0.02) is retained under tapering as the acceptance test that the fix worked; a tapered read flagging >0.02 REOPENS the seam issue.
+- PROBE noted: possible k≈2π/32 modulation from periodic weights — the standing P(k)-ratio column covers detection.
+Banked s3 numbers are never restated; fresh reads only. Precedent cited: Gaussian/Hann-weighted sliding-window inference is standard of practice (nnU-Net, Isensee+ 2021).
+
 — End of v2 amendment block.
 
 ---
