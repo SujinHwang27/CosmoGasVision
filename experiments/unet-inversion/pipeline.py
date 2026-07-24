@@ -307,6 +307,15 @@ def train_s3(model: UNet3D, ds: UNetPairDataset, val_batch, trk: Tracker,
 # file-order eval ray pattern ([0,1024) primary / [0,64) secondary).
 
 
+def hann3_weight(crop: int = CROP) -> np.ndarray:
+    """Periodic Hann^3 window weight (micro-cycle A1, 50de53a). With hop =
+    crop/2 the periodic Hann satisfies COLA exactly: w[n] + w[n + crop/2]
+    = 1 per axis, so the 3D accumulated weight is uniformly 1."""
+    n = np.arange(crop, dtype=np.float64)
+    w = 0.5 * (1.0 - np.cos(2.0 * np.pi * n / crop))   # periodic Hann
+    return w[:, None, None] * w[None, :, None] * w[None, None, :]
+
+
 def sliding_window_predict(
     model: UNet3D,
     source: PhysicsSource,
@@ -314,14 +323,24 @@ def sliding_window_predict(
     device: torch.device,
     delta_f: Optional[np.ndarray] = None,
     input_transform: Optional[Callable[[np.ndarray], np.ndarray]] = None,
+    taper: str = "hann",
 ) -> np.ndarray:
-    """Predict the full n_grid^3 x-field by overlapping 64^3 windows."""
+    """Predict the full n_grid^3 x-field by overlapping 64^3 windows.
+
+    taper='hann' (inference-of-record per micro-cycle A1): per-window
+    Hann^3 weighting, normalized by accumulated weight; runtime assertion
+    accumulated-weight-uniform-to-<1e-6. taper='uniform' retained as a
+    diagnostic co-report column only (8x-count assert).
+    """
     geom = source.geometry
     n = geom.n_grid
     df = source.delta_f if delta_f is None else delta_f
     ray_ids = np.asarray(ray_ids, dtype=np.int64)
+    if taper not in ("hann", "uniform"):
+        raise ValueError(f"unknown taper {taper!r}")
+    W = hann3_weight(CROP) if taper == "hann" else np.ones((CROP,) * 3)
     pred_sum = np.zeros((n, n, n), dtype=np.float64)
-    cnt = np.zeros((n, n, n), dtype=np.float64)
+    wsum = np.zeros((n, n, n), dtype=np.float64)
     # S7 (spec v2): PERIODIC window placement — stride 32 on the periodic
     # box, 6 positions/axis, 216 windows, exact 8x per-voxel coverage.
     positions = list(range(0, n, STRIDE))
@@ -339,13 +358,19 @@ def sliding_window_predict(
             out = model(xb)[0, 0].float().cpu().numpy().astype(np.float64)
             ix = np.ix_(*[(np.arange(c, c + CROP) % n) for c in
                           (ca, cb, cc)])
-            pred_sum[ix] += out
-            cnt[ix] += 1.0
-    # S7 runtime assertion: uniform 8x coverage before averaging
-    assert (cnt == 8.0).all(), (
-        f"S7 coverage FAIL: expected uniform 8x, got "
-        f"[{cnt.min():g}, {cnt.max():g}]")
-    return pred_sum / cnt
+            pred_sum[ix] += out * W
+            wsum[ix] += W
+    if taper == "hann":
+        # A1 runtime assertion: accumulated weight uniform to < 1e-6
+        assert np.abs(wsum - 1.0).max() < 1e-6, (
+            f"Hann COLA FAIL: accumulated weight in "
+            f"[{wsum.min():.8f}, {wsum.max():.8f}]")
+    else:
+        # uniform diagnostic path keeps the 8x-count assert
+        assert (wsum == 8.0).all(), (
+            f"S7 coverage FAIL: expected uniform 8x, got "
+            f"[{wsum.min():g}, {wsum.max():g}]")
+    return pred_sum / wsum
 
 
 def window_interior_mask(n: int = N_GRID) -> np.ndarray:
@@ -404,9 +429,26 @@ def read_val_band_edge():
 # ------------------------------------------------------- quick masked eval
 
 
+def val_block_slices():
+    """8 congruent sub-blocks of the VAL slab [134,163) — R9 geometry
+    transplanted: 29 voxels is odd -> trim ONE voxel at the high-index end
+    ([134,162), two 14-voxel halves) x 2x2 transverse (96)."""
+    lo, hi = 134, 162
+    half = (hi - lo) // 2
+    ht = N_GRID // 2
+    out = []
+    for a0, a1 in ((lo, lo + half), (lo + half, hi)):
+        for j in (0, 1):
+            for k in (0, 1):
+                out.append((slice(a0, a1), slice(j * ht, (j + 1) * ht),
+                            slice(k * ht, (k + 1) * ht)))
+    return out
+
+
 def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                       device: torch.device,
-                      source_p2: Optional[PhysicsSource] = None) -> Dict:
+                      source_p2: Optional[PhysicsSource] = None,
+                      untrained_swap: Optional[Dict] = None) -> Dict:
     """s3 quick eval: r_s on the [D-49] VAL mask, real frame, sigma {1,2,4};
     U-G controls z1/z2/z3; descriptive columns. Scoring conventions IMPORTED
     from the R9 machinery, not re-implemented.
@@ -462,8 +504,8 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                 [np.zeros_like(a[0]), a[1]])),
         "z3_deranged_ray": dict(delta_f=df_derange),
     }
-    # z4 (S5): cross-physics flux swap — P2 flux into the P1 eval pattern
-    # (free given byte-identical LOS geometry, asserted here).
+    # z4 (S5, reclassified 3ccf6a2): cross-physics flux swap — P2 flux into
+    # the P1 eval pattern. Diagnostic Delta_phys column, NOT a U-G trigger.
     if source_p2 is not None:
         assert np.array_equal(source.geometry.voxel3,
                               source_p2.geometry.voxel3)
@@ -471,6 +513,12 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
         df_swap = source.delta_f.copy()
         df_swap[rays_primary] = source_p2.delta_f[rays_primary]
         conditions["z4_cross_physics_swap"] = dict(delta_f=df_swap)
+    # R2 (50de53a): untrained-physics swap column (diagnostic, not trigger)
+    # untrained_swap = {"label": "z5_untrained_swap_P3", "delta_f": arr}
+    if untrained_swap is not None:
+        df_u = source.delta_f.copy()
+        df_u[rays_primary] = untrained_swap["delta_f"][rays_primary]
+        conditions[untrained_swap["label"]] = dict(delta_f=df_u)
 
     cubes, scores = {}, {}
     for name, kw in conditions.items():
@@ -489,6 +537,15 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
         print(f"[eval] {name}: r_s(2,real,masked)="
               f"{entry['2']['pearson_masked']:.4f} "
               f"({time.time()-t0:.0f}s)", flush=True)
+
+    # uniform-taper diagnostic co-report (A1: hann governs; uniform demoted)
+    pred_unif = sliding_window_predict(model, source, rays_primary, device,
+                                       taper="uniform")
+    unif_s2 = NC.gaussian_smooth_periodic(pred_unif, BOX_MPC_H, 2.0)
+    uniform_co_report = {
+        "r_s2_val_mask_uniform": masked_pearson(truth_s[2.0], unif_s2, mask),
+        "note": "diagnostic co-report only; hann column governs (A1)",
+    }
 
     # secondary pattern (descriptive; no controls, no gate)
     pred64 = sliding_window_predict(model, source, rays_secondary, device)
@@ -528,15 +585,39 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
             "divergence": abs(r2_interior - r2),
             "seam_flag": bool(abs(r2_interior - r2) > 0.02)}
 
+    # U-G trigger set = z1-z3 ONLY (z4 reclassified, 3ccf6a2/50de53a)
+    trigger_keys = ("z1_all_zero_input", "z2_mask_only", "z3_deranged_ray")
     controls_r2 = {k: scores[k]["2"]["pearson_masked"]
                    for k in conditions if k != "actual"}
+    trigger_r2 = {k: controls_r2[k] for k in trigger_keys}
     collapse = descriptive["var_ratio_unsmoothed_mask"] < 0.01
+
+    # Delta_phys column (mandatory on every read) + R1 two-sided flag
+    delta_phys = None
+    if "z4_cross_physics_swap" in scores:
+        blocks = val_block_slices()
+        z4_s2 = NC.gaussian_smooth_periodic(
+            cubes["z4_cross_physics_swap"], BOX_MPC_H, 2.0)
+        d_blk = np.array([
+            NC.pearson(truth_s[2.0][b], pred_s2[b])
+            - NC.pearson(truth_s[2.0][b], z4_s2[b]) for b in blocks])
+        d_se = float(np.std(d_blk, ddof=1) / np.sqrt(len(d_blk)))
+        d_val = r2 - scores["z4_cross_physics_swap"]["2"]["pearson_masked"]
+        delta_phys = {
+            "delta_phys_sigma2": d_val,
+            "block_deltas": [float(v) for v in d_blk],
+            "block_se": d_se,
+            "r1_anomaly_flag_two_sided": bool(d_val < -2.0 * d_se),
+            "scope_note": "Delta_phys ~ 0 => recovery scoped 'suite-common "
+                          "(shared-IC) structure recovered from flux' "
+                          "(3ccf6a2)",
+        }
     # VAL null band + m (K2): cell evaluates ONLY with both present
     edge, m_edge, null_block = read_val_band_edge()
-    # S4 trigger: any control >= 0.5 x actual OR any control > null97.5(VAL)
-    u_g_fired = any(v >= 0.5 * r2 for v in controls_r2.values())
+    # S4 trigger over z1-z3: any >= 0.5 x actual OR any > null97.5(VAL)
+    u_g_fired = any(v >= 0.5 * r2 for v in trigger_r2.values())
     if edge is not None:
-        u_g_fired = u_g_fired or any(v > edge for v in controls_r2.values())
+        u_g_fired = u_g_fired or any(v > edge for v in trigger_r2.values())
     # K2 re-banded cell (VAL slab; requires the governing edge AND m)
     if edge is not None and m_edge is not None:
         if u_g_fired or collapse or r2 <= edge - m_edge:
@@ -558,11 +639,15 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
         "scores_real_frame": scores,
         "secondary_pattern_r_s2": p64,
         "descriptive": descriptive,
+        "taper": "hann (inference-of-record, micro-cycle A1; uniform = "
+                 "diagnostic co-report)",
+        "uniform_co_report": uniform_co_report,
         "seam_diagnostic": seam,
         "controls_r_s2": controls_r2,
+        "delta_phys": delta_phys,
         "u_g_fired_S4_rule": u_g_fired,
-        "u_g_rule": "any control r_s >= 0.5 x actual OR any control > "
-                    "null97.5(VAL) (spec v2 S4)",
+        "u_g_rule": "over z1-z3 ONLY (z4 reclassified 3ccf6a2): any >= "
+                    "0.5 x actual OR any > null97.5(VAL)",
         "variance_collapse": collapse,
         "z3_derangement": {"seed": 20260729, "n_redraws": n_redraws,
                            "rule": "global derangement of whole-ray flux "
