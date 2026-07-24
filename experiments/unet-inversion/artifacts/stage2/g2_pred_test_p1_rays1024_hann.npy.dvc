@@ -1,0 +1,6 @@
+outs:
+- md5: a7f9e88fad568869238a023ff26aeaef
+  size: 28311680
+  isexec: true
+  hash: md5
+  path: g2_pred_test_p1_rays1024_hann.npy

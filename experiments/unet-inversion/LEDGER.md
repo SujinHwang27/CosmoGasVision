@@ -20,7 +20,7 @@ flowchart LR
 |:--- |:--- |:--- |:--- |:--- |
 | **Stage 0** | Track founding + research proposal | ✅ **DONE 2026-07-23** — (a) PI ratification landed as **[U-04]** (R15-PROVISIONAL, panel pre-review owed before Stage-2 Juno dispatch); (b) corrected-metric table landed ([U-03], [D-75]); (c) novelty panel landed ([U-02]) | Proposal + ratified gates in §2/§3 + `design/u04_stage1_ratification.md` | Founded + ratified 2026-07-23 per user directives (NeRF track wrapped same day) |
 | **Stage 1** | Pair-manufacture data plumbing (crop × ray-pattern sampler, flux rasterizer) | ✅ **DONE 2026-07-23 — PI gate APPROVE** (all 9 rungs; 28 tests green; δ_F scale ×12.5 measurement-ratified; byte-identical LOS geometry across physics noted → G3 scoped "shared-seed physics-response generalization"; Caveat 1 six record JSONs force-added / cubes DVC owed pre-Stage-2-close; Caveat 2 G1(c) re-scoped to masked r_s + null, masked NCCF not grandfathered) | S1–S4 all PASS/REPORTED | **Operative G2 bars banked ([U-06] App.): grid 0.5758±0.044 masked / wiener_L3 0.0863 / mlp 0.0727 (held-out consistent with zero)** |
-| **Stage 2** | Baseline 3D U-Net training + corrected-metric eval | 🚀 **SMOKE GREEN of record (s3 VAL r_s(σ=2)=0.8824; both null bands cleared; U-G z1–z3 clean; micro-cycle-approved) → Juno job 304539 SUBMITTED 2026-07-24 (a30, seed 42, 60k steps/11h ceiling, §(b2) protocol)**; was: s-ladder dispatched 2026-07-23 per [U-06] spec (`design/u06_stage2_spec.md`): 4-level base-32 U-Net ≈5.5M params, MSE on x, smoke gates s1–s3 with numeric thresholds, N=200 null-band protocol, U-G controls from first smoke; **pre-Juno blockers B1 (panel pre-review) + B2 (Juno reachability + cost block)** | [U-06] §(d) smoke gates; G2 at Stage-2 close | R28 9≥9; Juno needs A1–A9 green |
+| **Stage 2** | Baseline 3D U-Net training + corrected-metric eval | 🚀 **SMOKE GREEN of record (s3 VAL r_s(σ=2)=0.8824; both null bands cleared; U-G z1–z3 clean; micro-cycle-approved) → Juno job 304539 SUBMITTED 2026-07-24 (a30, seed 42, 60k steps/11h ceiling, §(b2) protocol)**; was: s-ladder dispatched 2026-07-23 per [U-06] spec (`design/u06_stage2_spec.md`): 4-level base-32 U-Net ≈5.5M params, MSE on x, smoke gates s1–s3 with numeric thresholds, N=200 null-band protocol, U-G controls from first smoke; **pre-Juno blockers B1 (panel pre-review) + B2 (Juno reachability + cost block)** | [U-06] §(d) smoke gates; G2 at Stage-2 close | R28 9≥9; Juno needs A1–A9 green; **G2 confirmatory read EXECUTED 2026-07-24 — fired cell U-A (mechanical; PI disposition owed; §7 snapshot)** |
 | **Stage 3** | Cross-physics generalization (train 3 physics, test held-out 4th) | ⏳ | Gate G3 in §3 [U-01] | Measures prior-robustness risk |
 
 ### Completed Milestones
@@ -105,6 +105,7 @@ Same dataset as exp/nerf — no new external data (user directive 2026-07-23):
 | 3D truth ρ | `SherwoodIGM_gal/` snapshots via `SherwoodLoader.extract_rho_crops` | [D-48] disk cache + [D-50] chunked CIC, reused |
 | Train/val/test split | [D-49] `HeldoutSplitScheme` 70/15/15 axis-0, strict straddle rejection | reused unchanged |
 | Baseline artifacts for eval table | exp/nerf `d73-1dprime` grid ckpt (DVC), A4′ Wiener, pub-t1 MLP ckpts (`cloud_runs/pub-t1-extracted/`) | context columns only |
+| **Stage-2 G2 read — prediction cube** | `experiments/unet-inversion/artifacts/stage2/g2_pred_test_p1_rays1024_hann.npy` | 192³ float32 x-field, z=0.3, P1, [0,1024) pattern, Hann-of-record; md5 `a7f9e88fad568869238a023ff26aeaef`; DVC pushed; producer ckpt `cloud_runs/UNetS2-S42-39804b8-1784883256-e5b664/checkpoints/best_val.pt` md5 `d42683677ba939b033eb2423fae2dfd7` (K1 best-VAL, step 16000) |
 
 DVC: any produced artifact > 10 MB tracked at `s3://cosmo-gas-vision-storage/dvc-data` per repo rule.
 
@@ -120,6 +121,10 @@ Prerequisite: the corrected-metric suite being spec'd on the exp/nerf close-out 
 
 (placeholder — first entries expected at Stage 1: one rendered (input channels, target crop) example per physics variant)
 
+- **Run ID**: none (offline scoring read; no MLflow run — matches the R9/A5/A10 artifact convention)
+- **Primary Trace**: `experiments/unet-inversion/artifacts/stage2/g2_confirmatory_read.json` (+ `pred_null_bands_g2.json`, `g2_pred_test_p1_rays1024_hann.npy` DVC)
+- **Insights**: G2 confirmatory read 2026-07-24 (mechanical record; no interpretation here): test-mask r_s(σ=2, real) = 0.93407 vs bars grid 0.5758 / wiener_L3 0.0863 / mlp 0.0727; all three unet> pairs fire on all five conditions at every σ; fired cell **U-A**; U-G clean (z1 −0.043, z2 −0.017, z3 0.130 vs triggers 0.46704 / 0.22108); Δ_phys(σ=2) = −0.00110 ± 0.00256; both null bands cleared at all σ; seam divergence 0.00587 (< 0.02); var-ratio 0.245 unsm / 0.779 σ2 (tail compression disclosure rides).
+
 ---
 
 ## 7. Session History & Next Handoff
@@ -129,3 +134,21 @@ Prerequisite: the corrected-metric suite being spec'd on the exp/nerf close-out 
 - This track (amortized U-Net inversion) parked at Stage 0. Sibling track parked at `exp/diffusion-posterior` (dormant until this track's Stage 2 gate — see its LEDGER).
 - In flight on exp/nerf side: PI corrected-metric spec (NeRF-primary re-scoring of pub-t1 checkpoints + baselines); defense-panel prior-art/novelty audit (covers this track's related-work positioning too — supervised deep-learning Lyα tomography prior work must be checked before any novelty claim).
 - **Immediate next steps:** (1) corrected-metric table lands → PI ratifies/adjusts G2–G3 bars against the measured Wiener/grid numbers; (2) PI review of this proposal; (3) Stage 1 data plumbing dispatch (core-implementer + data-engineer).
+
+### Session Snapshot: 2026-07-24 (G2 confirmatory read — the sanctioned test-slab touch)
+
+- G2 confirmatory read EXECUTED per [U-04] five-condition machinery + [U-06] v2 amendments (K1/S3/S4/S5/S7 + micro-cycle A1/A2/R1/R2). Checkpoint-of-record `best_val.pt` (md5 `d42683677ba939b033eb2423fae2dfd7`, n_params 5839713 == train_full_record.json, strict load). Identity checks: truth_real sha256 / truth_zspace / grid / mlp / wiener_L3 md5 all MATCH; G1(c) re-assert on the test mask PASS (|r−1| ≤ 1e-6, both frames, all σ).
+- Test-mask scores (actual, Hann-of-record, [0,1024) pattern): real p = 0.84240/0.93407/0.96393, sp = 0.84712/0.93594/0.95688 at σ=1/2/4; zspace p = 0.79112/0.86922/0.88231. Block means±SE (real): 0.83942±0.01104 / 0.93538±0.00782 / 0.96806±0.00484.
+- Pairs (σ=2, real): unet>grid Δ=+0.3583 t=18.206 boot CI[+0.2926,+0.4241] FIRES; unet>wiener_L3 Δ=+0.8477 t=15.387 CI[+0.7299,+0.9598] FIRES (cond-4 sign both frames TRUE); unet>mlp Δ=+0.8613 t=14.948 CI[+0.7269,+0.9819] FIRES; all reverses non-firing; no frame reversal anywhere; same fire pattern at σ=1 and σ=4. **Fired cell: U-A** (mechanical). U-H not evaluable (G3 scope).
+- Controls: z1 −0.04302, z2 −0.01657, z3 +0.13016 (triggers 0.46704 / 0.22108 — U-G clean); Δ_phys(z4) = −0.00110 ± 0.00256 block-SE (R1 flag none, within 2×SE of zero → suite-common scope rule applies); z5 untrained-P3 swap Δ = +0.00070 ± 0.00243.
+- Both-band discipline: sealed test 97.5th (0.12353/0.22108/0.35639 σ=1/2/4 real pearson) AND prediction-matched band (0.13198/0.21571/0.35971, seeds default_rng([20260728,i]), lineage shared with the s3 pred-null) — actual clears both at every σ/frame/metric.
+- Seam (A2 acceptance under taper): divergence 0.00587 < 0.02 — no reopen. Uniform co-report 0.94095 (hann−uniform −0.00688). Random-pattern (seed 20260730) 0.94069; secondary [0,64) 0.22693. Taper-modulation P(k) probe at k=0.6283: ratio 0.789, excursion ×1.054 vs neighbor bins.
+- Descriptives: var-ratio 0.2445 unsm / 0.7792 σ2; x-PDF 99.5th pred +0.323 vs truth +1.289 (tail-compression disclosure rides every quote). Distance-to-train strata r_s2: 0.9414 (1.25 Mpc/h) / 0.9365 / 0.9378 / 0.9192 (7.97 Mpc/h).
+- Artifacts: `g2_confirmatory_read.json`, `pred_null_bands_g2.json`, prediction cube DVC-pushed (md5 `a7f9e88fad568869238a023ff26aeaef`); script `scripts/u06_g2_confirmatory_read.py`; wall 800 s local MPS.
+
+### Immediate Next Steps
+- PI disposition of the fired U-A cell (this read is mechanical; interpretation/claims are the PI's call).
+- G3 (held-out-physics) remains the second and last sanctioned test-mask touch.
+
+### Blockers
+- None (DVC push OK after clearing ExFAT `._*` litter; AWS creds via `.env`).
