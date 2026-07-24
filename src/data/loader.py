@@ -500,6 +500,52 @@ def distance_to_train_region(
     )
 
 
+def region_voxel_interval(
+    region: Region,
+    n_grid: int,
+    scheme: HeldoutSplitScheme = DEFAULT_SCHEME,
+) -> Tuple[int, int]:
+    """Right-open voxel-index interval ``[start, end)`` of ``region`` on
+    ``scheme.axis`` for an ``n_grid`` lattice.
+
+    Single source of truth for the fraction->voxel mapping (extracted from
+    :meth:`SherwoodLoader.extract_rho_crops_split` under [U-04] Stage-1 R3 so
+    the U-Net truth-crop provider reuses, not forks, the [D-49] logic).
+    ``int()`` truncation keeps the split robust against non-multiple-of-N
+    fractions, e.g. at n_grid=192: train=[0,134) (0.7*192=134.4), val=
+    [134,163) (0.85*192=163.2), test=[163,192); at n_grid=768:
+    train=[0,537), val=[537,652), test=[652,768). The truncation is applied
+    at each lattice independently, so region boundaries at different n_grid
+    agree to within one voxel of the exact fractions (134/192=0.6979 vs
+    537/768=0.6992 — both floor(0.7*n)).
+    """
+    valid_regions = ("train", "val", "test", "heldout")
+    if region not in valid_regions:
+        raise ValueError(f"region must be one of {valid_regions}; got {region!r}")
+    if scheme.axis not in (0, 1, 2):
+        raise ValueError(f"scheme.axis must be in {{0, 1, 2}}; got {scheme.axis!r}")
+    if not (0.0 < scheme.train_x_max < scheme.val_x_max < 1.0):
+        raise ValueError(
+            "scheme must satisfy 0 < train_x_max < val_x_max < 1; got "
+            f"train_x_max={scheme.train_x_max}, val_x_max={scheme.val_x_max}"
+        )
+    train_end = int(scheme.train_x_max * n_grid)
+    val_end = int(scheme.val_x_max * n_grid)
+    start = {
+        "train": 0,
+        "val": train_end,
+        "test": val_end,
+        "heldout": train_end,
+    }[region]
+    end = {
+        "train": train_end,
+        "val": val_end,
+        "test": n_grid,
+        "heldout": n_grid,
+    }[region]
+    return start, end
+
+
 # Header byte layout matches Sherwood/src/utils.py:
 #   7 doubles (z, Om, OL, Ob, h100, box, Xh) + 2 int32 (nbins, num_los)
 _N_HEADER_BYTES = 7 * 8 + 2 * 4
@@ -1124,36 +1170,15 @@ class SherwoodLoader:
             )
         if not isinstance(n_crops, int) or n_crops <= 0:
             raise ValueError(f"n_crops must be a positive int; got {n_crops!r}")
-        valid_regions = ("train", "val", "test", "heldout")
-        if region not in valid_regions:
-            raise ValueError(
-                f"region must be one of {valid_regions}; got {region!r}"
-            )
-        if scheme.axis not in (0, 1, 2):
-            raise ValueError(f"scheme.axis must be in {{0, 1, 2}}; got {scheme.axis!r}")
-        if not (0.0 < scheme.train_x_max < scheme.val_x_max < 1.0):
-            raise ValueError(
-                "scheme must satisfy 0 < train_x_max < val_x_max < 1; got "
-                f"train_x_max={scheme.train_x_max}, val_x_max={scheme.val_x_max}"
-            )
-
-        # ---- voxel-index intervals per region (right-open).
-        # Use floor() implicitly via int() so the split is robust against
-        # non-multiple-of-N fractions (e.g., 0.7 * 32 = 22.4 -> 22).
-        train_end = int(scheme.train_x_max * n_grid)
-        val_end = int(scheme.val_x_max * n_grid)
-        region_voxel_start = {
-            "train": 0,
-            "val": train_end,
-            "test": val_end,
-            "heldout": train_end,
-        }[region]
-        region_voxel_end = {
-            "train": train_end,
-            "val": val_end,
-            "test": n_grid,
-            "heldout": n_grid,
-        }[region]
+        # ---- voxel-index intervals per region (right-open). Delegated to
+        # the module-level `region_voxel_interval` (single source of truth,
+        # shared with src/data/truth_crop_provider.py per [U-04] R3); it
+        # also validates `region` / `scheme`. Uses floor() implicitly via
+        # int() so the split is robust against non-multiple-of-N fractions
+        # (e.g., 0.7 * 32 = 22.4 -> 22).
+        region_voxel_start, region_voxel_end = region_voxel_interval(
+            region, n_grid, scheme
+        )
         # Acceptance interval on the split axis for a corner c: a crop is
         # wholly in region iff c >= region_voxel_start AND
         # c + crop_size <= region_voxel_end. Wraparound is automatically

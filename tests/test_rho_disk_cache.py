@@ -323,15 +323,25 @@ def test_corrupted_npy_triggers_fallback(loader, prewarmed_cache_dir):
 
 
 @_skip_no_p1
-def test_default_cache_dir_resolves_to_d_drive(monkeypatch):
-    """Spec (1): when COSMOGAS_RHO_CACHE_DIR is unset, the resolved cache
-    directory must live on D:\\, not C:\\ or under ~/. (Path-resolution
-    sanity only — we do NOT write to it.)
+def test_default_cache_dir_resolves_repo_relative(monkeypatch):
+    """Spec (1), amended 2026-06-25: when COSMOGAS_RHO_CACHE_DIR is unset,
+    the resolved cache directory is the repo-relative
+    ``Sherwood/.rho_field_cache`` — NOT the retired Windows
+    ``D:\\...`` hardcode (which on macOS/Linux spawned a junk directory
+    literally named ``D:\\Data\\...``; see the module-level comment in
+    ``src/data/loader.py``). Stale D:-drive assertion updated under
+    [U-04] Stage-1 R3 (pre-existing failure, unrelated to the
+    region_voxel_interval refactor — verified failing on the
+    pre-refactor tree). Path-resolution sanity only — we do NOT write
+    to it.
     """
     monkeypatch.delenv("COSMOGAS_RHO_CACHE_DIR", raising=False)
     resolved = loader_mod._resolve_rho_cache_dir()
-    assert resolved.drive.lower() == "d:", (
-        f"default rho-cache dir must resolve to D: drive, got {resolved!r}"
+    assert not resolved.is_absolute(), (
+        f"default rho-cache dir must be repo-relative, got {resolved!r}"
+    )
+    assert resolved.drive == "", (
+        f"default rho-cache dir must not carry a Windows drive, got {resolved!r}"
     )
     # And the expected basename
     assert resolved.name == ".rho_field_cache"
