@@ -28,10 +28,18 @@ Output: experiments/unet-inversion/artifacts/stage2/null_band_n200.json
 Checkpointing: partial results appended to null_band_n200.partial.npz every
 CHUNK realizations; restart resumes from the last completed chunk.
 
-Usage: PYTHONPATH=. .venv/bin/python -u scripts/u06_a5_null_band.py
+Usage: PYTHONPATH=. .venv/bin/python -u scripts/u06_a5_null_band.py [--region {test,val}]
+
+B1 panel amendment K1/K2 follow-up: --region val scores the identical N=200
+realizations on region_voxel_interval('val', 192) (loader-derived, runtime
+thickness/axis asserts; NOT hard-pinned to any message) ->
+null_band_val_n200.json. The banked-value lineage assert applies to the test
+region only (0.1185 was banked on the test mask); for val, realization 0's
+masked r_s(sigma=2, real) is recorded as the new lineage anchor.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -59,11 +67,16 @@ LINEAGE_BANKED = 0.11852512479595659   # r9_heldout_bars.json
 LINEAGE_TOL = 1e-6
 
 OUT_DIR = REPO / "experiments" / "unet-inversion" / "artifacts" / "stage2"
-OUT = OUT_DIR / "null_band_n200.json"
-PARTIAL = OUT_DIR / "null_band_n200.partial.npz"
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--region", choices=("test", "val"), default="test")
+    region = ap.parse_args().region
+    stem = "null_band_n200" if region == "test" else "null_band_val_n200"
+    OUT = OUT_DIR / f"{stem}.json"
+    PARTIAL = OUT_DIR / f"{stem}.partial.npz"
+
     t0 = time.time()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -81,10 +94,14 @@ def main():
         if v == "MISMATCH":
             raise SystemExit(f"IDENTITY MISMATCH: {fname}")
 
-    # ---- mask (runtime-asserted, per R9) ------------------------------------
-    lo, hi = region_voxel_interval("test", N192, DEFAULT_SCHEME)
-    assert (lo, hi) == (163, 192), f"unexpected test interval [{lo},{hi})"
+    # ---- mask (loader-derived, runtime-asserted) ----------------------------
+    lo, hi = region_voxel_interval(region, N192, DEFAULT_SCHEME)
+    if region == "test":
+        assert (lo, hi) == (163, 192), f"unexpected test interval [{lo},{hi})"
+    assert hi - lo == 29, f"unexpected {region} thickness {hi - lo}"
     assert DEFAULT_SCHEME.axis == 0
+    print(f"[a5] region={region} mask=[{lo},{hi}) axis=0 (loader-derived)",
+          flush=True)
     mask = np.zeros((N192, N192, N192), dtype=bool)
     mask[lo:hi, :, :] = True
 
@@ -124,7 +141,7 @@ def main():
                 xt = smoothed_truth[fr][s]
                 vals[fi, si, 0, i] = masked_pearson(xt, prs, mask)
                 vals[fi, si, 1, i] = masked_spearman(xt, prs, mask)
-        if i == 0:
+        if i == 0 and region == "test":
             r0 = vals[0, list(SIGMAS).index(2.0), 0, 0]
             dev = abs(r0 - LINEAGE_BANKED)
             lineage_pass = bool(dev <= LINEAGE_TOL)
@@ -154,16 +171,27 @@ def main():
                          "realization 0 IS the banked seed-20260726 draw",
             "verified": seed0_equiv,
         },
-        "banked_value": LINEAGE_BANKED,
-        "banked_source": "experiments/unet-inversion/artifacts/stage1/"
-                         "r9_heldout_bars.json g1_clause_c.phase_rand_null"
-                         ".r_s_vs_truth_real['2'].pearson_masked",
-        "observed": r0,
-        "abs_dev": abs(r0 - LINEAGE_BANKED),
-        "tolerance": LINEAGE_TOL,
-        "verdict": "PASS" if abs(r0 - LINEAGE_BANKED) <= LINEAGE_TOL
-                   else "FAIL",
     }
+    if region == "test":
+        lineage.update({
+            "banked_value": LINEAGE_BANKED,
+            "banked_source": "experiments/unet-inversion/artifacts/stage1/"
+                             "r9_heldout_bars.json g1_clause_c.phase_rand_null"
+                             ".r_s_vs_truth_real['2'].pearson_masked",
+            "observed": r0,
+            "abs_dev": abs(r0 - LINEAGE_BANKED),
+            "tolerance": LINEAGE_TOL,
+            "verdict": "PASS" if abs(r0 - LINEAGE_BANKED) <= LINEAGE_TOL
+                       else "FAIL",
+        })
+    else:
+        lineage.update({
+            "note": "no banked masked value exists for the val region; "
+                    "realization 0's masked r_s(sigma=2, real) is recorded "
+                    "as the val-region lineage anchor (same field as the "
+                    "banked seed-20260726 draw, different mask)",
+            "anchor_r_s2_real_masked": r0,
+        })
 
     # ---- band statistics ----------------------------------------------------
     band = {}
@@ -184,7 +212,11 @@ def main():
                 }
 
     payload = {
-        "rung": "A5 (R7) — pre-registered N=200 phase-randomized null band",
+        "rung": ("A5 (R7) — pre-registered N=200 phase-randomized null band"
+                 if region == "test" else
+                 "A5 follow-up (B1 panel amendments K1/K2) — val-mask N=200 "
+                 "phase-randomized null band, identical machinery"),
+        "region": region,
         "spec": "experiments/unet-inversion/design/u06_stage2_spec.md §(c) "
                 "null-band protocol, branch HEAD 489a0d3",
         "session_utc": "2026-07-24",
@@ -200,8 +232,8 @@ def main():
                        "scripts/u04_r9_heldout_rescore.py: smooth the FULL "
                        "periodic cube FIRST (sigma in {1,2,4} h^-1 Mpc), "
                        "then restrict Pearson/Spearman to the test mask",
-            "mask": "region_voxel_interval('test', 192) = axis-0 slab "
-                    "[163, 192), runtime-asserted",
+            "mask": f"region_voxel_interval('{region}', 192) = axis-0 slab "
+                    f"[{lo}, {hi}), loader-derived, runtime-asserted",
             "frames": "real (primary) + zspace (column); the randomized "
                       "field is always built from x_truth_real and scored "
                       "against each frame's smoothed truth",
