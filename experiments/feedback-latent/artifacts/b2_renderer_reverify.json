@@ -1,0 +1,33 @@
+{
+  "blocker": "B2",
+  "verdict": "PASS",
+  "d57": {
+    "fixed_coeff_present": true,
+    "bug_coeff_present": false,
+    "status": "PRESENT"
+  },
+  "autograd_vs_fd": {
+    "grad_finite_nonnan": true,
+    "g_autograd": [
+      0.09340889311132525,
+      0.044518936719184395,
+      -0.07213717353953919
+    ],
+    "g_finite_diff": [
+      0.0934088917545206,
+      0.04451893661439055,
+      -0.0721371729006659
+    ],
+    "max_rel_err": 1.452543345046366e-08,
+    "tolerance": 0.01,
+    "pass": true
+  },
+  "igmnerf_hooks": {
+    "g_scalar_continuous_differentiable": true,
+    "physics_id_embedding_table_differentiable": true,
+    "note": "IGMNeRF.forward built-in hooks: g is a 1-D continuous scalar (g_dim=1) concatenated at input; physics_id is a discrete index into nn.Embedding (differentiable w.r.t. the table, not w.r.t. a continuous input vector). A DeepSDF-style continuous d-dim z concatenated at input is NOT a built-in IGMNeRF hook; the feedback-latent SIREN auto-decoder (A2) is a NEW module by design, and the renderer imposes NO obstacle since conditioning lives in the field module passed as `mlp`."
+  },
+  "gaps": [
+    "IGMNeRF.forward does not accept a continuous d-dim conditioning vector directly (only g-scalar / physics_id-embedding); continuous-z conditioning must live in the A2 field module (renderer itself is agnostic \u2014 verified)."
+  ]
+}

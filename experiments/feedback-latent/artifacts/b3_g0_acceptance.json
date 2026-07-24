@@ -1,0 +1,72 @@
+{
+  "blocker": "B3",
+  "verdict": "PASS",
+  "estimator_module": "src/analysis/nccf.py (NOT tracked on exp/feedback-latent; imported from exp/unet-inversion commit 39804b8 extract)",
+  "checks": {
+    "a_truth_vs_truth_P1": {
+      "cube": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy",
+      "P1_mean_rho": 0.9999999999972362,
+      "clamped_fraction": 4.111395941840278e-05,
+      "per_sigma": {
+        "sigma1": {
+          "r_s": 0.9999999999999998,
+          "abs_dev_from_1": 2.220446049250313e-16,
+          "pass": true
+        },
+        "sigma2": {
+          "r_s": 1.0000000000000002,
+          "abs_dev_from_1": 2.220446049250313e-16,
+          "pass": true
+        },
+        "sigma4": {
+          "r_s": 1.0,
+          "abs_dev_from_1": 0.0,
+          "pass": true
+        }
+      },
+      "pass": true
+    },
+    "b_difference_field": {
+      "data_available": true,
+      "P2_mean_rho": 1.0000000000080942,
+      "clamped_fraction_P2": 4.492865668402778e-05,
+      "D_std": 0.045315991216468114,
+      "D_var": 0.0020535390599310155,
+      "self_corr_per_sigma": {
+        "sigma1": {
+          "r_s": 0.9999999999999998,
+          "abs_dev_from_1": 2.220446049250313e-16,
+          "pass": true
+        },
+        "sigma2": {
+          "r_s": 1.0,
+          "abs_dev_from_1": 0.0,
+          "pass": true
+        },
+        "sigma4": {
+          "r_s": 1.0,
+          "abs_dev_from_1": 0.0,
+          "pass": true
+        }
+      },
+      "self_corr_pass": true,
+      "phase_rand_null_sigma2": {
+        "N": 200,
+        "n_finite": 200,
+        "mean": 0.006804080907101106,
+        "max": 0.22516942007864693,
+        "pct97.5": 0.11820863794790008,
+        "well_below_1": true
+      },
+      "pass": true
+    },
+    "c_degenerate_variance": {
+      "pearson_constant": null,
+      "smoothed_pearson_constant": null,
+      "returns_UNDEFINED_nan": true,
+      "silently_returns_0": false,
+      "DEGENERATE_STD": 1e-12,
+      "pass": true
+    }
+  }
+}
