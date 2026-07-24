@@ -1,0 +1,6 @@
+outs:
+- md5: 269d6927988e5e2fc8c7ed52eb092ef4
+  size: 23378741
+  isexec: true
+  hash: md5
+  path: s3_model_step500.pt
