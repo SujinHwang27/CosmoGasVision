@@ -1,86 +1,101 @@
 {
-  "record": "juno_submission_record",
-  "track": "unet-inversion",
-  "stage": "stage2",
-  "spec_of_record": "experiments/unet-inversion/design/u06_stage2_spec.md (v2)",
-  "authorization": "A1-A10 + B1 + B2 green; A10 both-band clearance at de7fa4d; cost block artifacts/stage2/a9_juno_block.json (a30, 1 GPU, --time=12:00:00, 24 GPU-hr ceiling incl. seed contingency)",
-  "job_id": "304539",
-  "job_name": "Stage2-UNet-Full",
-  "partition": "a30",
-  "time_limit": "12:00:00",
-  "seed": 42,
-  "seed_policy": "primary 42; contingency seeds 142/242 S6-reserved, NOT submitted",
-  "submit_time_utc": "2026-07-24T06:43:00Z",
-  "submitted_from": "juno login pool (landed juno-l-01)",
-  "submit_script": "scripts/submit_juno_unet_stage2.sh",
-  "remote_work_tree": "~/work/CosmoGasVision",
-  "remote_branch": "exp/unet-inversion",
-  "remote_head": "de7fa4dc077d9079eabc9b9d132d709cef54b97a",
-  "remote_head_matches_origin": true,
-  "remote_tracked_dirty": false,
-  "remote_env": {
-    "torch": "2.6.0+cu124",
-    "sherwood_scratch_mirror": "/scratch/juno/sxh240010/sherwood/Physics1_nofeedback (present; atime touch-refreshed at preflight)"
+ "record": "juno_submission_record",
+ "track": "unet-inversion",
+ "stage": "stage2",
+ "spec_of_record": "experiments/unet-inversion/design/u06_stage2_spec.md (v2)",
+ "authorization": "A1-A10 + B1 + B2 green; A10 both-band clearance at de7fa4d; cost block artifacts/stage2/a9_juno_block.json (a30, 1 GPU, --time=12:00:00, 24 GPU-hr ceiling incl. seed contingency)",
+ "job_id": "304539",
+ "job_name": "Stage2-UNet-Full",
+ "partition": "a30",
+ "time_limit": "12:00:00",
+ "seed": 42,
+ "seed_policy": "primary 42; contingency seeds 142/242 S6-reserved, NOT submitted",
+ "submit_time_utc": "2026-07-24T06:43:00Z",
+ "submitted_from": "juno login pool (landed juno-l-01)",
+ "submit_script": "scripts/submit_juno_unet_stage2.sh",
+ "remote_work_tree": "~/work/CosmoGasVision",
+ "remote_branch": "exp/unet-inversion",
+ "remote_head": "de7fa4dc077d9079eabc9b9d132d709cef54b97a",
+ "remote_head_matches_origin": true,
+ "remote_tracked_dirty": false,
+ "remote_env": {
+  "torch": "2.6.0+cu124",
+  "sherwood_scratch_mirror": "/scratch/juno/sxh240010/sherwood/Physics1_nofeedback (present; atime touch-refreshed at preflight)"
+ },
+ "artifact_checksums": {
+  "experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy": {
+   "bytes": 56623232,
+   "md5": "efd93749f70de25104833dfd98a859fe",
+   "sha256": "971a72ed5b1b872a972fd3ff8c35e99d6a0998a129afb822ebbd42417da34994",
+   "remote_verified": true,
+   "transfer_note": "rsync failed twice (io_read_flush; remote dest dir absent) -> mkdir -p + scp succeeded"
   },
-  "artifact_checksums": {
-    "experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy": {
-      "bytes": 56623232,
-      "md5": "efd93749f70de25104833dfd98a859fe",
-      "sha256": "971a72ed5b1b872a972fd3ff8c35e99d6a0998a129afb822ebbd42417da34994",
-      "remote_verified": true,
-      "transfer_note": "rsync failed twice (io_read_flush; remote dest dir absent) -> mkdir -p + scp succeeded"
-    },
-    "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy": {
-      "bytes": 56623232,
-      "md5": "c33707c37f458d89e7c85ac07469c527",
-      "sha256": "d3cdc03764b7cedb9314bf978ab12b73d69697348897baac3ea07162ce548f1e",
-      "remote_verified": true,
-      "transfer_note": "rsync"
-    },
-    "experiments/unet-inversion/artifacts/stage2/null_band_val_n200.json": {
-      "bytes": 193442,
-      "md5": "d33068ebc9871b5320fe9a8b3f2989e7",
-      "sha256": "ff457119a71294bc0de25e622722e541090dc474f22853a0d7c4c62c19f46074",
-      "remote_verified": true,
-      "transfer_note": "rsync (remote copy pre-existing; re-synced, delta-matched)"
-    }
+  "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy": {
+   "bytes": 56623232,
+   "md5": "c33707c37f458d89e7c85ac07469c527",
+   "sha256": "d3cdc03764b7cedb9314bf978ab12b73d69697348897baac3ea07162ce548f1e",
+   "remote_verified": true,
+   "transfer_note": "rsync"
   },
-  "squeue_snapshot": {
-    "taken_utc": "2026-07-24T06:43:20Z",
-    "job": "304539 a30 Stage2-UNet-Full sxh240010 PENDING 0:00 12:00:00 1 (Priority)",
-    "scheduler_start_estimate": "N/A (squeue --start returned no estimate)",
-    "a30_partition_context": [
-      "304150  RUNNING 8:05:57  / 1-00:00:00 g-02-01",
-      "304383_3 RUNNING 47:43   / 16:00:00   g-02-01",
-      "304275  PENDING (Priority) 6:00:00",
-      "304287_[4-] PENDING (Priority) 2:00:00",
-      "304383_[7-] PENDING (None) 16:00:00",
-      "304518  PENDING (Priority) 12:00:00"
-    ],
-    "eta_guess": "queue-dependent; several jobs ahead on a30 — start plausibly within ~1-8 h, no scheduler commitment"
-  },
-  "expected_outputs": {
-    "run_tag_pattern": "UNetS2-S42-de7fa4d-<epoch>-<uuid6>",
-    "scratch_run_dir": "${JUNO_SCRATCH}/unet_stage2/${RUN_TAG} (deleted at cleanup)",
-    "copy_out_dest": "~/work/unet_stage2_results/${RUN_TAG}/",
-    "pcv_copy_out_list": [
-      "mlflow/ (file-store; hard-fail exit 2 if absent)",
-      "checkpoints/best_val.pt (hard-fail exit 4)",
-      "checkpoints/final.pt (hard-fail exit 4)",
-      "checkpoints/*.pt (last-3 retained per ckpt policy)",
-      "train_full_record.json (hard-fail exit 5)",
-      "Stage2-TrainFull_metrics.csv (hard-fail exit 6)"
-    ],
-    "slurm_logs": "~/work/CosmoGasVision/Stage2-UNet-Full-304539.{out,err}"
-  },
-  "retrieval_plan": {
-    "when": "after job 304539 reaches COMPLETED (sacct -j 304539) and copy-out dir exists",
-    "commands": [
-      "ssh juno 'ls ~/work/unet_stage2_results/'  # discover RUN_TAG",
-      "rsync -av juno:work/unet_stage2_results/<RUN_TAG>/ experiments/unet-inversion/artifacts/stage2/juno_runs/<RUN_TAG>/",
-      "rsync -av 'juno:work/CosmoGasVision/Stage2-UNet-Full-304539.*' experiments/unet-inversion/artifacts/stage2/juno_runs/<RUN_TAG>/slurm_logs/"
-    ],
-    "pcv_close_loop": "before declaring Stage 2 done: torch.load best_val.pt into the U-Net class, run the first downstream consumer against it, and import mlflow/ file-store into the host tracker only after asserting the artifact tree is complete",
-    "dvc": "DVC-track retrieved .pt files (>10 MB) per dvc-track skill"
+  "experiments/unet-inversion/artifacts/stage2/null_band_val_n200.json": {
+   "bytes": 193442,
+   "md5": "d33068ebc9871b5320fe9a8b3f2989e7",
+   "sha256": "ff457119a71294bc0de25e622722e541090dc474f22853a0d7c4c62c19f46074",
+   "remote_verified": true,
+   "transfer_note": "rsync (remote copy pre-existing; re-synced, delta-matched)"
   }
+ },
+ "squeue_snapshot": {
+  "taken_utc": "2026-07-24T06:43:20Z",
+  "job": "304539 a30 Stage2-UNet-Full sxh240010 PENDING 0:00 12:00:00 1 (Priority)",
+  "scheduler_start_estimate": "N/A (squeue --start returned no estimate)",
+  "a30_partition_context": [
+   "304150  RUNNING 8:05:57  / 1-00:00:00 g-02-01",
+   "304383_3 RUNNING 47:43   / 16:00:00   g-02-01",
+   "304275  PENDING (Priority) 6:00:00",
+   "304287_[4-] PENDING (Priority) 2:00:00",
+   "304383_[7-] PENDING (None) 16:00:00",
+   "304518  PENDING (Priority) 12:00:00"
+  ],
+  "eta_guess": "queue-dependent; several jobs ahead on a30 \u2014 start plausibly within ~1-8 h, no scheduler commitment"
+ },
+ "expected_outputs": {
+  "run_tag_pattern": "UNetS2-S42-de7fa4d-<epoch>-<uuid6>",
+  "scratch_run_dir": "${JUNO_SCRATCH}/unet_stage2/${RUN_TAG} (deleted at cleanup)",
+  "copy_out_dest": "~/work/unet_stage2_results/${RUN_TAG}/",
+  "pcv_copy_out_list": [
+   "mlflow/ (file-store; hard-fail exit 2 if absent)",
+   "checkpoints/best_val.pt (hard-fail exit 4)",
+   "checkpoints/final.pt (hard-fail exit 4)",
+   "checkpoints/*.pt (last-3 retained per ckpt policy)",
+   "train_full_record.json (hard-fail exit 5)",
+   "Stage2-TrainFull_metrics.csv (hard-fail exit 6)"
+  ],
+  "slurm_logs": "~/work/CosmoGasVision/Stage2-UNet-Full-304539.{out,err}"
+ },
+ "retrieval_plan": {
+  "when": "after job 304539 reaches COMPLETED (sacct -j 304539) and copy-out dir exists",
+  "commands": [
+   "ssh juno 'ls ~/work/unet_stage2_results/'  # discover RUN_TAG",
+   "rsync -av juno:work/unet_stage2_results/<RUN_TAG>/ experiments/unet-inversion/artifacts/stage2/juno_runs/<RUN_TAG>/",
+   "rsync -av 'juno:work/CosmoGasVision/Stage2-UNet-Full-304539.*' experiments/unet-inversion/artifacts/stage2/juno_runs/<RUN_TAG>/slurm_logs/"
+  ],
+  "pcv_close_loop": "before declaring Stage 2 done: torch.load best_val.pt into the U-Net class, run the first downstream consumer against it, and import mlflow/ file-store into the host tracker only after asserting the artifact tree is complete",
+  "dvc": "DVC-track retrieved .pt files (>10 MB) per dvc-track skill"
+ },
+ "job_304539_outcome": {
+  "state": "FAILED",
+  "elapsed_s": 44,
+  "exit": "1:0",
+  "cause": "ModuleNotFoundError: scripts.d75_corrected_metric_rescore \u2014 file existed in the local working tree but was never tracked on exp/unet-inversion; clean cluster checkout lacked it. Fixed by commit 39804b8 (tracks d75 scoring module + src/analysis/nccf.py).",
+  "guard_gap": "required-artifact guard covers data files, not python import deps \u2014 preflight amendment candidate",
+  "coordinator_error_disclosed": "first resubmission attempt invoked the sbatch payload with bash on the login node (script has no 'submit' mode); died at login-node memory ulimit during the first forward pass; stray scratch RUN_DIR removed; no job was created by that attempt"
+ },
+ "resubmission": {
+  "job_id": "304588",
+  "submit_time_utc": "2026-07-24",
+  "command": "sbatch --export=ALL,SEED=42 scripts/submit_juno_unet_stage2.sh",
+  "remote_head": "39804b8",
+  "state_at_submit": "PENDING"
+ }
 }
