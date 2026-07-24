@@ -1,0 +1,29 @@
+{
+  "rung": "R3 — truth-crop provider over the [D-49] split at n=192 (A3)",
+  "spec": "u04_stage1_ratification.md §2(a)/(c)/(e), commit 58ac831",
+  "module": "src/data/truth_crop_provider.py",
+  "api": "TruthCropProvider(cube|path, region, crop_size=64, scheme=DEFAULT_SCHEME, seed) -> .sample(n) / .crop_at(corner); module-level x_transform() replicating scripts/d75_corrected_metric_rescore.py:196-201 (X_FLOOR=1e-3, float64, floor-before-log)",
+  "d49_reuse_not_fork": {
+    "refactor": "extracted the fraction->voxel interval logic from SherwoodLoader.extract_rho_crops_split into module-level src.data.loader.region_voxel_interval; extract_rho_crops_split now delegates to it (behavior-identical; regression-gated)",
+    "reused_symbols": ["HeldoutSplitScheme", "DEFAULT_SCHEME", "region_voxel_interval", "distance_to_train_region", "Region"],
+    "sampling": "rejection sampling mirrors extract_rho_crops_split: one RNG advanced through accepts AND rejects; split axis non-wrapping by acceptance; transverse axes periodic"
+  },
+  "n192_vs_768_documentation": {
+    "scheme_is_fraction_based": "HeldoutSplitScheme stores normalized fractions (0.7/0.85, axis 0) — lattice-independent; region_voxel_interval applies int() truncation per lattice",
+    "intervals_n192": {"train": [0, 134], "val": [134, 163], "test": [163, 192], "heldout": [134, 192]},
+    "intervals_n768": {"train": [0, 537], "val": [537, 652], "test": [652, 768]},
+    "crop64_consequences_at_192": "train corners on axis 0 in [0, 70] -> 71 distinct offsets (spec's ~70); val/test/heldout widths 29/29/58 < 64 -> constructor refuses 64-crops there by design (test-region eval is sliding-window full-box masked to test voxels per spec §2(a))",
+    "truncation_note": "134/192 = 0.6979 vs 537/768 = 0.6992 — boundaries at different lattices agree to within one voxel of the exact fraction; both are floor(0.7*n)"
+  },
+  "tests": {
+    "file": "tests/test_truth_crop_provider.py",
+    "count": 12,
+    "status": "12/12 PASS (16.5 s)",
+    "coverage": ["region intervals at 192 and 768", "71-offset diversity", "crop containment (sampled + explicit)", "crop==x_cube[np.ix_] with transverse wrap", "straddle rejection at 192 pitch (corners 71..191 refused)", "val/test/heldout 64-crop refusal at 192", "smaller-crop val containment", "non-default scheme (axis 2)", "x-transform <=1e-12 (bit-exact) vs d75 expression + clamped fraction", "floor-before-log", "determinism under seed / stream advance / seed divergence", "NaN + negative cube refusal"]
+  },
+  "regression_gate": {
+    "tests/test_heldout_split.py": "8/8 PASS post-refactor",
+    "tests/test_rho_crop_extraction.py + tests/test_rho_disk_cache.py": "10 passed, 1 failed in first post-refactor run; the single failure (test_default_cache_dir_resolves_to_d_drive) VERIFIED PRE-EXISTING via git-stash rerun on the pre-refactor tree (asserts the retired Windows D:-drive cache default, fixed in loader 2026-06-25; platform-impossible on macOS). Test updated to assert the documented repo-relative default; suites re-run green (see final status below).",
+    "final_rerun": "GREEN — test_rho_disk_cache.py (6) + test_heldout_split.py (8) = 14/14 pass post-fix (752 s uncontended); test_rho_crop_extraction.py 5/5 passed in the first post-refactor run; tests/test_truth_crop_provider.py 12/12"
+  }
+}

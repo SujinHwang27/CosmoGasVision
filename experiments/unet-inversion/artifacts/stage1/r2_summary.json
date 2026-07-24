@@ -1,0 +1,47 @@
+{
+  "rung": "R2 \u2014 P2-P4 truth cubes at 192^3 (A2)",
+  "spec": "u04_stage1_ratification.md \u00a72(c), commit 58ac831",
+  "producer": {
+    "script": "scripts/u04_stage1_build_truth_cubes.py",
+    "committed_as": "0f820c2",
+    "path_identity": "SherwoodLoader.extract_rho_crops [D-48] three-tier cache + [D-50] chunked CIC; mean_pool verbatim from scripts/d75_corrected_metric_rescore.py:174-179 (same as the pinned P1 truth_real_192.npy)"
+  },
+  "extraction_performed": "NONE \u2014 all 4 snapshot sets were already extracted (see r1_data_locality.json \u00a7b)",
+  "cubes": {
+    "p2": {
+      "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy",
+      "sha256": "d3cdc03764b7cedb9314bf978ab12b73d69697348897baac3ea07162ce548f1e",
+      "mean": 1.0,
+      "mean_ok": true,
+      "wall_s_field": 244.0,
+      "wall_s_pool": 2.7,
+      "rho768_cache_sha256": "12fd51cde6705c465be27bed1ae6acf5a25c9b40bc53b58e80d835e79adad447"
+    },
+    "p3": {
+      "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p3.npy",
+      "sha256": "ccc173e8e2bfdd706d0ab0b9025cb9a5cf693353f882d521f93aaf5f1319ab81",
+      "mean": 1.0,
+      "mean_ok": true,
+      "wall_s_field": 577.3,
+      "wall_s_pool": 17.1,
+      "rho768_cache_sha256": "2a223cfd71385a78d0ac7702d98d877da8a57b17991f07698e015b24ea5e0721"
+    },
+    "p4": {
+      "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p4.npy",
+      "sha256": "14e36e08eded2d56a922b1ee45eb3aa6b9f094484a58db88079f698554b8a042",
+      "mean": 1.0,
+      "mean_ok": true,
+      "wall_s_field": 660.2,
+      "wall_s_pool": 14.3,
+      "rho768_cache_sha256": "476d130b39afefb6abac969d66c404c5662b4873c7ade2fa382d8856e9af05bf"
+    }
+  },
+  "full_manifests": "truth_real_192_p{2,3,4}.json alongside each cube (full sha256s, sidecars, snapshot mtimes)",
+  "budget": {
+    "cap_cpu_hr": 1.0,
+    "used_cpu_min_aggregate": 25.3,
+    "verdict": "WITHIN CAP"
+  },
+  "side_effect": "Sherwood/.rho_field_cache/ now holds n768 caches for all 4 physics ([D-48] location, gitignored/DVC-excluded by design)",
+  "exit_code": 0
+}

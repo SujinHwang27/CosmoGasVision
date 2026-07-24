@@ -1,0 +1,79 @@
+{
+  "rung": "R1 — current-session data-locality enumeration (R15 clause (c); 2026-05-13c rule)",
+  "spec": "experiments/unet-inversion/design/u04_stage1_ratification.md §2(e), commit 58ac831",
+  "session_utc": "2026-07-23",
+  "method_note": "Empirical ls/stat/df/shasum/md5 enumeration this session; every state below is an observation, not an inherited claim. AppleDouble '._*' litter ignored throughout (ExFAT).",
+  "dvc_status": {
+    "state": "BLOCKED-BY-APPLEDOUBLE",
+    "error": "ERROR: unable to read: 'cloud_runs/Sprint5cprime-.../checkpoints/._resnet18_3d_4class_best_seed_142.pt.dvc', is not valid utf-8",
+    "impact": "None for R1 inputs: Sherwood/ and SherwoodIGM_gal/ are explicitly NOT DVC-tracked (pulled from s3://sherwood-raw/), and the d75_rescore cubes carry hash pins in JSON records, verified below."
+  },
+  "a_sightline_binaries": {
+    "root": "Sherwood/",
+    "state": "ALL PRESENT — all 4 physics dirs, z0.300 los + tau files present with identical expected sizes",
+    "per_physics": {
+      "P1": {"dir": "Sherwood/Physics1_nofeedback", "los2048_n16384_z0.300.dat": {"present": true, "bytes": 1074233408}, "tauH1_2048_n16384_z0.300.dat": {"present": true, "bytes": 536870912}},
+      "P2": {"dir": "Sherwood/Physics2_stellarwind", "los2048_n16384_z0.300.dat": {"present": true, "bytes": 1074233408}, "tauH1_2048_n16384_z0.300.dat": {"present": true, "bytes": 536870912}},
+      "P3": {"dir": "Sherwood/Physics3_windAGN", "los2048_n16384_z0.300.dat": {"present": true, "bytes": 1074233408}, "tauH1_2048_n16384_z0.300.dat": {"present": true, "bytes": 536870912}},
+      "P4": {"dir": "Sherwood/Physics4_windstrongAGN", "los2048_n16384_z0.300.dat": {"present": true, "bytes": 1074233408}, "tauH1_2048_n16384_z0.300.dat": {"present": true, "bytes": 536870912}}
+    },
+    "note": "Each physics dir also holds z0.100/z2.200/z2.400 los+tauH1+tauwH1 (not needed for Stage 1)."
+  },
+  "b_snapshot_extraction_state": {
+    "root": "SherwoodIGM_gal/",
+    "state": "ALL 4 PHYSICS EXTRACTED — no un-tarring needed; the ~87 GB extraction contingency in the dispatch brief is MOOT",
+    "per_physics": {
+      "P1": {"snapshot_set": "planck1_60_768_z0.300", "tarball": {"present": true, "bytes": 26800448819}, "extracted": {"state": "EXTRACTED-PRESENT", "path": "SherwoodIGM_gal/extracted/planck1_60_768_z0.300/snapdir_012", "hdf5_files": 16, "extra_files": ["checksums_brahan.txt", "checksums_dirac.txt"], "total_bytes": 38669000000, "snap_012.0_mtime_utc": "2020-05-23T18:59:05Z"}},
+      "P2": {"snapshot_set": "planck1_60_768_ps13_z0.300", "tarball": {"present": true, "bytes": 28889039093}, "extracted": {"state": "EXTRACTED-PRESENT", "path": "SherwoodIGM_gal/extracted/planck1_60_768_ps13_z0.300/snapdir_012", "hdf5_files": 16, "total_bytes": 44294600000, "snap_012.0_mtime_utc": "2020-06-13T04:55:05Z"}},
+      "P3": {"snapshot_set": "planck1_60_768_ps13agn_z0.300", "tarball": {"present": true, "bytes": 29093266516}, "extracted": {"state": "EXTRACTED-PRESENT", "path": "SherwoodIGM_gal/extracted/planck1_60_768_ps13agn_z0.300/snapdir_012", "hdf5_files": 16, "total_bytes": 44745800000, "snap_012.0_mtime_utc": "2020-06-15T19:31:04Z"}},
+      "P4": {"snapshot_set": "planck1_60_768_ps13agn_strong_z0.300", "tarball": {"present": true, "bytes": 29134990241}, "extracted": {"state": "EXTRACTED-PRESENT", "path": "SherwoodIGM_gal/extracted/planck1_60_768_ps13agn_strong_z0.300/snapdir_012", "hdf5_files": 16, "total_bytes": 44775100000, "snap_012.0_mtime_utc": "2021-01-29T16:21:00Z"}}
+    },
+    "physics_to_snapshot_mapping_source": "src/data/igm_gal_loader.py PHYSICS_DIRS (1=fiducial, 2=ps13, 3=ps13agn, 4=ps13agn_strong)",
+    "hdf5_file_count_cross_check": "16 snap_012.{0..15}.hdf5 per set, verified per-directory this session",
+    "disk_arithmetic": {
+      "volume": "/Volumes/Elements (ExFAT, 931 Gi)",
+      "free_gib": 489,
+      "extraction_needed_gib": 0,
+      "r2_new_outputs_estimate_gib": 5.3,
+      "r2_breakdown": "3 x 1.69 GiB float32 768^3 rho caches + 3 x 0.053 GiB float64 192^3 cubes",
+      "verdict": "SUFFICIENT — proceed"
+    }
+  },
+  "c_d75_pinned_artifact_identity": {
+    "reference": "experiments/nerf/artifacts/d75_rescore/d75_scores.json provenance block + truth_real_record.json / grid_record.json / mlp_record.json",
+    "pin_semantics_ruling": "The provenance pins are SOURCE-artifact hashes, not 192-cube hashes: truth_sha256 = sha256 of the 768^3 rho cache; grid_md5/mlp_md5 = md5 of the producing checkpoints; only wiener_cube_md5_at_load pins the 192 cubes directly. Verified against record files' own key definitions this session.",
+    "checks": [
+      {"file": "Sherwood/.rho_field_cache/rho_field_p1_z0.300_n768.npy", "kind": "sha256_full", "pinned": "1189851352af8f9ac82492eff37d64985634923d88c8db811698cc40e1805a2c", "observed": "1189851352af8f9ac82492eff37d64985634923d88c8db811698cc40e1805a2c", "verdict": "MATCH"},
+      {"file": "Sherwood/.rho_field_cache/rho_field_p1_z0.300_n768.npy", "kind": "sha256_first_1MB (sidecar)", "pinned": "c9cc766ee3a24ea804db639e270d162423fcf37eafb18658ac6f2b2c5ddc5453", "observed": "c9cc766ee3a24ea804db639e270d162423fcf37eafb18658ac6f2b2c5ddc5453", "verdict": "MATCH"},
+      {"file": "cloud_runs/d73-1dprime-voxel192-P1-z0.3-c6f3aed-20260618-000035-8b4e90/checkpoints/step_050000.pt", "kind": "md5 (grid_md5 pin)", "pinned": "9ceb25bc1061379874a21e9d7fad1322", "observed": "9ceb25bc1061379874a21e9d7fad1322", "verdict": "MATCH"},
+      {"file": "cloud_runs/pub-t1-extracted/P1-N64-S0-1778430089-7f65fe/checkpoints/step_050000.pt", "kind": "md5 (mlp_md5 pin)", "pinned": "4b3b6431d9e2745049642aee37476885", "observed": "4b3b6431d9e2745049642aee37476885", "verdict": "MATCH"},
+      {"file": "experiments/nerf/artifacts/d75_rescore/cubes/wiener_rec192_L1.npy", "kind": "md5", "pinned": "2efeb390aeedd329dddfa58e0acc60f7", "observed": "2efeb390aeedd329dddfa58e0acc60f7", "verdict": "MATCH"},
+      {"file": "experiments/nerf/artifacts/d75_rescore/cubes/wiener_rec192_L2.npy", "kind": "md5", "pinned": "e3a391e7e8180926d30a215ebc6443d1", "observed": "e3a391e7e8180926d30a215ebc6443d1", "verdict": "MATCH"},
+      {"file": "experiments/nerf/artifacts/d75_rescore/cubes/wiener_rec192_L3.npy", "kind": "md5", "pinned": "52fd6ae0fecfc69485ce0f4c14929707", "observed": "52fd6ae0fecfc69485ce0f4c14929707", "verdict": "MATCH"}
+    ],
+    "truth_real_192_cube": {
+      "path": "experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy",
+      "no_prior_cube_level_hash_pin_exists": "truth_real_record.json pins the 768^3 source (sha256_full) + cube stats, not a cube hash; this session establishes the cube-level pin of record for the U-track",
+      "sha256_observed_PIN_OF_RECORD": "971a72ed5b1b872a972fd3ff8c35e99d6a0998a129afb822ebbd42417da34994",
+      "stats_recomputed": {"shape": [192, 192, 192], "dtype": "float64", "mean": 0.9999999999972362, "std": 9.018914612729024, "min": 0.0, "max": 4114.559783935547},
+      "stats_vs_truth_real_record": "MATCH to all printed digits (mean/std/min/max)"
+    },
+    "companion_cube_md5s_observed_this_session": {
+      "grid_192.npy": "299f09b84c6f747a2ffbe800de9be51c",
+      "mlp_192.npy": "8357a9b7384af0d5e721c096648174e9",
+      "note": "no prior cube-level pins for these two either (checkpoint md5s are the pins); recorded here as U-track cube-level pins"
+    },
+    "overall_verdict": "ALL 7 pinned comparisons MATCH; zero mismatches"
+  },
+  "d_rho_field_disk_cache": {
+    "root": "Sherwood/.rho_field_cache/",
+    "per_physics_n768_z0.300": {
+      "P1": {"state": "PRESENT", "npy_bytes": 1811939456, "sidecar_json": true, "sha256_verified_against_d75_pin": "MATCH"},
+      "P2": {"state": "MISSING — to be produced in R2"},
+      "P3": {"state": "MISSING — to be produced in R2"},
+      "P4": {"state": "MISSING — to be produced in R2"}
+    },
+    "other_entries": "rho_field_p1_z0.300_n64.npy(+json) present; two orphaned n64 .tmp.npy files from 2026-05-11/12 (harmless, ignored)"
+  },
+  "r1_verdict": "GREEN for R2: all four physics fully local at every layer (los/tau binaries, tarballs AND extracted snapdir_012 HDF5s); d75 artifact identity verified 7/7; only the P2-P4 rho caches are missing, which is exactly the R2 work; disk ample (489 Gi free vs ~5.3 GiB needed); no extraction required."
+}
