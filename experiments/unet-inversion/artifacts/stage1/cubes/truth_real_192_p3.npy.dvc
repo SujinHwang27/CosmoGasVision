@@ -1,0 +1,6 @@
+outs:
+- md5: 2962c835435a21bade3967cb1a6d9917
+  size: 56623232
+  isexec: true
+  hash: md5
+  path: truth_real_192_p3.npy

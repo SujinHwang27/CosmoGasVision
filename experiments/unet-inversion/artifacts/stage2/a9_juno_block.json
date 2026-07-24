@@ -1,0 +1,93 @@
+{
+  "record": "A9 / B2 — Juno reachability re-verification + [U-06] standard cost block",
+  "date": "2026-07-24",
+  "author": "infrastructure-manager",
+  "branch": "exp/unet-inversion",
+  "host_head": "489a0d3",
+  "spec_of_record": "experiments/unet-inversion/design/u06_stage2_spec.md §(e) B2",
+
+  "task1_reachability": {
+    "verdict": "REACHABLE",
+    "method": "ssh juno (BatchMode, key ~/.ssh/id_ed25519_juno, alias in ~/.ssh/config) — no VPN action needed from current network; no password/Duo prompt",
+    "login_node": "juno-l-02",
+    "user": "sxh240010",
+    "work_repo": {
+      "path": "~/work/CosmoGasVision",
+      "head": "c6f3aed",
+      "branch": "exp/nerf",
+      "last_commit": "2026-06-17 fix(juno-d73): derive COMMIT label from checked-out HEAD, not a hardcode",
+      "note": "STALE for this track — pre-dispatch step required: git fetch + checkout exp/unet-inversion at >= 489a0d3 (plus Juno-side torch cu124 re-pin if uv.lock changed, per juno-hpc skill)"
+    },
+    "scratch_mirror": {
+      "path": "~/scratch/sherwood/",
+      "contents": ["Physics1_nofeedback", "Physics2_stellarwind", "Physics3_windAGN", "Physics4_windstrongAGN"],
+      "size": "4.7G",
+      "scratch_fs_usage": "6.2G / 30T",
+      "note": "45-day purge clock — last known activity 2026-06-18 (job 221335 era); mirror still present 2026-07-24; touch-refresh or re-verify immediately before dispatch"
+    },
+    "sinfo_2026_07_24": {
+      "a30": "up; 1 node mixed + 1 node reserved; gpu:nvidia_a30:2 per node (~2 GPUs schedulable)",
+      "h100": "up; mixed; nvidia_h100_80gb_hbm3:4 + h100_nvl:1 + h100_nvl_3g.47gb:4 (virtual slices — do not use slices)",
+      "fairshare": 0.273859,
+      "queue_note": "fairshare < 0.5 -> expect nontrivial PD wait on a30 (only ~2 physical GPUs free); fallback = h100 partition (physical 80GB cards) if PD(Resources) persists"
+    }
+  },
+
+  "task2_cost_block": {
+    "envelope": "[U-06] §(e) B2: single GPU, <=12 hr primary run + one seed-repeat contingency",
+    "partition_choice": {
+      "choice": "a30 (physical partition; NOT a30-2.12gb/a30-4.6gb virtual slices)",
+      "vram_arithmetic": {
+        "model_static_fp32": "5.5M params: weights 22 MB + grads 22 MB + AdamW moments 44 MB = ~0.09 GB",
+        "activations_per_example": "0.4–1.0 GB with autograd at 64^3 input, 4-level base-32 U-Net (spec §memory arithmetic; level-1 map 33.5 MB/retained tensor)",
+        "batch_16": "~6.5–16 GB peak -> fits A30 24 GB with headroom at the mid estimate",
+        "batch_32": "~13–32 GB peak -> pessimistic end EXCEEDS 24 GB; not the default",
+        "ruling": "batch 16 primary on A30; raise to 32 only after a measured peak at batch 16 shows < 11 GB"
+      },
+      "h100_rationale": "not needed — 5.5M-param model is compute-light and the run fits the 12 hr envelope on A30; H100 is queue-fallback only",
+      "cpu_mem": "--mem=32G explicit (never rely on 64G default per skill)"
+    },
+    "hrs_per_run": {
+      "throughput_anchor": "s3 smoke: 1–3 s/step at batch 4 on MPS fp32; A30 fp32 at batch 16 estimated 0.2–0.5 s/step",
+      "estimate": "~50k-step production run: 2.8–7 hr; planning figure 4–8 hr",
+      "ceiling": "12 hr hard"
+    },
+    "cost_accounting": {
+      "basis": "Juno is allocation-based (no dollar rate); costs stated in GPU-hr against the quota granted 2026-05-12 (user-confirmed; nerf LEDGER §4 2026-05-12 entry; grant was sized against the ~792 GPU-hr T4 envelope)",
+      "primary_run": "<= 12 A30 GPU-hr",
+      "seed_repeat_contingency": "<= 12 A30 GPU-hr (one run, different seed, same config)",
+      "total_ceiling_gpu_hr": 24,
+      "fraction_of_quota_scale": "~3% of the ~792 GPU-hr grant scale"
+    },
+    "auto_stop": "sbatch --time=12:00:00 (SLURM hard kill) + in-script max_steps bound; PCV copy-out ordered BEFORE cleanup so a time-kill after first checkpoint still preserves artifacts",
+    "artifact_lifecycle": {
+      "copy_in": "repo src/experiments/scripts + pyproject/uv.lock from ~/work -> ~/scratch RUN_DIR; sherwood via symlink to warm mirror",
+      "copy_out_pcv": "hard-fail asserts ([[ -d ]] || exit N; NO '2>/dev/null || true' on artifact paths) for: (1) best checkpoint *.pt, (2) MLflow file-store dir, (3) metrics CSV -> ~/work/stage2_results/<RUN_TAG>/",
+      "cleanup": "rm -rf RUN_DIR only after PCV passes; nothing persists on scratch post-job (45-day purge discipline per juno-hpc skill)",
+      "host_roundtrip": "rsync juno:~/work/stage2_results/<RUN_TAG>/ -> cloud_runs/<RUN_TAG>/ (wrap in caffeinate -is); replay MLflow file-store into local tracker; DVC-track checkpoint (>10 MB rule); LEDGER §6 entry",
+      "downstream_consumable_gate": "sweep not 'done' until the host-side G2/corrected-metric evaluator loads the pulled checkpoint and produces a non-trivial readout (PCV stage-gate)"
+    },
+    "pre_dispatch_checklist": [
+      "git fetch + checkout exp/unet-inversion >= 489a0d3 in ~/work/CosmoGasVision",
+      "re-pin torch cu124 wheel if uv.lock changed since c6f3aed",
+      "touch-refresh ~/scratch/sherwood/ (45-day clock)",
+      "B1 defense-panel pre-review lifted (co-blocker; this record clears B2 only)",
+      "sshare check at dispatch time (0.274 on 2026-07-24)"
+    ]
+  },
+
+  "task3_caveat1_dvc": {
+    "outcome": "DONE — 3 cubes dvc add + dvc push to s3://cosmo-gas-vision-storage/dvc-data ('3 files pushed')",
+    "files": [
+      "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy",
+      "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p3.npy",
+      "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p4.npy"
+    ],
+    "size_each": "~54 MB",
+    "fixes_applied": [
+      "deleted AppleDouble ._*.dvc litter (6 files under cloud_runs/Sprint5cprime.../checkpoints/) that broke DVC stage collection (utf-8 decode error)",
+      ".gitignore: experiments/**/artifacts/ dir-ignore replaced with content-ignore + negation so *.dvc pointers under artifacts/ are git-trackable"
+    ],
+    "push_credentials": "AWS keys loaded from .env (set -a; source .env)"
+  }
+}

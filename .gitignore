@@ -47,8 +47,14 @@ SherwoodIGM_gal/
 # precedent it is neither git- nor DVC-tracked.
 Sherwood/.rho_field_cache/
 
-# Experiments: track source (LEDGER.md, pipeline.py, configs); DVC-track artifacts
-experiments/**/artifacts/
+# Experiments: track source (LEDGER.md, pipeline.py, configs); DVC-track artifacts.
+# DVC pointer files (*.dvc) and DVC-written .gitignore stubs under artifacts/ ARE
+# git-tracked (negation pattern; A9/Caveat-1 2026-07-24) — the data they point to
+# is not.
+experiments/**/artifacts/**
+!experiments/**/artifacts/**/
+!experiments/**/artifacts/**/*.dvc
+!experiments/**/artifacts/**/.gitignore
 experiments/**/__pycache__/
 
 # MLflow
