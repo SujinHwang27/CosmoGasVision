@@ -129,6 +129,10 @@ Prerequisite: the corrected-metric suite being spec'd on the exp/nerf close-out 
 
 ## 7. Session History & Next Handoff
 
+### User-direction notes (2026-07-24, banked verbatim-in-substance as future-work of record)
+- **[FW-1] Real-survey deployment = distribution-shift problem, named by the user.** Real spectra have no fixed redshift (light-cone evolution along each sightline) plus noise/continuum systematics. Deployment path of record: light-cone-stitched mocks across snapshots, redshift-conditioning input, and/or transfer-learning fine-tuning on realism-matched mocks — bundled with the benchmark survey's realism-noise package (item 1). z=2.2/2.4 sightlines ×4 physics already local as raw material.
+- **[FW-2] Conditioned forward emulator for feedback latent-factor analysis, proposed by the user.** Train a shared-trunk field model across the 4 shared-IC physics variants with a small physics embedding; read the embedding/delta-fields as the interpretable feedback signature. Grounding: [D-46] embedding separability (max pairwise L2 7.045 even under collapse) + sprint-5 48³ discriminability (+24pp over moments). Key property: FORWARD, truth-supervised — not blocked by K2 (which poisons only inverse-from-flux). Adjacent value: compact differentiable surrogate (~6 MB vs ~40 GB snapshot).
+
 ### Session Snapshot: 2026-07-23 (track founding — Fable session)
 - User directives absorbed: (1) benefit gate on paper work (no quantifiable NeRF win in record → paper halted pending corrected metrics); (2) grid ≠ method — NeRF-centric framing for all exp/nerf re-scoring; (3) new track = new architecture on SAME dataset; (4) branch + LEDGER per suggested track.
 - This track (amortized U-Net inversion) parked at Stage 0. Sibling track parked at `exp/diffusion-posterior` (dormant until this track's Stage 2 gate — see its LEDGER).
