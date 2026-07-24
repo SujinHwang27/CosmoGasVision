@@ -1,0 +1,179 @@
+{
+  "spec": "f02_founding_ratification.md \u00a74(c) ladder + \u00a74(d) controls",
+  "scoring": {
+    "grid_n": 64,
+    "box_mpc_h": 60.0,
+    "sigma_mpc_h": 2.0,
+    "estimator": "nccf.gaussian_smooth_periodic + nccf.pearson (r_s)",
+    "val_voxel_bounds_on_grid": [
+      44,
+      54
+    ],
+    "note": "full-box 64^3 periodic smoothing (periodic-safe); pearson restricted to [D-49] val slab; truth block-mean downsampled 192->64."
+  },
+  "config": {
+    "d": 8,
+    "lr": 0.001,
+    "batch_per_variant": 1024,
+    "mini_steps": 500,
+    "s2_steps": 200,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "variants": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "s2": {
+    "recorded_floors": {
+      "mse_mean_floor": 0.3176283836364746,
+      "target_std": 0.566089928150177
+    },
+    "loss_50": 0.32055139541625977,
+    "loss_200": 0.33804479241371155,
+    "pred_std_50": 0.09808225929737091,
+    "gate_i_nontriviality": {
+      "value": 0.32055139541625977,
+      "bar": 0.28586554527282715,
+      "pass": false
+    },
+    "gate_ii_anticollapse": {
+      "value": 0.09808225929737091,
+      "bar": 0.0566089928150177,
+      "pass": true
+    },
+    "gate_iii_memorization": {
+      "value": 0.33804479241371155,
+      "bar": 0.1588141918182373,
+      "pass": false
+    },
+    "GREEN": false
+  },
+  "s3": {
+    "loss_1": 0.6701540350914001,
+    "loss_100": 0.33169347047805786,
+    "loss_final": 0.31674104928970337,
+    "pred_std_val": 0.08153698593378067,
+    "step100_contract": {
+      "pred_std_val_gt_0p01": true,
+      "loss100_lt_loss1": true,
+      "pass": true
+    },
+    "GREEN": true
+  },
+  "lambda_z_sweep": {
+    "ladder": [
+      {
+        "lambda_z": 0.0,
+        "Q_conditioned_mean": -0.02496275675967454,
+        "Q_shared_mean": -0.03653578703842847,
+        "c1_separation": 0.011573030278753928,
+        "Q_conditioned_per_variant": {
+          "1": 0.07624421879017992,
+          "2": 0.01180529278894903,
+          "3": -0.1494050237042243,
+          "4": -0.038495514913602834
+        }
+      },
+      {
+        "lambda_z": 0.0001,
+        "Q_conditioned_mean": 0.018055870843316273,
+        "Q_shared_mean": -0.03489731905392222,
+        "c1_separation": 0.05295318989723849,
+        "Q_conditioned_per_variant": {
+          "1": 0.022639041804844783,
+          "2": 0.1356037292984143,
+          "3": -0.06041333849805131,
+          "4": -0.025605949231942676
+        }
+      },
+      {
+        "lambda_z": 0.001,
+        "Q_conditioned_mean": 0.024214367823817702,
+        "Q_shared_mean": 0.008849632193295707,
+        "c1_separation": 0.015364735630521995,
+        "Q_conditioned_per_variant": {
+          "1": -0.014312728754203882,
+          "2": -0.05023731265356599,
+          "3": 0.18175629813518185,
+          "4": -0.02034878543214117
+        }
+      },
+      {
+        "lambda_z": 0.01,
+        "Q_conditioned_mean": 0.01626512432649092,
+        "Q_shared_mean": 0.031372811336348644,
+        "c1_separation": -0.015107687009857724,
+        "Q_conditioned_per_variant": {
+          "1": 0.03829499017224179,
+          "2": 0.03284299884921203,
+          "3": -0.0037070361755268066,
+          "4": -0.002370455539963325
+        }
+      }
+    ],
+    "pinned_lambda_z": 0.0001,
+    "rationale": "pinned at the lambda_z with largest c1 separation among those whose conditioned Q is within 0.02 of the best conditioned Q (fit not degraded). Derivation-at-spec-time; no magic default.",
+    "Q_degradation_tolerance": 0.02
+  },
+  "controls": {
+    "seed_SD_of_Q_conditioned": 0.010808885540959455,
+    "bar_2x_seedSD": 0.02161777108191891,
+    "c1_shared_z": {
+      "Q_conditioned_mean": 0.006000807647996793,
+      "Q_shared_mean": -0.013698516450230352,
+      "separation": 0.019699324098227146,
+      "bar": 0.02161777108191891,
+      "pass": false
+    },
+    "c2_swap_test": {
+      "mean_degradation": 0.001912961160301821,
+      "bar": 0.02161777108191891,
+      "pass": false
+    },
+    "c3_shuffled_assignment": {
+      "permutation": [
+        2,
+        0,
+        1,
+        3
+      ],
+      "Q_correct_mean": 0.018055870843316273,
+      "Q_shuffled_mean": 0.0187286944229631,
+      "degrades": false,
+      "note": "diagnostic"
+    },
+    "c4_label_shuffle_null": {
+      "conditioned_pairwise_code_L2": [
+        0.10527614504098892,
+        0.1993388831615448,
+        0.059246763586997986,
+        0.12622509896755219,
+        0.09538277238607407,
+        0.17323392629623413
+      ],
+      "labelshuffle_pairwise_code_L2": [
+        0.12453146278858185,
+        0.07209161669015884,
+        0.09046938270330429,
+        0.15704098343849182,
+        0.13103143870830536,
+        0.07571270316839218
+      ],
+      "conditioned_mean_pair_L2": 0.12645059823989868,
+      "labelshuffle_mean_pair_L2": 0.10847959791620572,
+      "note": "diagnostic: under shuffled labels z_p should NOT separate (labelshuffle_mean should be << conditioned_mean)."
+    }
+  },
+  "figures": {
+    "P1": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P1.png",
+    "P2": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P2.png",
+    "P3": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P3.png",
+    "P4": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P4.png"
+  }
+}

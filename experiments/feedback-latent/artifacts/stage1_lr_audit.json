@@ -1,0 +1,44 @@
+{
+  "probe": "Stage-1 F0 audit: overfit FIXED batch (2 variants x1024 pts, seed42) 400 steps, per lr",
+  "mean_floor_mse": 0.3176283836364746,
+  "target_std": 0.566089928150177,
+  "finding": "lr=1e-3 (driver default) does NOT overfit (min=floor, loss non-monotonic up); lr in {1e-4,3e-4} overfits to ~0. Root cause of Stage-1 smoke RED = lr too high for SIREN(omega0=30). Architecture healthy. Gates unchanged; fix is run-config lr.",
+  "ladder": [
+    {
+      "lr": 0.0001,
+      "loss_1": 0.6669544577598572,
+      "loss_100": 0.010881436988711357,
+      "loss_400": 0.0006305265706032515,
+      "min": 0.0006305265706032515,
+      "min_over_floor": 0.0019851077645658033,
+      "overfits": true
+    },
+    {
+      "lr": 0.0003,
+      "loss_1": 0.6669544577598572,
+      "loss_100": 0.0009830454364418983,
+      "loss_400": 0.00019482799689285457,
+      "min": 0.00019482799689285457,
+      "min_over_floor": 0.000613383459822769,
+      "overfits": true
+    },
+    {
+      "lr": 0.001,
+      "loss_1": 0.6669544577598572,
+      "loss_100": 0.33189696073532104,
+      "loss_400": 0.3301454484462738,
+      "min": 0.3171592652797699,
+      "min_over_floor": 0.9985230590813898,
+      "overfits": false
+    },
+    {
+      "lr": 0.003,
+      "loss_1": 0.6669544577598572,
+      "loss_100": 0.3559749722480774,
+      "loss_400": 0.3274998664855957,
+      "min": 0.32087576389312744,
+      "min_over_floor": 1.0102238352236477,
+      "overfits": false
+    }
+  ]
+}
