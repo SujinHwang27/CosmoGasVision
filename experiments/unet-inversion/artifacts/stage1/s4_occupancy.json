@@ -1,0 +1,127 @@
+{
+  "rung": "R8 \u2014 S3 figures + S4 occupancy/rejection stats (A8)",
+  "spec": "u04_stage1_ratification.md SS2(d), commit 58ac831",
+  "config": {
+    "seed": 42,
+    "crop_size": 64,
+    "n_grid": 192,
+    "delta_f_scale": 12.5,
+    "occupancy_crops_per_setting": 100,
+    "rejection_draws": 400
+  },
+  "per_physics": {
+    "P1": {
+      "n_rays_64": {
+        "n_crops": 100,
+        "occupancy_mean": 0.01549884796142578,
+        "occupancy_std": 9.317745370161118e-05,
+        "occupancy_min": 0.01528167724609375,
+        "occupancy_max": 0.015583038330078125,
+        "rays_taken_mean": 64.0,
+        "rays_taken_min": 64,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "n_rays_1024": {
+        "n_crops": 100,
+        "occupancy_mean": 0.2207210922241211,
+        "occupancy_std": 0.0012905359669098501,
+        "occupancy_min": 0.21626663208007812,
+        "occupancy_max": 0.223052978515625,
+        "rays_taken_mean": 1024.0,
+        "rays_taken_min": 1024,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "zero_ray_rejection": {
+        "n_draws": 400,
+        "n_rejections": 0,
+        "rate": 0.0,
+        "pool": "all 16384 sightlines (expected intersecting per 64^3 crop ~ 16384/9 ~ 1820 -> rejections expected ~0)"
+      }
+    },
+    "P2": {
+      "n_rays_64": {
+        "n_crops": 100,
+        "occupancy_mean": 0.01549884796142578,
+        "occupancy_std": 9.317745370161118e-05,
+        "occupancy_min": 0.01528167724609375,
+        "occupancy_max": 0.015583038330078125,
+        "rays_taken_mean": 64.0,
+        "rays_taken_min": 64,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "n_rays_1024": {
+        "n_crops": 100,
+        "occupancy_mean": 0.2207210922241211,
+        "occupancy_std": 0.0012905359669098501,
+        "occupancy_min": 0.21626663208007812,
+        "occupancy_max": 0.223052978515625,
+        "rays_taken_mean": 1024.0,
+        "rays_taken_min": 1024,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "zero_ray_rejection": {
+        "n_draws": 400,
+        "n_rejections": 0,
+        "rate": 0.0,
+        "pool": "all 16384 sightlines (expected intersecting per 64^3 crop ~ 16384/9 ~ 1820 -> rejections expected ~0)"
+      }
+    },
+    "P3": {
+      "n_rays_64": {
+        "n_crops": 100,
+        "occupancy_mean": 0.01549884796142578,
+        "occupancy_std": 9.317745370161118e-05,
+        "occupancy_min": 0.01528167724609375,
+        "occupancy_max": 0.015583038330078125,
+        "rays_taken_mean": 64.0,
+        "rays_taken_min": 64,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "n_rays_1024": {
+        "n_crops": 100,
+        "occupancy_mean": 0.2207210922241211,
+        "occupancy_std": 0.0012905359669098501,
+        "occupancy_min": 0.21626663208007812,
+        "occupancy_max": 0.223052978515625,
+        "rays_taken_mean": 1024.0,
+        "rays_taken_min": 1024,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "zero_ray_rejection": {
+        "n_draws": 400,
+        "n_rejections": 0,
+        "rate": 0.0,
+        "pool": "all 16384 sightlines (expected intersecting per 64^3 crop ~ 16384/9 ~ 1820 -> rejections expected ~0)"
+      }
+    },
+    "P4": {
+      "n_rays_64": {
+        "n_crops": 100,
+        "occupancy_mean": 0.01549884796142578,
+        "occupancy_std": 9.317745370161118e-05,
+        "occupancy_min": 0.01528167724609375,
+        "occupancy_max": 0.015583038330078125,
+        "rays_taken_mean": 64.0,
+        "rays_taken_min": 64,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "n_rays_1024": {
+        "n_crops": 100,
+        "occupancy_mean": 0.2207210922241211,
+        "occupancy_std": 0.0012905359669098501,
+        "occupancy_min": 0.21626663208007812,
+        "occupancy_max": 0.223052978515625,
+        "rays_taken_mean": 1024.0,
+        "rays_taken_min": 1024,
+        "note_shortfall": "rays_taken < n_rays when fewer rays intersect the crop than requested"
+      },
+      "zero_ray_rejection": {
+        "n_draws": 400,
+        "n_rejections": 0,
+        "rate": 0.0,
+        "pool": "all 16384 sightlines (expected intersecting per 64^3 crop ~ 16384/9 ~ 1820 -> rejections expected ~0)"
+      }
+    }
+  },
+  "cross_physics_note": "occupancy/rejection stats are IDENTICAL across P1-P4 by construction: the four los files carry byte-identical ray geometry (iaxis/x/y/zaxis/pos_axis verified equal this session; axis counts 5439/5452/5493) and corners are (seed,index)-deterministic; only delta_F values differ per physics."
+}
