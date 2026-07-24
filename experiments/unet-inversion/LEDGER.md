@@ -76,6 +76,14 @@ flowchart LR
   4. **Pre-work obligation before any novelty claim ships:** full scan of the Chaves-Montero 2026 ML-Lyα review (arXiv:2605.22489), whose field-level-inference section the panel could not extract; if it names learned-inversion work at low z, this entry re-opens.
   5. **External reference point for gates:** DeepCHART's ρ ≈ 0.77 at z=2.5 is the literature anchor the corrected-metric table positions against (with the regime caveat stated both ways). G2 remains a *benefit* gate vs our own baselines; U-02 adds no numeric bar, only claim discipline.
 
+- **[U-03] Pivot targets from the exp/nerf [D-75] corrected-metric campaign + user grid ruling (2026-07-23).**
+  Provenance: exp/nerf LEDGER §3 [D-75] (commit c627aad) + [D-75] §H user ruling (5423c3c). The user barred the grid from the NeRF-track paper (it belittles the chosen method); its numbers live HERE, as this track's quantitative pivot rationale and targets:
+  1. **Measured recoverable ceiling**: r_s(σ=2 h⁻¹Mpc, real frame, 192³ log-density) = **0.595 ± 0.020** at z=0.3, n_rays=1024 — what a maximal-capacity per-scene fit extracts from the flux likelihood alone (≈ truth low-passed at k_c ≲ 0.25 h/Mpc; coherence r(k) > 0.5 to k ≈ 0.62; amplitude-compressed). Estimator: `src/analysis/nccf.py` + smoothed Pearson per the [D-75] suite (acceptance-validated).
+  2. **NeRF method-lineage reference**: r_s(σ=2) = **0.275 ± 0.052** (production pub-t1, n_rays=64 config caveat rides). The 0.275 → 0.595 gap is the measured method-attributable improvement space that motivates this track.
+  3. **Classical reference**: Wiener best-L = **0.165 ± 0.031** ("this Wiener configuration" verbs mandatory; R14 caveats per [D-75]).
+  4. **Gate G2 is now CONCRETE**: this track claims a win only if the U-Net beats **0.595** (the likelihood-only ceiling) on the [D-75] scoreboard, held-out region, same estimator suite — beating 0.275 or 0.165 alone is progress, not the win condition, because the learned prior must demonstrably add information beyond what per-scene likelihood fitting already extracts (the K2 lesson: flux margin of record 3.884× means flux-fit quality cannot adjudicate; density-domain r_s on held-out truth is the only scoreboard).
+  5. Scale honesty inherited: recovery claims are scale-resolved (σ=2 gated; small scales and amplitude are where the data ran out for likelihood-only methods — they are exactly where a learned prior must prove itself).
+
 ---
 
 ## 4. The Data (Lineage & Governance)
