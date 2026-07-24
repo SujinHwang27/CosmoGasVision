@@ -1,0 +1,59 @@
+{
+  "artifact": "A2",
+  "rung": "R3 (module) + R4 model-side (unit tests)",
+  "spec": "f02_founding_ratification.md §4(a) architecture + §4(c)-s1 gates",
+  "module_path": "src/models/feedback_field.py",
+  "test_path": "tests/test_feedback_field.py",
+  "date": "2026-07-24",
+  "architecture": {
+    "trunk": "SIREN (Sitzmann+2020), sine activation, omega_0=30",
+    "sine_layers": 5,
+    "layer_dims": {
+      "first": "Linear(3+d -> 256), is_first, U(-1/n_in, 1/n_in)",
+      "inner_x4": "Linear(256 -> 256), U(-sqrt(6/n)/omega_0, +sqrt(6/n)/omega_0)",
+      "output": "Linear(256 -> 1), NO activation (x = log10-overdensity)"
+    },
+    "hidden_dim": 256,
+    "auto_decoder": "DeepSDF (Park+2019): nn.Embedding(4, d), init N(0, 0.01^2), joint-optimized",
+    "wiring": "concatenation-at-input, input dim = 3 (coords in [-1,1]) + d",
+    "d_default": 8,
+    "d_stage1_ladder": [1, 2, 4, 8]
+  },
+  "param_count": {
+    "d8_total": 266529,
+    "d8_trunk_only": 266497,
+    "d8_target_approx": "~0.26M -> MET",
+    "d1_total": 264709,
+    "breakdown_d8": "first 3072 + 4x65792 (inner) + 257 (out) + 32 (codes)"
+  },
+  "init_check": {
+    "first_layer_bound": 0.09090909090909091,
+    "first_layer_weight_absmax": 0.09082071483135223,
+    "hidden_layer_bound": 0.005103103630798287,
+    "hidden_layer_weight_absmax": 0.005103095434606075,
+    "code_bank_std_target": 0.01,
+    "code_bank_std_measured": 0.01012393832206726
+  },
+  "code_prior": {
+    "method": "code_prior(variant_idx, lambda_z) and code_prior_explicit(z, lambda_z)",
+    "form": "lambda_z * mean_b ||z_p(b)||^2",
+    "lambda_z": "REQUIRED ARG, no magic default (derivation-at-spec-time; PI pins at exit per §4(a)/§4(e))"
+  },
+  "differentiability": "gradients verified to reach BOTH trunk weights AND z_p (test 3)",
+  "tests": {
+    "framework": "pytest",
+    "command": "PYTHONPATH=. .venv/bin/python -m pytest tests/test_feedback_field.py -q",
+    "passed": 7,
+    "total": 7,
+    "gates": [
+      "1 forward finite on random coords",
+      "2 output shape [B]",
+      "3 gradient reaches trunk AND z_p",
+      "4 SIREN init statistics match Sitzmann spec (first + hidden bounds)",
+      "5 seeded determinism",
+      "6 explicit-z forward path works and differs from embedding path; exactly-one-of guard",
+      "7 param count == expected (266529 for d=8)"
+    ]
+  },
+  "scope_note": "A2 module + A4 model-side unit tests only. Smoke driver (A5) and cube provider (A3) owned by other agents. No git commit (coordinator commits)."
+}
