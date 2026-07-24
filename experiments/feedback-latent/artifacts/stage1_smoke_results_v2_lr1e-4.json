@@ -1,0 +1,179 @@
+{
+  "spec": "f02_founding_ratification.md \u00a74(c) ladder + \u00a74(d) controls",
+  "scoring": {
+    "grid_n": 64,
+    "box_mpc_h": 60.0,
+    "sigma_mpc_h": 2.0,
+    "estimator": "nccf.gaussian_smooth_periodic + nccf.pearson (r_s)",
+    "val_voxel_bounds_on_grid": [
+      44,
+      54
+    ],
+    "note": "full-box 64^3 periodic smoothing (periodic-safe); pearson restricted to [D-49] val slab; truth block-mean downsampled 192->64."
+  },
+  "config": {
+    "d": 8,
+    "lr": 0.0001,
+    "batch_per_variant": 1024,
+    "mini_steps": 500,
+    "s2_steps": 200,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "variants": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "s2": {
+    "recorded_floors": {
+      "mse_mean_floor": 0.3176283836364746,
+      "target_std": 0.566089928150177
+    },
+    "loss_50": 0.14136716723442078,
+    "loss_200": 0.0011377690825611353,
+    "pred_std_50": 0.34785181283950806,
+    "gate_i_nontriviality": {
+      "value": 0.14136716723442078,
+      "bar": 0.28586554527282715,
+      "pass": true
+    },
+    "gate_ii_anticollapse": {
+      "value": 0.34785181283950806,
+      "bar": 0.0566089928150177,
+      "pass": true
+    },
+    "gate_iii_memorization": {
+      "value": 0.0011377690825611353,
+      "bar": 0.1588141918182373,
+      "pass": true
+    },
+    "GREEN": true
+  },
+  "s3": {
+    "loss_1": 0.6701540350914001,
+    "loss_100": 0.26722458004951477,
+    "loss_final": 0.22784139215946198,
+    "pred_std_val": 0.23130610585212708,
+    "step100_contract": {
+      "pred_std_val_gt_0p01": true,
+      "loss100_lt_loss1": true,
+      "pass": true
+    },
+    "GREEN": true
+  },
+  "lambda_z_sweep": {
+    "ladder": [
+      {
+        "lambda_z": 0.0,
+        "Q_conditioned_mean": 0.5254791757826186,
+        "Q_shared_mean": 0.46007356171149993,
+        "c1_separation": 0.06540561407111867,
+        "Q_conditioned_per_variant": {
+          "1": 0.5150135503598675,
+          "2": 0.4987017589040515,
+          "3": 0.5116428350796568,
+          "4": 0.5765585587868983
+        }
+      },
+      {
+        "lambda_z": 0.0001,
+        "Q_conditioned_mean": 0.5243087347577848,
+        "Q_shared_mean": 0.4601131887146835,
+        "c1_separation": 0.06419554604310135,
+        "Q_conditioned_per_variant": {
+          "1": 0.5137162876679986,
+          "2": 0.4977798004970382,
+          "3": 0.5104419984139126,
+          "4": 0.5752968524521902
+        }
+      },
+      {
+        "lambda_z": 0.001,
+        "Q_conditioned_mean": 0.509635015482919,
+        "Q_shared_mean": 0.46072484687605464,
+        "c1_separation": 0.04891016860686437,
+        "Q_conditioned_per_variant": {
+          "1": 0.49701249262348096,
+          "2": 0.48375654884715,
+          "3": 0.4948158893811227,
+          "4": 0.5629551310799221
+        }
+      },
+      {
+        "lambda_z": 0.01,
+        "Q_conditioned_mean": 0.48101146642459097,
+        "Q_shared_mean": 0.4647814261447403,
+        "c1_separation": 0.0162300402798507,
+        "Q_conditioned_per_variant": {
+          "1": 0.4678197193346964,
+          "2": 0.4514838844852677,
+          "3": 0.4682565743272147,
+          "4": 0.536485687551185
+        }
+      }
+    ],
+    "pinned_lambda_z": 0.0,
+    "rationale": "pinned at the lambda_z with largest c1 separation among those whose conditioned Q is within 0.02 of the best conditioned Q (fit not degraded). Derivation-at-spec-time; no magic default.",
+    "Q_degradation_tolerance": 0.02
+  },
+  "controls": {
+    "seed_SD_of_Q_conditioned": 0.028267542226276882,
+    "bar_2x_seedSD": 0.056535084452553765,
+    "c1_shared_z": {
+      "Q_conditioned_mean": 0.549647785104448,
+      "Q_shared_mean": 0.5443236756392696,
+      "separation": 0.005324109465178362,
+      "bar": 0.056535084452553765,
+      "pass": false
+    },
+    "c2_swap_test": {
+      "mean_degradation": 0.0052362452119071356,
+      "bar": 0.056535084452553765,
+      "pass": false
+    },
+    "c3_shuffled_assignment": {
+      "permutation": [
+        2,
+        0,
+        1,
+        3
+      ],
+      "Q_correct_mean": 0.5254791757826186,
+      "Q_shuffled_mean": 0.5254039167830564,
+      "degrades": true,
+      "note": "diagnostic"
+    },
+    "c4_label_shuffle_null": {
+      "conditioned_pairwise_code_L2": [
+        0.03666345775127411,
+        0.030392078682780266,
+        0.105880007147789,
+        0.01635006070137024,
+        0.12650319933891296,
+        0.11363586783409119
+      ],
+      "labelshuffle_pairwise_code_L2": [
+        0.01183053944259882,
+        0.0048920330591499805,
+        0.013163529336452484,
+        0.012561860494315624,
+        0.02375783957540989,
+        0.012210731394588947
+      ],
+      "conditioned_mean_pair_L2": 0.07157077857603629,
+      "labelshuffle_mean_pair_L2": 0.013069422217085958,
+      "note": "diagnostic: under shuffled labels z_p should NOT separate (labelshuffle_mean should be << conditioned_mean)."
+    }
+  },
+  "figures": {
+    "P1": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P1.png",
+    "P2": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P2.png",
+    "P3": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P3.png",
+    "P4": "/Volumes/Elements/Data/sujin/CosmoGasVision/experiments/feedback-latent/artifacts/stage1_slab_P4.png"
+  }
+}

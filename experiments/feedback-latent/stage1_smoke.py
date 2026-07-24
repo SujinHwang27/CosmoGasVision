@@ -50,7 +50,9 @@ D_MODEL = 8
 MINI_STEPS = 500
 S2_STEPS = 200
 BATCH_PER_VARIANT = 1024
-LR = 1e-3
+LR = 1e-4                        # F0 audit (stage1_lr_audit.json): 1e-3 too high for
+#                                  SIREN(omega0=30) — stuck at mean-floor; 1e-4 overfits
+#                                  a fixed batch to ~6e-4. lr is a run-config, gates unchanged.
 SEEDS = [0, 1, 2]
 LAMBDA_SWEEP = [0.0, 1e-4, 1e-3, 1e-2]
 DEVICE = torch.device("cpu")
