@@ -322,7 +322,9 @@ def sliding_window_predict(
     ray_ids = np.asarray(ray_ids, dtype=np.int64)
     pred_sum = np.zeros((n, n, n), dtype=np.float64)
     cnt = np.zeros((n, n, n), dtype=np.float64)
-    positions = list(range(0, n - CROP + 1, STRIDE))
+    # S7 (spec v2): PERIODIC window placement — stride 32 on the periodic
+    # box, 6 positions/axis, 216 windows, exact 8x per-voxel coverage.
+    positions = list(range(0, n, STRIDE))
     model.eval()
     with torch.no_grad():
         for ca, cb, cc in itertools.product(positions, repeat=3):
@@ -335,27 +337,43 @@ def sliding_window_predict(
                 inp = input_transform(inp)
             xb = torch.from_numpy(inp[None]).to(device)
             out = model(xb)[0, 0].float().cpu().numpy().astype(np.float64)
-            pred_sum[ca:ca + CROP, cb:cb + CROP, cc:cc + CROP] += out
-            cnt[ca:ca + CROP, cb:cb + CROP, cc:cc + CROP] += 1.0
-    assert cnt.min() > 0, "sliding window did not cover the box"
+            ix = np.ix_(*[(np.arange(c, c + CROP) % n) for c in
+                          (ca, cb, cc)])
+            pred_sum[ix] += out
+            cnt[ix] += 1.0
+    # S7 runtime assertion: uniform 8x coverage before averaging
+    assert (cnt == 8.0).all(), (
+        f"S7 coverage FAIL: expected uniform 8x, got "
+        f"[{cnt.min():g}, {cnt.max():g}]")
     return pred_sum / cnt
+
+
+def window_interior_mask(n: int = N_GRID) -> np.ndarray:
+    """S7 seam diagnostic support: voxels >= 8 from EVERY face of EVERY
+    covering window. With stride 32 / crop 64, a voxel's local coord along
+    an axis in its two covering windows is (c mod 32) and (c mod 32) + 32;
+    both are >= 8 from the faces iff (c mod 32) in [8, 24)."""
+    ax = (np.arange(n) % STRIDE >= 8) & (np.arange(n) % STRIDE < 24)
+    return ax[:, None, None] & ax[None, :, None] & ax[None, None, :]
 
 
 # ------------------------------------------------------- quick masked eval
 
 
 def quick_masked_eval(model: UNet3D, source: PhysicsSource,
-                      device: torch.device) -> Dict:
+                      device: torch.device,
+                      source_p2: Optional[PhysicsSource] = None) -> Dict:
     """s3 quick eval: r_s on the [D-49] VAL mask, real frame, sigma {1,2,4};
     U-G controls z1/z2/z3; descriptive columns. Scoring conventions IMPORTED
     from the R9 machinery, not re-implemented.
 
-    B1 KILLER-1 amendment (coordinator, 2026-07-24): ALL pre-G2 evaluation
-    reads are on the VAL slab — region_voxel_interval('val', 192) = [134,163)
-    — NOT 'test'. The test mask is touched exactly twice in this track's
-    life (G2 confirmatory + G3). Checkpoint selection for any long run =
-    final checkpoint or best-VAL, never best-test. No cell verdict here:
-    raw numbers only; cells re-band under spec v2 against measured VAL nulls.
+    Spec v2 (74684ad) + s2 ruling (7a7f251) shape: K1 VAL-slab reads only
+    (region_voxel_interval('val', 192) = [134,163); test mask touched
+    exactly twice ever: G2 + G3); S5 controls z1-z4 (z3 = pinned seed-
+    20260729 derangement; z4 = P2 flux into the P1 pattern); S4 U-G
+    trigger; S7 periodic windows + coverage assert + seam column; K2
+    re-banded cell, evaluated ONLY if the VAL band AND its m value exist —
+    otherwise raw numbers + PENDING-cell.
     """
     from scripts.d75_corrected_metric_rescore import BOX_MPC_H
     from scripts.u04_r9_heldout_rescore import masked_pearson, masked_spearman
@@ -378,12 +396,18 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
     rays_primary = np.arange(1024, dtype=np.int64)   # file-order [0,1024)
     rays_secondary = np.arange(64, dtype=np.int64)   # file-order [0,64)
 
-    # z3 shuffled-ray: permute delta_F row assignment among the eval rays,
-    # geometry intact. Seed pre-registered here: default_rng([42, 3]).
-    z3_rng = np.random.default_rng([SEED, 3])
-    df_shuf = source.delta_f.copy()
-    perm = z3_rng.permutation(rays_primary.size)
-    df_shuf[rays_primary] = source.delta_f[rays_primary[perm]]
+    # z3 (S5, pinned): GLOBAL seeded DERANGEMENT of whole-ray flux profiles
+    # across the eval pattern — geometry fixed, seed 20260729, no ray maps
+    # to itself (rejection-resampled until derangement).
+    z3_rng = np.random.default_rng(20260729)
+    m = rays_primary.size
+    perm = z3_rng.permutation(m)
+    n_redraws = 0
+    while (perm == np.arange(m)).any():
+        perm = z3_rng.permutation(m)
+        n_redraws += 1
+    df_derange = source.delta_f.copy()
+    df_derange[rays_primary] = source.delta_f[rays_primary[perm]]
 
     conditions = {
         "actual": dict(),
@@ -392,8 +416,17 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
         "z2_mask_only": dict(
             input_transform=lambda a: np.stack(
                 [np.zeros_like(a[0]), a[1]])),
-        "z3_shuffled_ray": dict(delta_f=df_shuf),
+        "z3_deranged_ray": dict(delta_f=df_derange),
     }
+    # z4 (S5): cross-physics flux swap — P2 flux into the P1 eval pattern
+    # (free given byte-identical LOS geometry, asserted here).
+    if source_p2 is not None:
+        assert np.array_equal(source.geometry.voxel3,
+                              source_p2.geometry.voxel3)
+        assert np.array_equal(source.geometry.axis, source_p2.geometry.axis)
+        df_swap = source.delta_f.copy()
+        df_swap[rays_primary] = source_p2.delta_f[rays_primary]
+        conditions["z4_cross_physics_swap"] = dict(delta_f=df_swap)
 
     cubes, scores = {}, {}
     for name, kw in conditions.items():
@@ -437,32 +470,58 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                              np.percentile(x_truth[mask], pcts)],
     }
 
-    # raw readouts only (B1 KILLER-1: NO cell verdict pre-spec-v2; the
-    # test-mask null band 0.2211 does NOT apply to this VAL-mask read)
+    # S7 seam-diagnostic column (actual cube, sigma=2, VAL-mask cut to the
+    # all-window-interior voxel set; divergence > 0.02 raises a seam flag)
+    interior = window_interior_mask(N_GRID)
     r2 = scores["actual"]["2"]["pearson_masked"]
+    r2_interior = masked_pearson(truth_s[2.0], pred_s2, mask & interior)
+    seam = {"r_s2_val_mask": r2,
+            "r_s2_val_mask_window_interior": r2_interior,
+            "interior_definition": "(coord mod 32) in [8,24) on all axes "
+                                   "— >=8 from every face of every "
+                                   "covering window",
+            "n_interior_val_voxels": int((mask & interior).sum()),
+            "divergence": abs(r2_interior - r2),
+            "seam_flag": bool(abs(r2_interior - r2) > 0.02)}
+
     controls_r2 = {k: scores[k]["2"]["pearson_masked"]
-                   for k in ("z1_all_zero_input", "z2_mask_only",
-                             "z3_shuffled_ray")}
-    # spec-v1 U-G rule computed as a RAW DIAGNOSTIC only (any control
-    # r_s >= 0.5 x actual); binding cell logic deferred to spec v2
-    u_g_fired = any(v >= 0.5 * r2 for v in controls_r2.values())
+                   for k in conditions if k != "actual"}
     collapse = descriptive["var_ratio_unsmoothed_mask"] < 0.01
-    val_band_file = STAGE2_DIR / "null_band_n200_val.json"
+    # VAL null band + m (K2): cell evaluates ONLY with both present
+    val_band_file = STAGE2_DIR / "null_band_val_n200.json"
+    null975 = m_edge = None
     if val_band_file.exists():
-        band = json.loads(val_band_file.read_text())["band"]["real"]
+        vb = json.loads(val_band_file.read_text())
+        band = vb["band"]["real"]
         null975 = {s: band[s]["pearson"]["pct_97p5"] for s in ("1", "2", "4")}
+        for key in ("m", "m_value", "m_edge_mc_error",
+                    "edge_mc_error_m", "edge_ci_half_width"):
+            if isinstance(vb.get(key), (int, float)):
+                m_edge = float(vb[key])
+                break
         null_block = {"file": str(val_band_file.relative_to(REPO)),
                       "pct_97p5_real_pearson": null975,
-                      "note": "VAL-mask band; comparison recorded, cell "
-                              "still deferred to spec v2"}
+                      "m_edge_mc_error": m_edge}
     else:
-        null_block = {"file": None,
-                      "status": "PENDING-val-band",
-                      "note": "VAL-mask null band not landed at eval time; "
-                              "test-mask band (null_band_n200.json) is NOT "
-                              "applicable to this VAL-mask read"}
-    cell = "NOT-EVALUATED (B1 KILLER-1: raw numbers only; cells re-band " \
-           "under spec v2 against measured VAL nulls)"
+        null_block = {"file": None, "status": "PENDING-val-band"}
+    # S4 trigger: any control >= 0.5 x actual OR any control > null97.5(VAL)
+    u_g_fired = any(v >= 0.5 * r2 for v in controls_r2.values())
+    if null975 is not None:
+        u_g_fired = u_g_fired or any(v > null975["2"]
+                                     for v in controls_r2.values())
+    # K2 re-banded cell (VAL slab; requires band AND m)
+    if null975 is not None and m_edge is not None:
+        n975 = null975["2"]
+        if u_g_fired or collapse or r2 <= n975 - m_edge:
+            cell = "RED"
+        elif r2 > n975 + m_edge:
+            cell = "GREEN"
+        else:
+            cell = "AMBER"
+    else:
+        cell = ("PENDING-cell (VAL band present but m absent)"
+                if null975 is not None else
+                "PENDING-cell (VAL band absent)")
     return {
         "mask": {"interval_right_open": [lo, hi], "axis": 0,
                  "region": "val",
@@ -474,12 +533,20 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
         "scores_real_frame": scores,
         "secondary_pattern_r_s2": p64,
         "descriptive": descriptive,
+        "seam_diagnostic": seam,
         "controls_r_s2": controls_r2,
-        "u_g_fired_spec_v1_rule_raw_diagnostic": u_g_fired,
-        "variance_collapse_raw_diagnostic": collapse,
-        "z3_shuffle_seed": "default_rng([42, 3])",
+        "u_g_fired_S4_rule": u_g_fired,
+        "u_g_rule": "any control r_s >= 0.5 x actual OR any control > "
+                    "null97.5(VAL) (spec v2 S4)",
+        "variance_collapse": collapse,
+        "z3_derangement": {"seed": 20260729, "n_redraws": n_redraws,
+                           "rule": "global derangement of whole-ray flux "
+                                   "profiles, geometry fixed, no self-maps"},
         "null_band": null_block,
         "cell": cell,
+        "cell_rule": "K2 re-band (spec v2): GREEN r>null975(VAL)+m & U-G "
+                     "clean; AMBER in (null975-m, null975+m]; RED "
+                     "r<=null975-m or var<0.01 or U-G",
     }
 
 
@@ -524,7 +591,8 @@ def run_s3(steps: int = 500, lr: float = 3.0e-4) -> Dict:
         ckpt = STAGE2_DIR / "s3_model_step500.pt"
         torch.save(model.state_dict(), ckpt)
         # quick masked eval on P1 (trained physics), primary ray pattern
-        eval_block = quick_masked_eval(model, sources[0], device)
+        eval_block = quick_masked_eval(model, sources[0], device,
+                                       source_p2=sources[1])
         trk.log_metric(steps, "eval_r_s2_real_masked",
                        eval_block["scores_real_frame"]["actual"]["2"]
                        ["pearson_masked"])
