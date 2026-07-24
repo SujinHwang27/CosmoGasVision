@@ -1,0 +1,6 @@
+outs:
+- md5: f0c55bc48ba22ed30773c0d126a0745a
+  size: 28311680
+  isexec: true
+  hash: md5
+  path: s3_pred_p1_rays1024.npy
