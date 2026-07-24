@@ -1,0 +1,68 @@
+{
+  "rung": "R5 \u2014 global delta_F scale measurement + pin (A5)",
+  "spec": "u04_stage1_ratification.md SS2(b), commit 58ac831",
+  "flux_convention": "F = exp(-tau_h1) (redshift-space half, [D-24]); reused from src/analysis/p_flux.py / flux_power.py; delta_F = 1 - F",
+  "sample": "first 1024 sightlines x 4 physics, z=0.3",
+  "per_physics": {
+    "P1": {
+      "n_rays": 1024,
+      "n_bins": 2048,
+      "delta_f_std": 0.07717664506819022,
+      "delta_f_mean": 0.02095903847044921,
+      "mean_flux": 0.9790409615295509,
+      "percentiles_50_90_99": [
+        0.0016437695014627218,
+        0.03887424955656591,
+        0.40617504716333425
+      ]
+    },
+    "P2": {
+      "n_rays": 1024,
+      "n_bins": 2048,
+      "delta_f_std": 0.09108760144352372,
+      "delta_f_mean": 0.024356271499122045,
+      "mean_flux": 0.9756437285008775,
+      "percentiles_50_90_99": [
+        0.001698846292500944,
+        0.0437022306201678,
+        0.4949211352581388
+      ]
+    },
+    "P3": {
+      "n_rays": 1024,
+      "n_bins": 2048,
+      "delta_f_std": 0.0852360563129837,
+      "delta_f_mean": 0.023423526533260155,
+      "mean_flux": 0.976576473466739,
+      "percentiles_50_90_99": [
+        0.0017772749665666554,
+        0.044516624546263824,
+        0.4519862891064483
+      ]
+    },
+    "P4": {
+      "n_rays": 1024,
+      "n_bins": 2048,
+      "delta_f_std": 0.07314789719895926,
+      "delta_f_mean": 0.016190247902004077,
+      "mean_flux": 0.9838097520979953,
+      "percentiles_50_90_99": [
+        0.0012354417059222689,
+        0.0232522460976305,
+        0.34273199291541845
+      ]
+    }
+  },
+  "pooled": {
+    "delta_f_std": 0.08201988093444446,
+    "delta_f_mean": 0.021232271101208858,
+    "one_over_std": 12.192165955462238
+  },
+  "pinned_scale": {
+    "DELTA_F_SCALE": 12.5,
+    "where": "src/data/sightline_rasterizer.py",
+    "rule": "round number nearest 1/std(pooled delta_F); GLOBAL constant; per-crop/data-dependent normalization FORBIDDEN (spec SS2(b))",
+    "deviation_note": "spec guessed '~x50 expected'; measured 1/std = 12.19 (std is spike-dominated: p50 delta_F ~ 0.0016, p99 ~ 0.4) -> pin 12.5. Measurement supersedes the guess per SS2(b) ('final value pinned by core-implementer')."
+  },
+  "consistency_check_pass": true
+}
