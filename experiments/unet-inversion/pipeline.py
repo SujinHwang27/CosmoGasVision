@@ -748,16 +748,211 @@ def run_s3(steps: int = 500, lr: float = 3.0e-4) -> Dict:
     return record
 
 
+# --------------------------------------------- train-full (Juno, spec (b2))
+
+
+def build_untrained_delta_f(physics_id: int) -> np.ndarray:
+    """delta_F only (no truth cube) for the R2 untrained-physics swap."""
+    from src.data.loader import SherwoodLoader
+    from src.data.sightline_rasterizer import flux_decrement as _fd
+
+    sl = SherwoodLoader(str(REPO / "Sherwood")).load_sightlines(
+        physics_id, 0.3)
+    return _fd(sl["tau_h1"]).astype(np.float32)
+
+
+def val_masked_metrics(model, source, device, mask, truth_s2, x_truth,
+                       BOX_MPC_H, NC):
+    """K1 VAL read: sliding-window (hann, of record) -> VAL-mask MSE on x
+    + r_s(sigma=2, real)."""
+    from scripts.u04_r9_heldout_rescore import masked_pearson
+
+    pred = sliding_window_predict(
+        model, source, np.arange(1024, dtype=np.int64), device)
+    mse = float(np.mean((pred[mask] - x_truth[mask]) ** 2))
+    r2 = masked_pearson(
+        truth_s2, NC.gaussian_smooth_periodic(pred, BOX_MPC_H, 2.0), mask)
+    return mse, r2
+
+
+def run_train_full(args) -> Dict:
+    """Juno production run per spec v2 (b2). Ceilings: args.steps (60000)
+    or args.wallclock_hours (11 h), whichever first. Checkpoint-of-record =
+    best-VAL-MSE (K1); early stop on smoothed VAL MSE (mean of last 3
+    evals), patience 10 evals, min-delta 1e-4."""
+    from scripts.d75_corrected_metric_rescore import BOX_MPC_H
+    from src.analysis import nccf as NC
+    from src.data.loader import DEFAULT_SCHEME, region_voxel_interval
+
+    t0 = time.time()
+    device = pick_device_cuda_first()
+    torch.manual_seed(args.seed)
+    sources = build_sources([1, 2])
+    ds = UNetPairDataset(sources, length=args.steps * args.batch + 64,
+                         seed=args.seed, augment=True)
+    val_ds = UNetPairDataset(sources, length=8, seed=VAL_SEED, augment=False)
+    val_batch = stack_batch(val_ds, range(8), device)
+    lo, hi = region_voxel_interval("val", N_GRID, DEFAULT_SCHEME)
+    assert (lo, hi) == (134, 163)
+    vmask = np.zeros((N_GRID,) * 3, dtype=bool)
+    vmask[lo:hi] = True
+    x_truth = sources[0].provider.x_cube
+    truth_s2 = NC.gaussian_smooth_periodic(x_truth, BOX_MPC_H, 2.0)
+
+    model = UNet3D().to(device)
+    opt = torch.optim.AdamW(model.parameters(), lr=args.lr,
+                            weight_decay=1.0e-4)
+
+    def lr_at(step):  # linear warmup 500 -> cosine to 0 at args.steps
+        if step <= args.warmup:
+            return args.lr * step / max(args.warmup, 1)
+        p = (step - args.warmup) / max(args.steps - args.warmup, 1)
+        return args.lr * 0.5 * (1.0 + np.cos(np.pi * min(p, 1.0)))
+
+    ckpt_dir = STAGE2_DIR / "checkpoints"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    tags = mandatory_tags("1+2", args.seed)
+    tags["compute"] = os.environ.get("COSMOGAS_COMPUTE", "local")
+    best_smoothed = float("inf")
+    best_step = 0
+    evals: List[Dict] = []
+    periodic_ckpts: List[Path] = []
+    stop_reason = "step_ceiling"
+    deadline = t0 + args.wallclock_hours * 3600.0
+    with Tracker("Stage2-TrainFull", tags) as trk:
+        trk.log_params(vars(args) | {"n_params": model.n_parameters(),
+                                     "device": str(device),
+                                     "lr_schedule": "cosine+warmup",
+                                     "epoch_length_nominal": 8192})
+        model.train()
+        idx = 0
+        step = 0
+        losses: List[float] = []
+        while step < args.steps:
+            step += 1
+            for g in opt.param_groups:
+                g["lr"] = lr_at(step)
+            opt.zero_grad(set_to_none=True)
+            step_loss = 0.0
+            for _ in range(args.accum):
+                xb, yb = stack_batch(ds, range(idx, idx + args.batch), device)
+                idx += args.batch
+                loss = torch.nn.functional.mse_loss(model(xb), yb)
+                (loss / args.accum).backward()
+                step_loss += float(loss.item()) / args.accum
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            opt.step()
+            losses.append(step_loss)
+            trk.log_metric(step, "train_mse", step_loss)
+
+            if step % args.eval_every == 0:
+                vmse, vr2 = val_masked_metrics(
+                    model, sources[0], device, vmask, truth_s2, x_truth,
+                    BOX_MPC_H, NC)
+                vb_mse = float(torch.nn.functional.mse_loss(
+                    model(val_batch[0]), val_batch[1]).item())
+                model.train()
+                evals.append({"step": step, "val_mask_mse": vmse,
+                              "val_r_s2": vr2, "val_batch_mse": vb_mse})
+                trk.log_metric(step, "val_mask_mse", vmse)
+                trk.log_metric(step, "val_r_s2_real_masked", vr2)
+                trk.log_metric(step, "val_batch_mse", vb_mse)
+                smoothed = float(np.mean(
+                    [e["val_mask_mse"] for e in evals[-3:]]))
+                trk.log_metric(step, "val_mask_mse_smoothed", smoothed)
+                print(f"[train-full] step {step} train={step_loss:.4f} "
+                      f"valMSE={vmse:.4f} sm={smoothed:.4f} r_s2={vr2:.4f}",
+                      flush=True)
+                if smoothed < best_smoothed - args.min_delta:
+                    best_smoothed = smoothed
+                    best_step = step
+                    torch.save(model.state_dict(), ckpt_dir / "best_val.pt")
+                elif step - best_step >= args.patience * args.eval_every:
+                    stop_reason = "early_stop_patience"
+                    break
+            if step % args.ckpt_every == 0:
+                p = ckpt_dir / f"step_{step:06d}.pt"
+                torch.save(model.state_dict(), p)
+                periodic_ckpts.append(p)
+                for old in periodic_ckpts[:-3]:      # retain last 3
+                    old.unlink(missing_ok=True)
+                periodic_ckpts = periodic_ckpts[-3:]
+            if time.time() > deadline:
+                stop_reason = "wallclock_ceiling"
+                break
+        torch.save(model.state_dict(), ckpt_dir / "final.pt")
+        if not (ckpt_dir / "best_val.pt").exists():
+            torch.save(model.state_dict(), ckpt_dir / "best_val.pt")
+            best_step = step
+        # final read: checkpoint-of-record = best-VAL (K1), final model
+        # co-reported descriptively by the training curve only
+        model.load_state_dict(torch.load(ckpt_dir / "best_val.pt",
+                                         map_location=device))
+        try:
+            z5 = {"label": "z5_untrained_swap_P3",
+                  "delta_f": build_untrained_delta_f(3)}
+        except Exception as exc:  # noqa: BLE001 — column absent, disclosed
+            print(f"[train-full] z5 unavailable ({exc!r})", flush=True)
+            z5 = None
+        eval_p1 = quick_masked_eval(model, sources[0], device,
+                                    source_p2=sources[1],
+                                    untrained_swap=z5)
+        trk.log_metric(step, "final_r_s2_p1",
+                       eval_p1["scores_real_frame"]["actual"]["2"]
+                       ["pearson_masked"])
+    record = {
+        "rung": "Juno train-full (spec v2 (b2))",
+        "config": vars(args),
+        "device": str(device),
+        "n_params": model.n_parameters(),
+        "stop_reason": stop_reason,
+        "steps_run": step,
+        "best_val_step": best_step,
+        "best_val_mask_mse_smoothed": best_smoothed,
+        "val_evals": evals,
+        "checkpoint_of_record": "best_val.pt (K1: best-VAL-MSE, never "
+                                "test-informed)",
+        "quick_masked_eval_p1_best_val_ckpt": eval_p1,
+        "wall_clock_s": time.time() - t0,
+        "git_commit": git_commit_hash(),
+    }
+    out = STAGE2_DIR / "train_full_record.json"
+    out.write_text(json.dumps(record, indent=2))
+    print(f"[train-full] {stop_reason} at step {step}; record -> {out}",
+          flush=True)
+    return record
+
+
+def pick_device_cuda_first() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    return pick_device()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("stage", choices=["s2", "s3"])
+    ap.add_argument("stage", choices=["s2", "s3", "train-full"])
+    ap.add_argument("--steps", type=int, default=60000)
+    ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--accum", type=int, default=1)
+    ap.add_argument("--lr", type=float, default=3.0e-4)
+    ap.add_argument("--warmup", type=int, default=500)
+    ap.add_argument("--eval-every", type=int, default=1000)
+    ap.add_argument("--ckpt-every", type=int, default=2500)
+    ap.add_argument("--patience", type=int, default=10)
+    ap.add_argument("--min-delta", type=float, default=1.0e-4)
+    ap.add_argument("--wallclock-hours", type=float, default=11.0)
+    ap.add_argument("--seed", type=int, default=SEED)
     args = ap.parse_args()
     STAGE2_DIR.mkdir(parents=True, exist_ok=True)
     if args.stage == "s2":
         rec = run_s2()
         return 0 if rec["gate"]["verdict"] == "PASS" else 1
-    rec = run_s3()
-    return 0 if rec["loss_trend_gate"]["verdict"] == "PASS" else 1
+    if args.stage == "s3":
+        rec = run_s3()
+        return 0 if rec["loss_trend_gate"]["verdict"] == "PASS" else 1
+    run_train_full(args)
+    return 0
 
 
 if __name__ == "__main__":
