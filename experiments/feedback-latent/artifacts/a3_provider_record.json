@@ -1,0 +1,86 @@
+{
+  "record": "A3 truth-cube provider for exp/feedback-latent Stage-1 ([F-02] §5 R28 rung R2)",
+  "generated": "2026-07-24",
+  "branch": "exp/feedback-latent",
+  "module": "src/data/feedback_cube_provider.py",
+  "tests": "tests/test_feedback_cube_provider.py",
+  "deliverable": "FeedbackCubeProvider: coord->x sampler + whole-region accessor over the 4 rho truth cubes (P1..P4) at 192^3, z=0.3, [D-49] spatial split, SIREN [-1,1] coords.",
+
+  "cubes": {
+    "found": {
+      "P1": "experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy",
+      "P2": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy",
+      "P3": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p3.npy",
+      "P4": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p4.npy"
+    },
+    "missing": [],
+    "all_four_present_on_disk": true,
+    "dvc_pull_needed": false,
+    "note": "All 4 cubes were extracted-present on disk this session (ls -la confirmed, 56623232 bytes each). Consistent with f01c_cube_enumeration.json. Provider degrades gracefully (missing_variants list, strict=False default) if a cube is absent; verified by test_missing_path_graceful_and_strict.",
+    "shape_per_cube": [192, 192, 192],
+    "dtype_on_disk": "float64",
+    "content": "rho/<rho> real-space overdensity (already mean-normalized; passed straight to x_transform)"
+  },
+
+  "split_constants": {
+    "train_x_max": 0.7,
+    "val_x_max": 0.85,
+    "axis": 0,
+    "voxel_bounds_at_192": {"train": [0, 134], "val": [134, 163], "test": [163, 192]},
+    "source": "src.data.loader.DEFAULT_SCHEME / HeldoutSplitScheme ([D-49]); voxel floor rule int(frac*n_grid) mirrored from loader.extract_rho_crops (loader.py:1143-1144). NOT re-derived: imported.",
+    "verification": "test_split_matches_loader_int_floor_rule asserts bounds == int(DEFAULT_SCHEME.<frac>*192)."
+  },
+
+  "x_transform": {
+    "formula": "x = log10(max(rho/<rho>, 1e-3))",
+    "floor_X_FLOOR": 1e-3,
+    "source": "scripts.d75_corrected_metric_rescore.x_transform (imported verbatim, line 196; NOT re-implemented)",
+    "returns": "(x, clamped_fraction)",
+    "parity_test": "test_x_transform_matches_d75_reference: max|ours - d75_ref| <= 1e-12 (actual: 0.0)",
+    "clamped_fraction_per_variant": {
+      "P1": 4.111395941840278e-05,
+      "P2": 4.492865668402778e-05,
+      "P3": 4.3657090928819445e-05,
+      "P4": 0.00030997947410300923
+    }
+  },
+
+  "coordinates": {
+    "box_kpc_h": 60000.0,
+    "convention": "SIREN [-1,1]; cell center voxel i -> ((i+0.5)/192) in [0,1] -> 2u-1 in [-1,1]. Box scale cancels in normalization but carried explicitly (BOX_KPC_H) for the kpc/h round-trip and lineage.",
+    "roundtrip_test": "test_coord_roundtrip_siren_to_voxel: SIREN -> kpc/h -> floor(kpc/box*192) recovers integer voxel index exactly.",
+    "autograd": "coords returned as torch tensors; test_coords_autograd_capable confirms requires_grad_/backward path is finite. No detached-NumPy in the differentiable path."
+  },
+
+  "api": {
+    "sample(p, region, n, seed)": "-> (coords (n,3) SIREN float tensor, x_targets (n,) float tensor). Deterministic under seed. Random voxel-center samples within the region's axis-0 slab.",
+    "region_cube(p, region)": "-> (x_slab (na,192,192) float64, coords_siren (na,192,192,3) float64) whole-region accessor for scoring.",
+    "region_flat(p, region)": "-> (coords (M,3), x_targets (M,)) tensors, region flattened.",
+    "loaded_variants / missing_variants": "graceful-degradation reporting.",
+    "summary()": "lineage dict."
+  },
+
+  "validate_data": {
+    "checks": ["shape == (192,192,192)", "rho and x finite", "rho >= 0", "x in ~[-3, 3.7]"],
+    "note": "Runs on every loaded cube at construction. floor log10(1e-3)=-3; P1 max overdensity ~4115 -> log10 ~ 3.61, within window."
+  },
+
+  "test_results": {
+    "runner": "PYTHONPATH=. .venv/bin/python -m pytest tests/test_feedback_cube_provider.py -q",
+    "passed": 18,
+    "failed": 0,
+    "coverage": [
+      "split boundaries exact (0/134/163/192) + loader int-floor parity + contiguity",
+      "coord round-trip SIREN<->voxel + cell-center kpc/h endpoints",
+      "x-transform matches d75 reference <= 1e-12 + floor behavior",
+      "determinism under seed (equal for same seed, differ across seeds)",
+      "all-4-variants load-or-graceful-skip + strict-mode raise",
+      "sample shapes/dtype/region-containment/target-parity-to-cube",
+      "autograd-capable coords",
+      "whole-region accessor shapes + alignment + region_flat parity"
+    ]
+  },
+
+  "blocked": "none",
+  "scope_notes": "rho-only per Stage-1 spec ([F-02] §4). T/X_HI/v_pec heads deferred (cube enumeration f01c: MISSING-but-PRODUCIBLE). No compute, no Juno, no scoring run here — this is the data plumbing artifact only."
+}
