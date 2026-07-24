@@ -1,0 +1,131 @@
+{
+  "record": "F-01(c) pre-dispatch data-locality enumeration for exp/feedback-latent",
+  "generated": "2026-07-24",
+  "session_verified": true,
+  "verification_note": "CURRENT-SESSION filesystem enumeration per R15 / [D-37] rule (a). Inherited claims (rho P2-P4 DVC-tracked, extracted x4 local) were RE-VERIFIED on disk this session, not trusted. Empirical ls/np.load/h5py observations lead; conclusions are downstream.",
+  "repo_root": "/Volumes/Elements/Data/sujin/CosmoGasVision",
+  "worktree_note": "exp/feedback-latent is checked out at scratchpad/wt-feedback-latent (this worktree has NO nerf/ or unet-inversion/ experiment dirs). All truth cubes, raw snapshots, and src/data live at the shared main checkout /Volumes/Elements/Data/sujin/CosmoGasVision (git worktrees share one working tree location for data-heavy/DVC/untracked assets).",
+  "scoring_pitch": "192^3",
+  "redshift": "z=0.300 (snapdir_012); box=60000 kpc/h (60 Mpc/h), h-param confirmed in HDF5 header",
+  "variants": {
+    "P1_nofeedback": "planck1_60_768_z0.300",
+    "P2_stellarwind": "planck1_60_768_ps13_z0.300",
+    "P3_windAGN": "planck1_60_768_ps13agn_z0.300",
+    "P4_windstrongAGN": "planck1_60_768_ps13agn_strong_z0.300"
+  },
+
+  "cube_matrix": {
+    "rho_overdensity": {
+      "P1": {
+        "state": "EXTRACTED-PRESENT",
+        "path": "experiments/nerf/artifacts/d75_rescore/cubes/truth_real_192.npy",
+        "shape": [192, 192, 192], "dtype": "float64",
+        "range": [0.0, 4115.0],
+        "md5": "efd93749f70de25104833dfd98a859fe",
+        "dvc_tracked": false,
+        "note": "Real-space overdensity rho/<rho>. Produced by d75 CIC path (scripts/d75_corrected_metric_rescore.py). NOT DVC-tracked (nerf artifact); lives only on this disk."
+      },
+      "P2": {
+        "state": "EXTRACTED-PRESENT",
+        "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p2.npy",
+        "shape": [192, 192, 192], "dtype": "float64", "range": [0.0, 3812.0],
+        "dvc_tracked": true, "dvc_md5": "c33707c37f458d89e7c85ac07469c527", "size": 56623232,
+        "readable": true
+      },
+      "P3": {
+        "state": "EXTRACTED-PRESENT",
+        "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p3.npy",
+        "shape": [192, 192, 192], "dtype": "float64", "range": [0.0, 2224.0],
+        "dvc_tracked": true, "dvc_md5": "2962c835435a21bade3967cb1a6d9917", "size": 56623232,
+        "readable": true
+      },
+      "P4": {
+        "state": "EXTRACTED-PRESENT",
+        "path": "experiments/unet-inversion/artifacts/stage1/cubes/truth_real_192_p4.npy",
+        "shape": [192, 192, 192], "dtype": "float64", "range": [0.0, 537.4],
+        "dvc_tracked": true, "dvc_md5": "98c5ce91d179dcaead44bbfe93d9a49a", "size": 56623232,
+        "readable": true
+      },
+      "summary": "ALL 4 rho cubes EXIST at 192^3 and load cleanly. dvc status could not be run cleanly repo-wide because an unrelated corrupt AppleDouble file (stage2/._g2_pred_test_p1_..._.npy.dvc, non-utf8 name) aborts dvc's .dvc scan; the P2-P4 .dvc files themselves are valid and their .npy targets are present+readable. Recommend deleting ._*.dvc litter before next dvc op."
+    },
+
+    "T_temperature": {
+      "P1": {"state": "MISSING", "cube": null},
+      "P2": {"state": "MISSING", "cube": null},
+      "P3": {"state": "MISSING", "cube": null},
+      "P4": {"state": "MISSING", "cube": null},
+      "raw_available": true,
+      "raw_state": "EXTRACTED-PRESENT for all 4 variants",
+      "source_field": "PartType0/InternalEnergy (+ ElectronAbundance for mean molecular weight mu); T = (gamma-1)*mu*m_p/k_B * u",
+      "producible": true,
+      "blocker": "load_3d_field(field='T') raises NotImplementedError (src/data/igm_gal_loader.py:177-182)."
+    },
+
+    "xHI_neutral_fraction": {
+      "P1": {"state": "MISSING", "cube": null},
+      "P2": {"state": "MISSING", "cube": null},
+      "P3": {"state": "MISSING", "cube": null},
+      "P4": {"state": "MISSING", "cube": null},
+      "raw_available": true,
+      "raw_state": "EXTRACTED-PRESENT for all 4 variants",
+      "source_field": "PartType0/NeutralHydrogenAbundance",
+      "producible": true,
+      "blocker": "load_3d_field(field='xHI') raises NotImplementedError (same stub)."
+    },
+
+    "v_pec_peculiar_velocity": {
+      "P1": {
+        "state": "PARTIAL-PRESENT (z-component only)",
+        "path": "experiments/nerf/artifacts/d75_rescore/cubes/vlos_z_192.npy",
+        "shape": [192, 192, 192], "dtype": "float64", "range": [-849.1, 880.6],
+        "md5": "198a7e8fcf260f5ffd3359d2d61f916d",
+        "note": "This is ONLY the line-of-sight (z) component, mass-weighted CIC (momz/mass). Not the full 3-vector v_pec. Under a vlos_gate discharge bound to this exact md5.",
+        "full_vector_state": "MISSING"
+      },
+      "P2": {"state": "MISSING", "cube": null},
+      "P3": {"state": "MISSING", "cube": null},
+      "P4": {"state": "MISSING", "cube": null},
+      "raw_available": true,
+      "raw_state": "EXTRACTED-PRESENT for all 4 variants",
+      "source_field": "PartType0/Velocities (3-vector; a^0.5 GADGET convention as handled in d75)",
+      "producible": true,
+      "blocker_and_precedent": "load_3d_field(field='vlos') raises NotImplementedError, BUT scripts/d75_corrected_metric_rescore.py already produced the z-component via mass-weighted momentum CIC (momz192/mass192) reusing _cic_deposit_inplace. That is a WORKING, in-tree recipe for velocity that needs no SPH kernel. Generalizing to x/y/z x 4 variants is a parameter/loop change on a proven path, not new physics."
+    }
+  },
+
+  "raw_data_locality": {
+    "extracted_root": "SherwoodIGM_gal/extracted/",
+    "all_four_variants": "EXTRACTED-PRESENT and COMPLETE",
+    "per_variant": {
+      "snapdir_012": "16x snap_012.{0..15}.hdf5 + 2 checksum txt (18 files) per variant",
+      "sizes_du": {"P1": "36G", "P2": "41G", "P3": "42G", "P4": "42G"},
+      "groups_012": "present (FoF halo catalogs) for all 4"
+    },
+    "raw_tarballs": "ALSO present (RAW-TARBALL-PRESENT) alongside extracted: SherwoodIGM_gal/planck1_60_768*_z0.300.tar.gz (~27-29 GB each). Redundant with extracted/; can be pruned if disk pressure.",
+    "partType0_fields_confirmed_in_hdf5": ["Coordinates", "Density", "ElectronAbundance", "InternalEnergy", "Masses", "NeutralHydrogenAbundance", "ParticleIDs", "SmoothingLength", "StarFormationRate", "Velocities"],
+    "header": {"BoxSize_kpc_h": 60000.0, "Redshift": 0.30000000296},
+    "redshift_coverage": "ONLY z=0.300 (snapdir_012) is extracted. No other redshift local. Matches the F-01 requirement (z=0.3)."
+  },
+
+  "loader_lineage_assessment": {
+    "rho_path": "SherwoodIGMGalLoader.load_3d_field(field='rho') -> mass-weighted CIC via _cic_deposit_inplace (chunked, [D-50]-gated). Fully working; produced the rho cubes at n_grid up to 768, pooled/point-sampled to 192.",
+    "T_xHI_vlos_path": "STUBBED: src/data/igm_gal_loader.py:177-182 raises NotImplementedError. Docstring claims SPH-kernel weighting vs Density+SmoothingLength is required for intensive quantities.",
+    "does_rho_CIC_generalize": "NOT as a bare parameter change to load_3d_field (the field='T'/'xHI'/'vlos' branch is an explicit NotImplementedError). HOWEVER the underlying kernel generalizes cheaply: intensive fields = mass-weighted CIC = deposit sum(m_i * q_i) and sum(m_i) in two CIC passes, then divide. _cic_deposit_inplace already accepts arbitrary per-particle weights, and d75 already used exactly this for velocity (momz/mass). So the CIC machinery IS sufficient for a first-order mass-weighted deposit; full SPH-kernel (Density/SmoothingLength) weighting is an OPTIONAL accuracy upgrade, a methodology decision for the track, not a hard prerequisite.",
+    "sightline_note": "The 1D SherwoodLoader (los2048_*.dat) DOES carry per-bin density/h1_frac/temp/v_pec, but along sightlines only (num_los x nbins), not as a 3D field. Not a substitute for 192^3 cubes; useful only as an RMS cross-check (d75 used the los-file v_pec RMS as an S4 gate on the deposited velocity)."
+  },
+
+  "effort_per_missing_cube": {
+    "v_pec_full_vector_P1_P4": "LOW-MEDIUM. Proven momentum-CIC recipe exists in d75; extend to 3 components x 4 variants. ~1 script.",
+    "T_P1_P4": "MEDIUM. Mass-weighted CIC of InternalEnergy + mu from ElectronAbundance; positivity trivially holds. New branch in load_3d_field or standalone producer.",
+    "xHI_P1_P4": "MEDIUM. Mass-weighted CIC of NeutralHydrogenAbundance; must clamp/validate to [0,1] (mass-weighting keeps it in-range if done correctly).",
+    "shared": "All three can co-deposit in a SINGLE streaming pass over each variant's 16 HDF5 files (read Coordinates+Masses+Velocities+InternalEnergy+ElectronAbundance+NeutralHydrogenAbundance once, scatter into 1 mass grid + N weighted grids). This amortizes the dominant cost = ~40 GB/variant HDF5 I/O. Rough wall: order tens of min to ~1-2 hr per variant dominated by I/O at n_grid=192.",
+    "biggest_effort_item": "ONE new mass-weighted-intensive-CIC producer script (replacing the load_3d_field NotImplementedError stub for T/xHI/vlos) plus a validation contract (T>0, 0<=xHI<=1, finite v_pec) and a physics cross-check gate (deposited RMS vs los-file v_pec RMS, like d75 S4). Not blocked by data — raw is fully local. Blocked only by absent code + a methodology call on CIC-mass-weight vs full SPH-kernel."
+  },
+
+  "bottom_line": {
+    "EXIST": "rho/<rho> 192^3 for ALL 4 variants (P1 nerf/d75, P2-P4 unet stage1 DVC-tracked, all readable). Plus a P1 vlos_z (LOS-component-only) velocity cube.",
+    "MISSING_but_PRODUCIBLE": "T, xHI, and full-vector v_pec for all 4 variants. Raw snapshots fully extracted+local at z=0.3; all needed PartType0 fields present; proven CIC kernel in-tree.",
+    "BLOCKED": "None hard-blocked. Soft block = load_3d_field NotImplementedError stub for T/xHI/vlos and a pending methodology decision (mass-weighted CIC vs SPH-kernel deposition).",
+    "single_biggest_effort_item": "Write one mass-weighted intensive-quantity 3D deposition producer (T, xHI, v_pec) with per-field validation + RMS cross-check gate; run once per variant over the 40 GB HDF5 sets (I/O-dominated, single-pass co-deposit)."
+  }
+}
