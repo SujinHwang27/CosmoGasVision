@@ -46,17 +46,29 @@ from src.data.loader import (                                       # noqa: E402
 import pipeline as PL                                               # noqa: E402
 
 # ----------------------------------------------------------------- constants
-CKPT = (REPO / "cloud_runs" / "UNetS2-S42-39804b8-1784883256-e5b664"
+# S6 seed-repeat support (coordinator brief 2026-07-24): optional argv[1] in
+# {s142, s242} selects the seed-candidate run dir + per-seed output names;
+# no argv = the original seed-42 read (unchanged paths). One sanctioned
+# test-mask read per seed candidate under the S6 rule.
+_RUN_DIRS = {
+    "s42": "UNetS2-S42-39804b8-1784883256-e5b664",
+    "s142": "UNetS2-S142-72ecdd3-1784892086-ddae24",
+    "s242": "UNetS2-S242-72ecdd3-1784893571-adef2a",
+}
+SEED_TAG = sys.argv[1].lower() if len(sys.argv) > 1 else "s42"
+assert SEED_TAG in _RUN_DIRS, SEED_TAG
+_SUF = "" if SEED_TAG == "s42" else f"_{SEED_TAG}"
+CKPT = (REPO / "cloud_runs" / _RUN_DIRS[SEED_TAG]
         / "checkpoints" / "best_val.pt")
 TRAIN_RECORD = CKPT.parent.parent / "train_full_record.json"
 STAGE2 = REPO / "experiments" / "unet-inversion" / "artifacts" / "stage2"
 R9_BARS = (REPO / "experiments" / "unet-inversion" / "artifacts" / "stage1"
            / "r9_heldout_bars.json")
 SEALED_BAND = STAGE2 / "null_band_n200.json"
-OUT = STAGE2 / "g2_confirmatory_read.json"
-OUT_PRED_NULL = STAGE2 / "pred_null_bands_g2.json"
-PRED_NPY = STAGE2 / "g2_pred_test_p1_rays1024_hann.npy"
-PARTIAL = STAGE2 / "pred_null_bands_g2.partial.npz"
+OUT = STAGE2 / f"g2_confirmatory_read{_SUF}.json"
+OUT_PRED_NULL = STAGE2 / f"pred_null_bands_g2{_SUF}.json"
+PRED_NPY = STAGE2 / f"g2_pred_test_p1_rays1024_hann{_SUF}.npy"
+PARTIAL = STAGE2 / f"pred_null_bands_g2{_SUF}.partial.npz"
 
 N_PARAMS_PIN = 5839713                     # train_full_record.json n_params
 SEALED_TEST_NULL975_S2_REAL = 0.22108341828682537   # SEALED band, quoted 0.22108

@@ -1,0 +1,208 @@
+{
+  "rung": "S6 median-seed verdict",
+  "machinery": "[U-06] S6 rule: U-A win must hold on the MEDIAN of >=3 seeds (42,142,242). Median taken on headline metric test r_s(sigma=2, real, masked). Five-condition machinery = [D-75] \u00a77 B-ii. Operative bars from r9_heldout_bars.json (grid 0.5758 / wiener_L3 0.0863 / mlp 0.0727).",
+  "session_utc": "2026-07-24 (assembled by coordinator from three committed/loose per-seed reads)",
+  "seeds": [
+    "42",
+    "142",
+    "242"
+  ],
+  "per_seed_test_rs_sigma2_real": {
+    "42": 0.9340672407159021,
+    "142": 0.9402205590874942,
+    "242": 0.9368697325602248
+  },
+  "median_seed": "242",
+  "median_test_rs_sigma2_real": 0.9368697325602248,
+  "grid_bar_sigma2_real": 0.5757969969217723,
+  "median_delta_vs_grid": 0.36107273563845244,
+  "all_three_seeds_fire_U_A": true,
+  "median_seed_fires_U_A": true,
+  "VERDICT": "U-A CONFIRMED on the median seed (and unanimously across all three)",
+  "paper_relicensing_note": "Under the user benefit-gate ([D-75] \u00a7H halted the NeRF paper; U-A = the quantifiable-benefit event that returns the paper-relicensing decision to the user). This verdict is the trigger; the decision itself is the user's.",
+  "per_seed_detail": {
+    "42": {
+      "checkpoint_of_record": {
+        "file": "cloud_runs/UNetS2-S42-39804b8-1784883256-e5b664/checkpoints/best_val.pt",
+        "md5": "d42683677ba939b033eb2423fae2dfd7",
+        "rule": "best-VAL-MSE primary (K1), never test-informed",
+        "n_params_loaded": 5839713,
+        "n_params_pinned_train_record": 5839713,
+        "arch": "UNet3D 4-level base-32 GN8+SiLU (strict state_dict load)",
+        "train_record": "cloud_runs/UNetS2-S42-39804b8-1784883256-e5b664/train_full_record.json",
+        "train_stop_reason": "early_stop_patience",
+        "train_steps_run": 26000,
+        "best_val_step": 16000
+      },
+      "test_rs_sigma2_real": 0.9340672407159021,
+      "fired_cells": [
+        "U-A"
+      ],
+      "pairs": {
+        "unet>grid": {
+          "delta": 0.35827024379412975,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>wiener_L3": {
+          "delta": 0.8477469286984184,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>mlp": {
+          "delta": 0.8613326395446885,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        }
+      },
+      "controls_z1_z3": {
+        "z1_all_zero_input": -0.04302138073226254,
+        "z2_mask_only": -0.01656622407730683,
+        "z3_deranged_ray": 0.13016234354242084
+      },
+      "z4_cross_physics_swap_P2": 0.9351709054358212
+    },
+    "142": {
+      "checkpoint_of_record": {
+        "file": "cloud_runs/UNetS2-S142-72ecdd3-1784892086-ddae24/checkpoints/best_val.pt",
+        "md5": "6cdbb516d305f7c66777e6680f79268d",
+        "rule": "best-VAL-MSE primary (K1), never test-informed",
+        "n_params_loaded": 5839713,
+        "n_params_pinned_train_record": 5839713,
+        "arch": "UNet3D 4-level base-32 GN8+SiLU (strict state_dict load)",
+        "train_record": "cloud_runs/UNetS2-S142-72ecdd3-1784892086-ddae24/train_full_record.json",
+        "train_stop_reason": "early_stop_patience",
+        "train_steps_run": 41000,
+        "best_val_step": 31000
+      },
+      "test_rs_sigma2_real": 0.9402205590874942,
+      "fired_cells": [
+        "U-A"
+      ],
+      "pairs": {
+        "unet>grid": {
+          "delta": 0.3644235621657219,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>wiener_L3": {
+          "delta": 0.8539002470700106,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>mlp": {
+          "delta": 0.8674859579162808,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        }
+      },
+      "controls_z1_z3": {
+        "z1_all_zero_input": -0.0455595260884958,
+        "z2_mask_only": -0.02412937736130607,
+        "z3_deranged_ray": 0.07938039385067035
+      },
+      "z4_cross_physics_swap_P2": 0.938887961809897
+    },
+    "242": {
+      "checkpoint_of_record": {
+        "file": "cloud_runs/UNetS2-S242-72ecdd3-1784893571-adef2a/checkpoints/best_val.pt",
+        "md5": "e73d4d2b56fd78d03a49f56d68e355f8",
+        "rule": "best-VAL-MSE primary (K1), never test-informed",
+        "n_params_loaded": 5839713,
+        "n_params_pinned_train_record": 5839713,
+        "arch": "UNet3D 4-level base-32 GN8+SiLU (strict state_dict load)",
+        "train_record": "cloud_runs/UNetS2-S242-72ecdd3-1784893571-adef2a/train_full_record.json",
+        "train_stop_reason": "early_stop_patience",
+        "train_steps_run": 30000,
+        "best_val_step": 20000
+      },
+      "test_rs_sigma2_real": 0.9368697325602248,
+      "fired_cells": [
+        "U-A"
+      ],
+      "pairs": {
+        "unet>grid": {
+          "delta": 0.36107273563845244,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>wiener_L3": {
+          "delta": 0.8505494205427411,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        },
+        "unet>mlp": {
+          "delta": 0.8641351313890113,
+          "conds": {
+            "1_delta": true,
+            "2_fisher_t": true,
+            "3_bootstrap_ci_lb>0": true,
+            "4_wiener_sign": true,
+            "5_no_reversal": true,
+            "all": true
+          }
+        }
+      },
+      "controls_z1_z3": {
+        "z1_all_zero_input": -0.027326537774852836,
+        "z2_mask_only": -0.015348430517694047,
+        "z3_deranged_ray": 0.08872428222333476
+      },
+      "z4_cross_physics_swap_P2": 0.9368689544888745
+    }
+  },
+  "standing_disclosures": [
+    "z4_cross_physics_swap_P2 ~ actual is EXPECTED and pre-registered: reclassified to a Delta_phys scoping column (commit 3ccf6a2) because the shared-IC suite makes cross-physics flux genuinely informative; it is NOT a leakage control and does not block U-A.",
+    "Amplitude/variance compression stands on every readout; r_s is affine-invariant.",
+    "Hann-tapered sliding-window inference of record (irreversible); seam diagnostic carried as acceptance column.",
+    "Test slab SEALED; touched only at G2 close (this read) and G3."
+  ]
+}
