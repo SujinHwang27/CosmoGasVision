@@ -346,16 +346,26 @@ def sliding_window_predict(
 
 def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                       device: torch.device) -> Dict:
-    """s3 quick eval (spec S(c)/(d)): r_s on the [D-49] test mask, real
-    frame, sigma {1,2,4}; U-G controls z1/z2/z3; descriptive columns.
-    Scoring conventions IMPORTED from the R9 machinery, not re-implemented."""
+    """s3 quick eval: r_s on the [D-49] VAL mask, real frame, sigma {1,2,4};
+    U-G controls z1/z2/z3; descriptive columns. Scoring conventions IMPORTED
+    from the R9 machinery, not re-implemented.
+
+    B1 KILLER-1 amendment (coordinator, 2026-07-24): ALL pre-G2 evaluation
+    reads are on the VAL slab — region_voxel_interval('val', 192) = [134,163)
+    — NOT 'test'. The test mask is touched exactly twice in this track's
+    life (G2 confirmatory + G3). Checkpoint selection for any long run =
+    final checkpoint or best-VAL, never best-test. No cell verdict here:
+    raw numbers only; cells re-band under spec v2 against measured VAL nulls.
+    """
     from scripts.d75_corrected_metric_rescore import BOX_MPC_H
     from scripts.u04_r9_heldout_rescore import masked_pearson, masked_spearman
     from src.analysis import nccf as NC
     from src.data.loader import DEFAULT_SCHEME, region_voxel_interval
 
-    lo, hi = region_voxel_interval("test", N_GRID, DEFAULT_SCHEME)
-    assert (lo, hi) == (163, 192), f"unexpected test interval [{lo},{hi})"
+    EVAL_REGION = "val"                       # pre-G2 smoke reads: VAL only
+    assert EVAL_REGION == "val", "pre-G2 eval must never read the test slab"
+    lo, hi = region_voxel_interval(EVAL_REGION, N_GRID, DEFAULT_SCHEME)
+    assert (lo, hi) == (134, 163), f"unexpected val interval [{lo},{hi})"
     assert DEFAULT_SCHEME.axis == 0
     mask = np.zeros((N_GRID,) * 3, dtype=bool)
     mask[lo:hi] = True
@@ -427,45 +437,46 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                              np.percentile(x_truth[mask], pcts)],
     }
 
-    # null-band comparison + mechanical cell (spec S(d))
+    # raw readouts only (B1 KILLER-1: NO cell verdict pre-spec-v2; the
+    # test-mask null band 0.2211 does NOT apply to this VAL-mask read)
     r2 = scores["actual"]["2"]["pearson_masked"]
     controls_r2 = {k: scores[k]["2"]["pearson_masked"]
                    for k in ("z1_all_zero_input", "z2_mask_only",
                              "z3_shuffled_ray")}
-    # spec-literal rule: U-G fires if any control r_s >= 0.5 x actual
+    # spec-v1 U-G rule computed as a RAW DIAGNOSTIC only (any control
+    # r_s >= 0.5 x actual); binding cell logic deferred to spec v2
     u_g_fired = any(v >= 0.5 * r2 for v in controls_r2.values())
     collapse = descriptive["var_ratio_unsmoothed_mask"] < 0.01
-    if NULL_BAND.exists():
-        band = json.loads(NULL_BAND.read_text())["band"]["real"]
+    val_band_file = STAGE2_DIR / "null_band_n200_val.json"
+    if val_band_file.exists():
+        band = json.loads(val_band_file.read_text())["band"]["real"]
         null975 = {s: band[s]["pearson"]["pct_97p5"] for s in ("1", "2", "4")}
-        n975 = null975["2"]
-        if r2 <= n975 or collapse or u_g_fired:
-            cell = "RED"
-        elif r2 >= 0.20 and r2 > n975:
-            cell = "GREEN"
-        else:
-            cell = "AMBER"
-        null_block = {"file": str(NULL_BAND.relative_to(REPO)),
+        null_block = {"file": str(val_band_file.relative_to(REPO)),
                       "pct_97p5_real_pearson": null975,
-                      "comparison": "r_s(2) vs pct_97p5(sigma=2)"}
+                      "note": "VAL-mask band; comparison recorded, cell "
+                              "still deferred to spec v2"}
     else:
-        cell = "PENDING-NULL"
         null_block = {"file": None,
-                      "note": "null_band_n200.json absent at eval time; "
-                              "AMBER/GREEN boundary re-evaluates when the "
-                              "band lands"}
+                      "status": "PENDING-val-band",
+                      "note": "VAL-mask null band not landed at eval time; "
+                              "test-mask band (null_band_n200.json) is NOT "
+                              "applicable to this VAL-mask read"}
+    cell = "NOT-EVALUATED (B1 KILLER-1: raw numbers only; cells re-band " \
+           "under spec v2 against measured VAL nulls)"
     return {
         "mask": {"interval_right_open": [lo, hi], "axis": 0,
-                 "source": "region_voxel_interval('test', 192) — "
-                           "runtime-asserted"},
+                 "region": "val",
+                 "source": "region_voxel_interval('val', 192) — "
+                           "runtime-asserted; pre-G2 reads never touch "
+                           "the test slab (B1 KILLER-1)"},
         "ray_patterns": {"primary": "[0, 1024) file-order",
                          "secondary": "[0, 64) file-order"},
         "scores_real_frame": scores,
         "secondary_pattern_r_s2": p64,
         "descriptive": descriptive,
         "controls_r_s2": controls_r2,
-        "u_g_fired": u_g_fired,
-        "variance_collapse": collapse,
+        "u_g_fired_spec_v1_rule_raw_diagnostic": u_g_fired,
+        "variance_collapse_raw_diagnostic": collapse,
         "z3_shuffle_seed": "default_rng([42, 3])",
         "null_band": null_block,
         "cell": cell,
