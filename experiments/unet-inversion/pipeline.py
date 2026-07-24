@@ -357,6 +357,50 @@ def window_interior_mask(n: int = N_GRID) -> np.ndarray:
     return ax[:, None, None] & ax[None, :, None] & ax[None, None, :]
 
 
+def read_val_band_edge():
+    """Governing VAL null97.5(sigma=2, real, Pearson) edge + m (K2).
+
+    K2 N-selection rule: if the N=200 edge bootstrap CI95 half-width
+    > ~0.02, the N=1000 extension governs. m = CI95 half-width of the
+    governing edge. Returns (edge, m, provenance_block); (None, None, ...)
+    if the artifact or required fields are absent (-> PENDING-cell).
+    """
+    f = STAGE2_DIR / "null_band_val_n200.json"
+    if not f.exists():
+        return None, None, {"file": None, "status": "PENDING-val-band"}
+    vb = json.loads(f.read_text())
+    try:
+        band = vb["band"]["real"]
+        null975_band = {s: band[s]["pearson"]["pct_97p5"]
+                        for s in ("1", "2", "4")}
+        n200 = vb["mc_error_97p5_edge"]["real"]["2"]["pearson"]
+        ci200 = n200["boot_ci95"]
+        hw200 = (ci200[1] - ci200[0]) / 2.0
+        if hw200 > 0.02 and "n1000_extension_sigma2" in vb:
+            n1k = vb["n1000_extension_sigma2"]["real"]["pearson"]
+            ci1k = n1k["boot_ci95_edge_n1000"]
+            edge = float(n1k["pct_97p5_n1000"])
+            m_edge = (ci1k[1] - ci1k[0]) / 2.0
+            prov = ("N=1000 governs (N=200 edge CI95 half-width "
+                    f"{hw200:.5f} > 0.02)")
+        else:
+            edge = float(n200["edge"])
+            m_edge = hw200
+            prov = f"N=200 governs (edge CI95 half-width {hw200:.5f})"
+    except (KeyError, TypeError):
+        return None, None, {"file": str(f.relative_to(REPO)),
+                            "status": "PENDING-m (schema fields missing)"}
+    return edge, m_edge, {
+        "file": str(f.relative_to(REPO)),
+        "pct_97p5_real_pearson_n200_band": null975_band,
+        "governing_edge_sigma2": edge,
+        "m_ci95_half_width": m_edge,
+        "edge_provenance": prov,
+        "green_floor": edge + m_edge,
+        "red_ceiling": edge - m_edge,
+    }
+
+
 # ------------------------------------------------------- quick masked eval
 
 
@@ -488,40 +532,21 @@ def quick_masked_eval(model: UNet3D, source: PhysicsSource,
                    for k in conditions if k != "actual"}
     collapse = descriptive["var_ratio_unsmoothed_mask"] < 0.01
     # VAL null band + m (K2): cell evaluates ONLY with both present
-    val_band_file = STAGE2_DIR / "null_band_val_n200.json"
-    null975 = m_edge = None
-    if val_band_file.exists():
-        vb = json.loads(val_band_file.read_text())
-        band = vb["band"]["real"]
-        null975 = {s: band[s]["pearson"]["pct_97p5"] for s in ("1", "2", "4")}
-        for key in ("m", "m_value", "m_edge_mc_error",
-                    "edge_mc_error_m", "edge_ci_half_width"):
-            if isinstance(vb.get(key), (int, float)):
-                m_edge = float(vb[key])
-                break
-        null_block = {"file": str(val_band_file.relative_to(REPO)),
-                      "pct_97p5_real_pearson": null975,
-                      "m_edge_mc_error": m_edge}
-    else:
-        null_block = {"file": None, "status": "PENDING-val-band"}
+    edge, m_edge, null_block = read_val_band_edge()
     # S4 trigger: any control >= 0.5 x actual OR any control > null97.5(VAL)
     u_g_fired = any(v >= 0.5 * r2 for v in controls_r2.values())
-    if null975 is not None:
-        u_g_fired = u_g_fired or any(v > null975["2"]
-                                     for v in controls_r2.values())
-    # K2 re-banded cell (VAL slab; requires band AND m)
-    if null975 is not None and m_edge is not None:
-        n975 = null975["2"]
-        if u_g_fired or collapse or r2 <= n975 - m_edge:
+    if edge is not None:
+        u_g_fired = u_g_fired or any(v > edge for v in controls_r2.values())
+    # K2 re-banded cell (VAL slab; requires the governing edge AND m)
+    if edge is not None and m_edge is not None:
+        if u_g_fired or collapse or r2 <= edge - m_edge:
             cell = "RED"
-        elif r2 > n975 + m_edge:
+        elif r2 > edge + m_edge:
             cell = "GREEN"
         else:
             cell = "AMBER"
     else:
-        cell = ("PENDING-cell (VAL band present but m absent)"
-                if null975 is not None else
-                "PENDING-cell (VAL band absent)")
+        cell = "PENDING-cell (VAL band or m absent)"
     return {
         "mask": {"interval_right_open": [lo, hi], "axis": 0,
                  "region": "val",
