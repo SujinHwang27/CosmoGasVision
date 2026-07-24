@@ -1,0 +1,88 @@
+{
+  "purpose": "true-field headroom for c1/c2 mis-specification proof (PI f03 req): how similar ARE the variants' whole fields? If r_s(TRUE P_i, TRUE P_1) ~0.9+ the whole-field swap-test had no headroom by construction.",
+  "box_mpc_h": 60.0,
+  "sigmas": [
+    1,
+    2,
+    4
+  ],
+  "measurements": [
+    {
+      "sigma": 1.0,
+      "pair": "P2_vs_P1",
+      "r_s_wholefield": 0.9991768379491657,
+      "std_true_diff": 0.045315991216468114,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.08367163386001963
+    },
+    {
+      "sigma": 1.0,
+      "pair": "P3_vs_P1",
+      "r_s_wholefield": 0.9942877214715946,
+      "std_true_diff": 0.12954045930396543,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.23918404055567163
+    },
+    {
+      "sigma": 1.0,
+      "pair": "P4_vs_P1",
+      "r_s_wholefield": 0.9359745090306708,
+      "std_true_diff": 0.36878796293424615,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.6809316221114253
+    },
+    {
+      "sigma": 2.0,
+      "pair": "P2_vs_P1",
+      "r_s_wholefield": 0.9994715513733525,
+      "std_true_diff": 0.045315991216468114,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.08367163386001963
+    },
+    {
+      "sigma": 2.0,
+      "pair": "P3_vs_P1",
+      "r_s_wholefield": 0.9973769078377713,
+      "std_true_diff": 0.12954045930396543,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.23918404055567163
+    },
+    {
+      "sigma": 2.0,
+      "pair": "P4_vs_P1",
+      "r_s_wholefield": 0.9695662023054357,
+      "std_true_diff": 0.36878796293424615,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.6809316221114253
+    },
+    {
+      "sigma": 4.0,
+      "pair": "P2_vs_P1",
+      "r_s_wholefield": 0.9997176456477022,
+      "std_true_diff": 0.045315991216468114,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.08367163386001963
+    },
+    {
+      "sigma": 4.0,
+      "pair": "P3_vs_P1",
+      "r_s_wholefield": 0.9987171611369061,
+      "std_true_diff": 0.12954045930396543,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.23918404055567163
+    },
+    {
+      "sigma": 4.0,
+      "pair": "P4_vs_P1",
+      "r_s_wholefield": 0.9825384503576252,
+      "std_true_diff": 0.36878796293424615,
+      "std_P1": 0.5415932392605185,
+      "diff_over_field_std_ratio": 0.6809316221114253
+    }
+  ],
+  "headroom_verdict": {
+    "min_r_s_wholefield_sigma2": 0.9695662023054357,
+    "max_r_s_wholefield_sigma2": 0.9994715513733525,
+    "interpretation": "If these are ~0.9+ the whole-field c1/c2 swap-test had ~no headroom (shared cosmic web saturates the statistic); confirms PI mis-specification finding. The feedback signal lives in the DIFFERENCE field D_i, amplitude std(D) above."
+  }
+}
